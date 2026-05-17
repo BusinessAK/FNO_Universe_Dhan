@@ -125,7 +125,7 @@ def signal_label(row):
 
 
 # ── Data ──────────────────────────────────────────────────────────────────────
-@st.cache_data(ttl=60, show_spinner=False)
+@st.cache_data(ttl=2, show_spinner=False)
 def load_data():
     try:
         signals = pd.read_csv("data/processed/signals.csv")
