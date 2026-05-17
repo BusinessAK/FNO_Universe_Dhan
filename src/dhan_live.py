@@ -75,6 +75,21 @@ class DhanLiveEngine:
         
         symbols_upper = [s.upper() for s in target_symbols]
         
+        # Try to load EOD close prices from signals.csv as fallback seeds
+        eod_signals_path = "data/processed/signals.csv"
+        eod_spots = {}
+        if os.path.exists(eod_signals_path):
+            try:
+                sig_df = pd.read_csv(eod_signals_path)
+                for _, row in sig_df.iterrows():
+                    sym = str(row['SYMBOL']).upper().strip()
+                    cmp = float(row.get('CMP', 0))
+                    if cmp > 0:
+                        eod_spots[sym] = cmp
+                print(f"[SUCCESS] Seeded spot prices for {len(eod_spots)} symbols from EOD signals.csv.")
+            except Exception as e:
+                print(f"[!] Warning seeding spot prices: {e}")
+
         # 1. Map Spot tokens (Cash Market Equities)
         spot_df = df[
             (df['EXCH_ID'] == 'NSE') & 
@@ -86,8 +101,9 @@ class DhanLiveEngine:
             token = str(row['SECURITY_ID'])
             self.symbol_to_spot_token[sym] = token
             self.spot_token_to_symbol[token] = sym
-            self.spot_prices[sym] = float(row.get('PREV_CLOSE', 0)) # Initial seed spot price
-            print(f"[*] Mapped Spot Token for {sym}: {token}")
+            # Seed with EOD close price if available, else standard fallback
+            self.spot_prices[sym] = eod_spots.get(sym, float(row.get('PREV_CLOSE', 0)))
+            print(f"[*] Mapped Spot Token for {sym}: {token} (Seed Price: ₹{self.spot_prices[sym]:.2f})")
 
         # 2. Map Option tokens (Near-Month active expiry)
         options_df = df[
@@ -116,6 +132,35 @@ class DhanLiveEngine:
             mapped_count += 1
             
         print(f"[SUCCESS] Loaded {mapped_count} option instruments for active expiry {target_expiry}.")
+
+        # Seed Option quotes from EOD greeks.csv as fallback seeds
+        eod_greeks_path = "data/processed/greeks.csv"
+        if os.path.exists(eod_greeks_path):
+            try:
+                g_df = pd.read_csv(eod_greeks_path)
+                eod_lookup = {}
+                for _, row in g_df.iterrows():
+                    k = (str(row['SYMBOL']).upper().strip(), float(row['STRIKE_PR']), str(row['OPTION_TYP']).upper().strip())
+                    eod_lookup[k] = {
+                        'ltp': float(row.get('CLOSE', 0)),
+                        'oi': int(row.get('OPEN_INT', 0)),
+                        'oi_chg': int(row.get('CHG_IN_OI', 0))
+                    }
+                
+                seeded_count = 0
+                for token, meta in self.token_metadata.items():
+                    k = (meta['symbol'].upper(), meta['strike'], meta['option_type'].upper())
+                    if k in eod_lookup:
+                        self.live_quotes[token] = {
+                            'ltp': eod_lookup[k]['ltp'],
+                            'oi': eod_lookup[k]['oi'],
+                            'oi_chg': eod_lookup[k]['oi_chg'],
+                            'timestamp': datetime.now()
+                        }
+                        seeded_count += 1
+                print(f"[SUCCESS] Seeded {seeded_count} active live quotes from EOD greeks.csv.")
+            except Exception as e:
+                print(f"[!] Warning seeding option quotes: {e}")
 
     def start(self):
         """Starts the Dhan Live Market Feed WebSocket in a persistent background thread."""
