@@ -36,12 +36,41 @@ def main():
             print("[!] Client ID and Access Token are required. Exiting.")
             sys.exit(1)
             
-    # 2. Configure target symbols and expiry
+    # 2. Configure target symbols and expiry dynamically
     # Target expiry format: YYYY-MM-DD
     target_expiry = "2026-05-26"  # Near-Month May 2026 Expiry
     
-    # Track major liquid F&O stocks and index
-    target_symbols = ["TMPV", "RELIANCE", "NIFTY", "BHEL", "TATASTEEL", "SBIN"]
+    # Track major liquid F&O indices
+    indices = ["NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY"]
+    
+    # Dynamically pick top stocks from EOD post-market bhavcopy signals
+    top_stocks = []
+    signals_path = "data/processed/signals.csv"
+    if os.path.exists(signals_path):
+        try:
+            import pandas as pd
+            sig_df = pd.read_csv(signals_path)
+            # Exclude indices from the stock search
+            stock_candidates = sig_df[~sig_df['SYMBOL'].isin(indices)].copy()
+            if 'Δ GEX (Lakhs)' in stock_candidates.columns:
+                # Convert GEX column to numeric absolute values for sorting
+                stock_candidates['abs_gex'] = pd.to_numeric(stock_candidates['Δ GEX (Lakhs)'], errors='coerce').abs()
+                # Sort descending to isolate the most active dealer-interest stocks
+                stock_candidates = stock_candidates.sort_values(by='abs_gex', ascending=False)
+            
+            # Extract top 6 F&O stocks
+            top_stocks = stock_candidates['SYMBOL'].head(6).tolist()
+            print(f"[SUCCESS] Dynamically selected Top 6 F&O Stocks from EOD signals: {', '.join(top_stocks)}")
+        except Exception as e:
+            print(f"[!] Warning reading EOD signals for dynamic watchlist: {e}")
+            
+    # Fallback to standard high-conviction stocks if EOD copy is missing or empty
+    if not top_stocks:
+        top_stocks = ["RELIANCE", "SBIN", "BHEL", "TATASTEEL", "TMPV"]
+        print(f"[*] Watchlist EOD fallback active: {', '.join(top_stocks)}")
+        
+    # Combine indices and top stocks dynamically
+    target_symbols = list(dict.fromkeys(indices + top_stocks))
     
     print("\n" + "-" * 80)
     print(f"Target Expiry:  {target_expiry}")
