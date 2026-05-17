@@ -6,7 +6,7 @@ import numpy as np
 import threading
 from datetime import datetime
 from typing import Dict, List, Tuple
-from dhanhq import marketfeed
+from dhanhq import DhanContext, MarketFeed
 from src.greeks_engine import GreeksEngine
 
 class DhanLiveEngine:
@@ -77,7 +77,8 @@ class DhanLiveEngine:
         
         # 1. Map Spot tokens (Cash Market Equities)
         spot_df = df[
-            (df['EXCH_ID'] == 'NSE_EQ') & 
+            (df['EXCH_ID'] == 'NSE') & 
+            (df['SEGMENT'] == 'C') &
             (df['SYMBOL_NAME'].isin(symbols_upper))
         ]
         for _, row in spot_df.iterrows():
@@ -90,10 +91,11 @@ class DhanLiveEngine:
 
         # 2. Map Option tokens (Near-Month active expiry)
         options_df = df[
-            (df['EXCH_ID'] == 'NSE_FO') & 
+            (df['EXCH_ID'] == 'NSE') & 
+            (df['SEGMENT'] == 'D') &
             (df['UNDERLYING_SYMBOL'].isin(symbols_upper)) &
             (df['SM_EXPIRY_DATE'] == target_expiry) &
-            (df['INSTRUMENT_TYPE'].isin(['OPTSTK', 'OPTIDX']))
+            (df['INSTRUMENT_TYPE'] == 'OP')
         ]
         
         mapped_count = 0
@@ -123,39 +125,39 @@ class DhanLiveEngine:
 
         # Prepare subscription list
         instruments = []
-        # Add spot tokens
+        # Add spot tokens (Cash Market Equities)
         for sym, token in self.symbol_to_spot_token.items():
-            instruments.append((marketfeed.NSE_EQ, token))
+            instruments.append((MarketFeed.NSE, token, MarketFeed.Quote))
         
-        # Add option tokens
+        # Add option tokens (Derivatives)
         for token in self.token_metadata.keys():
-            instruments.append((marketfeed.NSE_FO, token))
+            instruments.append((MarketFeed.NSE_FNO, token, MarketFeed.Quote))
 
         print(f"[*] Initializing Dhan WebSocket for {len(instruments)} instruments...")
 
         def on_connect(instance):
             print("[SUCCESS] Connected to Dhan Market Feed.")
-            # Dhan recommends subscribing in batches
-            instance.subscribe(instruments)
+            # Dhan recommends subscribing
+            instance.subscribe_symbols(instruments)
 
         def on_message(instance, message):
             try:
-                # Dhan returns binary or structured ticks
-                # For standard users, we extract Security ID, LTP, and OI
-                token = str(message.get("security_id"))
+                # Handle both upper and lowercase keys for maximum compatibility
+                token = str(message.get("security_id") or message.get("SecurityID") or "")
+                if not token: return
                 
                 # Check if it's a Spot Price update
                 if token in self.spot_token_to_symbol:
                     sym = self.spot_token_to_symbol[token]
-                    new_spot = float(message.get("LTP", 0))
+                    new_spot = float(message.get("LTP") or message.get("ltp") or 0)
                     if new_spot > 0:
                         self.spot_prices[sym] = new_spot
                 
                 # Check if it's an Option update
                 elif token in self.token_metadata:
-                    ltp = float(message.get("LTP", 0))
-                    oi = int(message.get("OI", 0))
-                    oi_chg = int(message.get("OI_Chg", 0))
+                    ltp = float(message.get("LTP") or message.get("ltp") or 0)
+                    oi = int(message.get("OI") or message.get("oi") or 0)
+                    oi_chg = int(message.get("OI_Chg") or message.get("oi_chg") or 0)
                     
                     self.live_quotes[token] = {
                         'ltp': ltp,
@@ -164,7 +166,6 @@ class DhanLiveEngine:
                         'timestamp': datetime.now()
                     }
             except Exception as e:
-                # Suppress parsing warnings for heartbeat or irrelevant system packets
                 pass
 
         def on_error(instance, error):
@@ -173,11 +174,12 @@ class DhanLiveEngine:
         def on_close(instance):
             print("[*] Dhan Market Feed Connection Closed.")
 
-        # Initialize DhanFeed
-        self.feed_instance = marketfeed.DhanFeed(
-            self.client_id,
-            self.access_token,
-            instruments,
+        # Initialize DhanContext and MarketFeed
+        dhan_context = DhanContext(self.client_id, self.access_token)
+        
+        self.feed_instance = MarketFeed(
+            dhan_context=dhan_context,
+            instruments=instruments,
             on_connect=on_connect,
             on_message=on_message,
             on_error=on_error,
@@ -310,5 +312,5 @@ class DhanLiveEngine:
         """Stops the live feed and closes all WebSocket connections."""
         self.feed_running = False
         if self.feed_instance:
-            self.feed_instance.disconnect()
+            self.feed_instance.close_connection()
             print("[*] Live Feed successfully disconnected.")

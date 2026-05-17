@@ -1,6 +1,12 @@
 import os
 import sys
 import time
+import certifi
+
+# Globally resolve macOS Python SSL Certificate verification failures natively using certifi
+os.environ['SSL_CERT_FILE'] = certifi.where()
+os.environ['WEBSOCKETS_SSL_CA_FILE'] = certifi.where()
+
 from src.dhan_live import DhanLiveEngine
 
 def main():
@@ -8,6 +14,14 @@ def main():
     print("          VANGUARD QUANTITATIVE TERMINAL - LIVE DHAN BRIDGE")
     print("=" * 80)
     
+    # Load .env file natively if it exists
+    if os.path.exists(".env"):
+        with open(".env", "r") as f:
+            for line in f:
+                if "=" in line and not line.strip().startswith("#"):
+                    k, v = line.strip().split("=", 1)
+                    os.environ[k.strip()] = v.strip().replace('"', '').replace("'", "")
+
     # 1. Load or prompt for credentials
     client_id = os.environ.get("DHAN_CLIENT_ID")
     access_token = os.environ.get("DHAN_ACCESS_TOKEN")
