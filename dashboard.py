@@ -260,8 +260,8 @@ with tab1:
         if "PE" not in strike_gex.columns: strike_gex["PE"] = 0
 
         strike_gex = strike_gex[
-            (strike_gex.index >= cmp * 0.80) &
-            (strike_gex.index <= cmp * 1.20)
+            (strike_gex.index >= cmp * 0.90) &
+            (strike_gex.index <= cmp * 1.10)
         ]
         strike_gex["NET"] = strike_gex["CE"] + strike_gex["PE"]
 
@@ -270,6 +270,7 @@ with tab1:
             column_widths=[0.72, 0.28],
             subplot_titles=("Net Gamma by Strike (Lakhs)", "Cumulative Net GEX"),
             horizontal_spacing=0.05,
+            shared_yaxes=True,
         )
 
         # Left: CE + PE bars
@@ -401,8 +402,8 @@ with tab2:
         if "PE" not in oi_data.columns: oi_data["PE"] = 0
 
         oi_data = oi_data[
-            (oi_data.index >= cmp * 0.85) &
-            (oi_data.index <= cmp * 1.15)
+            (oi_data.index >= cmp * 0.90) &
+            (oi_data.index <= cmp * 1.10)
         ]
 
         fig2 = go.Figure()

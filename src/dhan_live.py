@@ -329,10 +329,22 @@ class DhanLiveEngine:
                 # 2. Recalculate Signals/Walls for the live dashboard
                 signals = []
                 for sym in self.spot_prices.keys():
-                    sym_greeks = greeks_df[greeks_df['SYMBOL'] == sym]
-                    if sym_greeks.empty: continue
-                    
                     spot = self.spot_prices[sym]
+                    sym_greeks = greeks_df[greeks_df['SYMBOL'] == sym]
+                    if sym_greeks.empty:
+                        signals.append({
+                            'RANK': len(signals) + 1,
+                            'SYMBOL': sym,
+                            'CMP': spot,
+                            'CALL_WALL': 0.0,
+                            'PUT_WALL': 0.0,
+                            'GAMMA_FLIP': 0.0,
+                            'Δ GEX (Lakhs)': 0.0,
+                            'Δ CALL OI': "0.0L",
+                            'Δ PUT OI': "0.0L",
+                            'SCORE': 50
+                        })
+                        continue
                     
                     # Locate Walls (Strikes with largest absolute GEX)
                     ce_greeks = sym_greeks[sym_greeks['OPTION_TYP'] == 'CE']
