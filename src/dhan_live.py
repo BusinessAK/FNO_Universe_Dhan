@@ -111,6 +111,9 @@ class DhanLiveEngine:
         # Hardcoded realistic fallback closing prices as of May 15, 2026 if file cache is empty
         hardcoded_fallbacks = {
             'NIFTY': 23643.50,
+            'BANKNIFTY': 47650.00,
+            'FINNIFTY': 21180.00,
+            'MIDCPNIFTY': 12240.00,
             'RELIANCE': 1336.40,
             'SBIN': 963.20,
             'TMPV': 356.55,
