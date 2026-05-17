@@ -44,8 +44,16 @@ class DhanLiveEngine:
 
         print(f"[*] Downloading detailed Dhan Scrip Master from {self.MASTER_URL} (this may take a moment)...")
         try:
-            urllib.request.urlretrieve(self.MASTER_URL, self.CACHE_PATH)
-            print("[SUCCESS] Scrip Master successfully downloaded and cached.")
+            import requests
+            response = requests.get(self.MASTER_URL, stream=True, timeout=60)
+            if response.status_code == 200:
+                with open(self.CACHE_PATH, 'wb') as f:
+                    for chunk in response.iter_content(chunk_size=1024*1024):
+                        if chunk:
+                            f.write(chunk)
+                print("[SUCCESS] Scrip Master successfully downloaded and cached.")
+            else:
+                print(f"[!] Server returned status code {response.status_code}")
         except Exception as e:
             print(f"[!] Error downloading Dhan master list: {e}")
 
