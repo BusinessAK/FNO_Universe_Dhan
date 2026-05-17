@@ -38,7 +38,7 @@ def main():
             
     # 2. Configure target symbols and expiry dynamically
     # Target expiry format: YYYY-MM-DD
-    target_expiry = "2026-05-26"  # Near-Month May 2026 Expiry
+    target_expiry = "2026-05-28"  # Near-Month May 2026 Monthly Expiry (Thursday)
     
     # Track major liquid F&O indices
     indices = ["NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY"]
