@@ -1,0 +1,23 @@
+# Python cache files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Large data directories (Bhavcopies and processed calculations)
+data/raw/
+data/processed/
+
+# Credentials and environment secrets
+.env
+secret.json
+credentials.json
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Virtual environments
+venv/
+.venv/
+env/
