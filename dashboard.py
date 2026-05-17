@@ -207,31 +207,42 @@ st.markdown('<p class="term-header">KEY LEVELS</p>', unsafe_allow_html=True)
 
 m1, m2, m3, m4, m5, m6 = st.columns(6)
 m1.metric("CMP",          f"₹{cmp:,.2f}")
-m2.metric("CALL WALL",    f"₹{call_wall:,.0f}",  f"{pct_from_wall(cmp, call_wall):+.2f}% gap")
-m3.metric("PUT WALL",     f"₹{put_wall:,.0f}",   f"{pct_from_wall(cmp, put_wall):+.2f}% gap")
-m4.metric("GAMMA FLIP",   f"₹{gamma_flip:,.0f}", f"{pct_from_wall(cmp, gamma_flip):+.2f}% gap")
-m5.metric("GEX SHIFT",    f"{gex_shift:+.2f}L")
-m6.metric("BIAS",         sig_txt)
 
-# ── Signal alerts ─────────────────────────────────────────────────────────────
-st.markdown('<p class="term-header">SIGNAL ALERTS</p>', unsafe_allow_html=True)
+if call_wall == 0 and put_wall == 0:
+    m2.metric("CALL WALL",    "N/A")
+    m3.metric("PUT WALL",     "N/A")
+    m4.metric("GAMMA FLIP",   "N/A")
+    m5.metric("GEX SHIFT",    "N/A")
+    m6.metric("BIAS",         "NEUTRAL")
 
-a1, a2 = st.columns(2)
-with a1:
-    if cmp > call_wall:
-        st.markdown(f'<div class="alert-box bull">📈 CMP ({cmp}) has CROSSED above CALL WALL ({call_wall}) — dealer delta-buying pressure active. Watch for squeeze continuation.</div>', unsafe_allow_html=True)
-    elif cmp > gamma_flip:
-        st.markdown(f'<div class="alert-box bull">⚡ CMP above GAMMA FLIP ({gamma_flip}) — positive gamma regime. Moves upward are dealer-amplified.</div>', unsafe_allow_html=True)
-    else:
-        st.markdown(f'<div class="alert-box bear">⚠ CMP ({cmp}) below GAMMA FLIP ({gamma_flip}) — negative gamma regime. Downside moves get amplified.</div>', unsafe_allow_html=True)
+    # ── Signal alerts ─────────────────────────────────────────────────────────────
+    st.markdown('<p class="term-header">SIGNAL ALERTS</p>', unsafe_allow_html=True)
+    st.markdown('<div class="alert-box">ℹ️ Spot price tracking active. Options chain and dealer GEX calculations are not loaded/applicable for this symbol.</div>', unsafe_allow_html=True)
+else:
+    m2.metric("CALL WALL",    f"₹{call_wall:,.0f}",  f"{pct_from_wall(cmp, call_wall):+.2f}% gap")
+    m3.metric("PUT WALL",     f"₹{put_wall:,.0f}",   f"{pct_from_wall(cmp, put_wall):+.2f}% gap")
+    m4.metric("GAMMA FLIP",   f"₹{gamma_flip:,.0f}", f"{pct_from_wall(cmp, gamma_flip):+.2f}% gap")
+    m5.metric("GEX SHIFT",    f"{gex_shift:+.2f}L")
+    m6.metric("BIAS",         sig_txt)
 
-with a2:
-    gap_to_call = call_wall - cmp
-    gap_to_put  = cmp - put_wall
-    if gap_to_call < gap_to_put:
-        st.markdown(f'<div class="alert-box warn">🎯 Only ₹{gap_to_call:.1f} to CALL WALL breakout. Breakout = bullish gamma cascade. Failure = pin at current level.</div>', unsafe_allow_html=True)
-    else:
-        st.markdown(f'<div class="alert-box warn">🛡 PUT WALL ({put_wall}) is ₹{gap_to_put:.1f} below CMP — strong dealer support floor here.</div>', unsafe_allow_html=True)
+    # ── Signal alerts ─────────────────────────────────────────────────────────────
+    st.markdown('<p class="term-header">SIGNAL ALERTS</p>', unsafe_allow_html=True)
+    a1, a2 = st.columns(2)
+    with a1:
+        if cmp > call_wall:
+            st.markdown(f'<div class="alert-box bull">📈 CMP ({cmp}) has CROSSED above CALL WALL ({call_wall}) — dealer delta-buying pressure active. Watch for squeeze continuation.</div>', unsafe_allow_html=True)
+        elif cmp > gamma_flip:
+            st.markdown(f'<div class="alert-box bull">⚡ CMP above GAMMA FLIP ({gamma_flip}) — positive gamma regime. Moves upward are dealer-amplified.</div>', unsafe_allow_html=True)
+        else:
+            st.markdown(f'<div class="alert-box bear">⚠ CMP ({cmp}) below GAMMA FLIP ({gamma_flip}) — negative gamma regime. Downside moves get amplified.</div>', unsafe_allow_html=True)
+
+    with a2:
+        gap_to_call = call_wall - cmp
+        gap_to_put  = cmp - put_wall
+        if gap_to_call < gap_to_put:
+            st.markdown(f'<div class="alert-box warn">🎯 Only ₹{gap_to_call:.1f} to CALL WALL breakout. Breakout = bullish gamma cascade. Failure = pin at current level.</div>', unsafe_allow_html=True)
+        else:
+            st.markdown(f'<div class="alert-box warn">🛡 PUT WALL ({put_wall}) is ₹{gap_to_put:.1f} below CMP — strong dealer support floor here.</div>', unsafe_allow_html=True)
 
 
 # ── Main charts ───────────────────────────────────────────────────────────────
