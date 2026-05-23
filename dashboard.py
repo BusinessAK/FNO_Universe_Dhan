@@ -1,583 +1,347 @@
+"""
+Vanguard Institutional EOD Terminal - Main Streamlit Orchestration
+"""
 import streamlit as st
 import pandas as pd
-import plotly.graph_objects as go
-from plotly.subplots import make_subplots
 import numpy as np
-from datetime import datetime
+import json
+import os, sys
+import duckdb
 
-# ── Page config ──────────────────────────────────────────────────────────────
-st.set_page_config(
-    page_title="Vanguard Quantitative Terminal",
-    page_icon="⚡",
-    layout="wide",
-    initial_sidebar_state="collapsed",
+# Setup package paths
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+sys.path.insert(0, os.path.dirname(__file__))
+
+# Import UI components and logic modules
+from src.ui.styling import inject_styles
+from src.ui.sidebar import render_sidebar
+from src.ui.matrix import render_inventory_matrix
+from src.ui.setups_grid import render_setups_grid
+from src.ui.cards import (
+    render_metric_row, render_alerts, render_intelligence_panel, 
+    render_greeks_ledger, sig_colors, render_market_breadth_panel,
+    render_daily_changes_panel, render_playbook_card
+)
+from src.charts import (
+    render_wall_migration_chart, render_cumulative_oi_chart,
+    render_gex_profile_chart, render_oi_concentration_chart,
+    render_iv_skew_chart
 )
 
-# ── CSS ───────────────────────────────────────────────────────────────────────
-st.markdown("""
-<style>
-    /* Base */
-    .stApp { background-color: #020209; color: #e2e8f0; font-family: 'Courier New', monospace; }
-    section[data-testid="stSidebar"] { background-color: #0a0a14; }
+# ─────────────────────────────────────────────────────────────────────────────
+# PAGE CONFIGURATION
+# ─────────────────────────────────────────────────────────────────────────────
+st.set_page_config(
+    page_title="Vanguard Institutional EOD Terminal",
+    page_icon="⚡",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
 
-    /* Metric cards */
-    div[data-testid="metric-container"] {
-        background: linear-gradient(135deg, #0d0d1a 0%, #111122 100%);
-        border: 1px solid #1e2a4a;
-        border-radius: 8px;
-        padding: 12px 16px;
-        transition: border-color 0.2s;
-    }
-    div[data-testid="metric-container"]:hover { border-color: #3b4fd8; }
-    div[data-testid="metric-container"] label { color: #7888aa !important; font-size: 11px !important; letter-spacing: 1px; }
-    div[data-testid="metric-container"] [data-testid="metric-value"] { color: #e2e8f0; font-size: 20px; font-weight: 700; }
+# Inject modern premium stylesheet
+inject_styles()
 
-    /* Signal badges */
-    .badge-bull  { background:#0d2b1a; color:#34d399; border:1px solid #1f6b44; padding:3px 10px; border-radius:4px; font-size:11px; font-weight:700; letter-spacing:1px; }
-    .badge-bear  { background:#2b0d0d; color:#f87171; border:1px solid #6b1f1f; padding:3px 10px; border-radius:4px; font-size:11px; font-weight:700; letter-spacing:1px; }
-    .badge-neut  { background:#1a1a0d; color:#fbbf24; border:1px solid #6b5a1f; padding:3px 10px; border-radius:4px; font-size:11px; font-weight:700; letter-spacing:1px; }
+# ─────────────────────────────────────────────────────────────────────────────
+# WIDGET STATE MUTATION CALLBACK
+# ─────────────────────────────────────────────────────────────────────────────
+def select_stock(symbol):
+    """Callback triggered on setup card selection to route to Single Stock Deep Dive."""
+    st.session_state.selected_symbol = symbol
+    st.session_state.symbol_selector = symbol
+    st.session_state.view_mode = "📊 SINGLE-STOCK / INDEX DEEP DIVE"
 
-    /* Section headers */
-    .term-header {
-        font-size: 11px; letter-spacing: 2px; color: #4a5a8a;
-        border-bottom: 1px solid #1e2a4a; padding-bottom: 6px;
-        margin: 20px 0 14px; text-transform: uppercase;
-    }
+# ─────────────────────────────────────────────────────────────────────────────
+# DATA SEEDING & DEFAULTS LOADERS
+# ─────────────────────────────────────────────────────────────────────────────
+def load_session_history():
+    path = "data/compiled/session_history.json"
+    if os.path.exists(path):
+        try:
+            with open(path) as f:
+                return json.load(f)
+        except Exception as e:
+            st.error(f"Error parsing session history JSON: {e}")
+    return {}
 
-    /* Divider */
-    hr { border-color: #1e2a4a !important; }
-
-    /* Alert box */
-    .alert-box {
-        background: #0d1a2b; border-left: 3px solid #3b82f6;
-        padding: 10px 14px; border-radius: 0 6px 6px 0;
-        font-size: 12px; color: #93c5fd; margin: 6px 0;
-    }
-    .alert-box.bull { border-left-color: #34d399; color: #6ee7b7; background: #0d2b1a; }
-    .alert-box.bear { border-left-color: #f87171; color: #fca5a5; background: #2b0d0d; }
-    .alert-box.warn { border-left-color: #fbbf24; color: #fde68a; background: #1a1500; }
-
-    /* Dataframe */
-    .dataframe { background-color: #0a0a14 !important; }
-    iframe[title="st.dataframe"] { border: 1px solid #1e2a4a; border-radius: 6px; }
-
-    /* Selectbox */
-    .stSelectbox > div > div { background-color: #0d0d1a; border-color: #1e2a4a; color: #e2e8f0; }
-
-    /* Tabs */
-    button[data-baseweb="tab"] { color: #7888aa; }
-    button[data-baseweb="tab"][aria-selected="true"] { color: #e2e8f0; border-bottom: 2px solid #3b4fd8; }
-
-    /* Title bar */
-    .title-bar {
-        display: flex; align-items: center; gap: 12px;
-        border-bottom: 1px solid #1e2a4a; padding-bottom: 14px; margin-bottom: 20px;
-    }
-    .title-bar h1 { font-size: 18px; letter-spacing: 3px; color: #e2e8f0; margin: 0; }
-    .title-bar .ts { font-size: 11px; color: #4a5a8a; margin-left: auto; }
-
-    /* Greeks table */
-    .g-table { width: 100%; font-size: 12px; border-collapse: collapse; }
-    .g-table th { color: #4a5a8a; text-align: right; padding: 5px 10px; border-bottom: 1px solid #1e2a4a; font-size: 10px; letter-spacing: 1px; }
-    .g-table th:first-child { text-align: left; }
-    .g-table td { text-align: right; padding: 4px 10px; border-bottom: 1px solid #0d1020; color: #c0ccdd; }
-    .g-table td:first-child { text-align: left; color: #e2e8f0; font-weight: 600; }
-    .g-table tr:hover td { background: #0d1020; }
-    .g-table .atm td { color: #fbbf24; background: #141008; }
-</style>
-""", unsafe_allow_html=True)
-
-
-# ── Helpers ───────────────────────────────────────────────────────────────────
-COLORS = {
-    "call":       "#58a6ff",
-    "put":        "#f85149",
-    "cmp":        "#fbbf24",
-    "flip":       "#a78bfa",
-    "call_wall":  "#58a6ff",
-    "put_wall":   "#f85149",
-    "net_pos":    "#34d399",
-    "net_neg":    "#f87171",
-}
-
-def pct_from_wall(cmp, wall):
-    if wall == 0:
-        return 0.0
-    return round((cmp - wall) / wall * 100, 2)
-
-def signal_label(row):
-    """Derive a simple bias label from wall/flip positioning."""
-    cmp = float(row["CMP"])
-    cw  = float(row["CALL_WALL"])
-    pw  = float(row["PUT_WALL"])
-    gf  = float(row["GAMMA_FLIP"])
-    gex = float(row.get("Δ GEX (Lakhs)", 0))
-
-    if cmp > cw and gex > 0:
-        return "BULL", "bull"
-    if cmp < pw and gex < 0:
-        return "BEAR", "bear"
-    if cmp > gf:
-        return "BULL WATCH", "bull"
-    if cmp < gf:
-        return "BEAR WATCH", "bear"
-    return "NEUTRAL", "neut"
-
-
-# ── Data ──────────────────────────────────────────────────────────────────────
-def load_data():
+def load_base_signals():
     try:
         signals = pd.read_csv("data/processed/signals.csv")
         greeks  = pd.read_csv("data/processed/greeks.csv")
         return signals, greeks
-    except FileNotFoundError:
+    except Exception:
         return pd.DataFrame(), pd.DataFrame()
 
-signals_df, greeks_df = load_data()
+# Seeding state data
+session_history = load_session_history()
+signals_df, greeks_df = load_base_signals()
 
-if signals_df.empty or greeks_df.empty:
-    st.error("⚠  Data missing — run `python3 main.py` first.")
+if not session_history:
+    st.error("⚠ Vanguard EOD Database compiled index (`session_history.json`) is missing. Run `python3 daily_compiler.py` first.")
     st.stop()
 
-# Normalise column names
-signals_df.columns = signals_df.columns.str.strip()
-greeks_df.columns  = greeks_df.columns.str.strip()
+# Identify all symbols and trading dates chronologically
+all_symbols = sorted(list(session_history.keys()))
+trading_dates = []
+if all_symbols:
+    trading_dates = sorted(list(session_history[all_symbols[0]].keys()))
 
-# Ensure numeric
-for col in ["CMP", "CALL_WALL", "PUT_WALL", "GAMMA_FLIP"]:
-    signals_df[col] = pd.to_numeric(signals_df[col], errors="coerce")
+if not trading_dates:
+    st.error("⚠ No compiled dates found in session history database.")
+    st.stop()
 
-# Derive signal column
-signals_df[["_signal_txt", "_signal_cls"]] = signals_df.apply(
-    lambda r: pd.Series(signal_label(r)), axis=1
+if "selected_date" not in st.session_state:
+    st.session_state.selected_date = trading_dates[-1]
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SIDEBAR CONTROLLER DECK
+# ─────────────────────────────────────────────────────────────────────────────
+view_mode, selected_symbol, selected_expiry, strike_pct, active_date = render_sidebar(
+    all_symbols, st.session_state.selected_date, session_history, greeks_df, trading_dates
 )
+st.session_state.selected_date = active_date
+latest_date = active_date
 
-
-# ── Title bar ─────────────────────────────────────────────────────────────────
-st.markdown(f"""
-<div class="title-bar">
-  <span style="font-size:22px;">⚡</span>
-  <h1>VANGUARD QUANTITATIVE TERMINAL</h1>
-  <span class="ts">LAST REFRESH: {datetime.now().strftime('%d %b %Y  %H:%M:%S')}</span>
-</div>
-""", unsafe_allow_html=True)
-
-# Auto-refresh toggle
-col_r1, col_r2 = st.columns([8, 2])
-with col_r2:
-    auto_refresh = st.toggle("AUTO REFRESH (60s)", value=False)
-if auto_refresh:
-    import time
-    st.toast("Auto-refresh active — reloads every 60 s", icon="🔄")
-    time.sleep(60)
-    st.cache_data.clear()
-    st.rerun()
-
-
-# ── Symbol selector ───────────────────────────────────────────────────────────
-col_s1, col_s2, col_s3 = st.columns([2, 1, 5])
-with col_s1:
-    selected_symbol = st.selectbox(
-        "SELECT SYMBOL",
-        options=signals_df["SYMBOL"].tolist(),
-        index=0,
-    )
-with col_s2:
-    compare_mode = st.toggle("COMPARE", value=False)
-if compare_mode:
-    with col_s3:
-        compare_symbol = st.selectbox(
-            "COMPARE WITH",
-            options=[s for s in signals_df["SYMBOL"].tolist() if s != selected_symbol],
-            index=0,
-        )
-
-row = signals_df[signals_df["SYMBOL"] == selected_symbol].iloc[0]
-cmp        = float(row["CMP"])
-call_wall  = float(row["CALL_WALL"])
-put_wall   = float(row["PUT_WALL"])
-gamma_flip = float(row["GAMMA_FLIP"])
-gex_shift  = float(row.get("Δ GEX (Lakhs)", 0))
-sig_txt, sig_cls = row["_signal_txt"], row["_signal_cls"]
-
-
-# ── Top metrics row ───────────────────────────────────────────────────────────
-st.markdown('<p class="term-header">KEY LEVELS</p>', unsafe_allow_html=True)
-
-m1, m2, m3, m4, m5, m6 = st.columns(6)
-m1.metric("CMP",          f"₹{cmp:,.2f}")
-
-if call_wall == 0 and put_wall == 0:
-    m2.metric("CALL WALL",    "N/A")
-    m3.metric("PUT WALL",     "N/A")
-    m4.metric("GAMMA FLIP",   "N/A")
-    m5.metric("GEX SHIFT",    "N/A")
-    m6.metric("BIAS",         "NEUTRAL")
-
-    # ── Signal alerts ─────────────────────────────────────────────────────────────
-    st.markdown('<p class="term-header">SIGNAL ALERTS</p>', unsafe_allow_html=True)
-    st.markdown('<div class="alert-box">ℹ️ Spot price tracking active. Options chain and dealer GEX calculations are not loaded/applicable for this symbol.</div>', unsafe_allow_html=True)
-else:
-    m2.metric("CALL WALL",    f"₹{call_wall:,.0f}",  f"{pct_from_wall(cmp, call_wall):+.2f}% gap")
-    m3.metric("PUT WALL",     f"₹{put_wall:,.0f}",   f"{pct_from_wall(cmp, put_wall):+.2f}% gap")
-    m4.metric("GAMMA FLIP",   f"₹{gamma_flip:,.0f}", f"{pct_from_wall(cmp, gamma_flip):+.2f}% gap")
-    m5.metric("GEX SHIFT",    f"{gex_shift:+.2f}L")
-    m6.metric("BIAS",         sig_txt)
-
-    # ── Signal alerts ─────────────────────────────────────────────────────────────
-    st.markdown('<p class="term-header">SIGNAL ALERTS</p>', unsafe_allow_html=True)
-    a1, a2 = st.columns(2)
-    with a1:
-        if cmp > call_wall:
-            st.markdown(f'<div class="alert-box bull">📈 CMP ({cmp}) has CROSSED above CALL WALL ({call_wall}) — dealer delta-buying pressure active. Watch for squeeze continuation.</div>', unsafe_allow_html=True)
-        elif cmp > gamma_flip:
-            st.markdown(f'<div class="alert-box bull">⚡ CMP above GAMMA FLIP ({gamma_flip}) — positive gamma regime. Moves upward are dealer-amplified.</div>', unsafe_allow_html=True)
-        else:
-            st.markdown(f'<div class="alert-box bear">⚠ CMP ({cmp}) below GAMMA FLIP ({gamma_flip}) — negative gamma regime. Downside moves get amplified.</div>', unsafe_allow_html=True)
-
-    with a2:
-        gap_to_call = call_wall - cmp
-        gap_to_put  = cmp - put_wall
-        if gap_to_call < gap_to_put:
-            st.markdown(f'<div class="alert-box warn">🎯 Only ₹{gap_to_call:.1f} to CALL WALL breakout. Breakout = bullish gamma cascade. Failure = pin at current level.</div>', unsafe_allow_html=True)
-        else:
-            st.markdown(f'<div class="alert-box warn">🛡 PUT WALL ({put_wall}) is ₹{gap_to_put:.1f} below CMP — strong dealer support floor here.</div>', unsafe_allow_html=True)
-
-
-# ── Main charts ───────────────────────────────────────────────────────────────
-st.markdown('<p class="term-header">GAMMA EXPOSURE PROFILE</p>', unsafe_allow_html=True)
-
-tab1, tab2, tab3 = st.tabs(["📊  GEX PROFILE", "📈  OI CHANGE", "🔢  GREEKS TABLE"])
-
-stock_greeks = greeks_df[greeks_df["SYMBOL"] == selected_symbol].copy()
-
-
-# ── Tab 1: GEX profile + net GEX ─────────────────────────────────────────────
-with tab1:
-    if stock_greeks.empty:
-        st.warning("No options data for this symbol.")
-    else:
-        for col in ["STRIKE_PR", "GEX"]:
-            stock_greeks[col] = pd.to_numeric(stock_greeks[col], errors="coerce")
-        stock_greeks.dropna(subset=["STRIKE_PR", "GEX"], inplace=True)
-
-        strike_gex = (
-            stock_greeks.groupby(["STRIKE_PR", "OPTION_TYP"])["GEX"]
-            .sum()
-            .unstack(fill_value=0)
-        )
-        if "CE" not in strike_gex.columns: strike_gex["CE"] = 0
-        if "PE" not in strike_gex.columns: strike_gex["PE"] = 0
-
-        strike_gex = strike_gex[
-            (strike_gex.index >= cmp * 0.90) &
-            (strike_gex.index <= cmp * 1.10)
-        ]
-        strike_gex["NET"] = strike_gex["CE"] + strike_gex["PE"]
-
-        fig = make_subplots(
-            rows=1, cols=2,
-            column_widths=[0.72, 0.28],
-            subplot_titles=("Net Gamma by Strike (Lakhs)", "Cumulative Net GEX"),
-            horizontal_spacing=0.05,
-            shared_yaxes=True,
-        )
-
-        # Left: CE + PE bars
-        fig.add_trace(go.Bar(
-            y=strike_gex.index,
-            x=strike_gex["PE"] / 1e5,
-            name="Put GEX",
-            orientation="h",
-            marker=dict(color=COLORS["put"], opacity=0.85),
-        ), row=1, col=1)
-
-        fig.add_trace(go.Bar(
-            y=strike_gex.index,
-            x=strike_gex["CE"] / 1e5,
-            name="Call GEX",
-            orientation="h",
-            marker=dict(color=COLORS["call"], opacity=0.85),
-        ), row=1, col=1)
-
-        # Right: Net GEX as horizontal bars (green/red)
-        net_colors = [COLORS["net_pos"] if v >= 0 else COLORS["net_neg"] for v in strike_gex["NET"]]
-        fig.add_trace(go.Bar(
-            y=strike_gex.index,
-            x=strike_gex["NET"] / 1e5,
-            name="Net GEX",
-            orientation="h",
-            marker=dict(color=net_colors, opacity=0.9),
-            showlegend=True,
-        ), row=1, col=2)
-
-        # Reference lines helper with premium overlap protection
-        def draw_reference_lines(fig, cmp, flip, call_wall, put_wall):
-            for col in [1, 2]:
-                # CMP Line
-                fig.add_hline(y=cmp, line_dash="dash", line_color="yellow", line_width=1.2,
-                              annotation_text=f" CMP: {cmp} ", annotation_position="bottom left",
-                              annotation=dict(bgcolor="rgba(0,0,0,0.75)", font_color="yellow", font_size=10),
-                              row=1, col=col)
-                
-                # Overlap logic
-                if call_wall == put_wall and call_wall == flip:
-                    fig.add_hline(y=flip, line_dash="solid", line_color="white", line_width=2,
-                                  annotation_text=f" ⚡ THE STRADDLE PIN (WALLS & FLIP): {flip} ", annotation_position="top right",
-                                  annotation=dict(bgcolor="rgba(255,255,255,0.2)", font_color="white", font_size=10),
-                                  row=1, col=col)
-                elif call_wall == put_wall:
-                    fig.add_hline(y=call_wall, line_dash="solid", line_color="purple", line_width=2,
-                                  annotation_text=f" 💥 CALL & PUT WALL: {call_wall} ", annotation_position="top right",
-                                  annotation=dict(bgcolor="rgba(128,0,128,0.3)", font_color="#ffffff", font_size=10),
-                                  row=1, col=col)
-                    fig.add_hline(y=flip, line_dash="solid", line_color="yellow", 
-                                  annotation_text=f" Γ FLIP: {flip} ", annotation_position="bottom right",
-                                  annotation=dict(bgcolor="rgba(0,0,0,0.7)", font_color="yellow", font_size=10),
-                                  row=1, col=col)
-                elif flip == call_wall:
-                    fig.add_hline(y=flip, line_dash="solid", line_color="#58a6ff", line_width=2,
-                                  annotation_text=f" CALL WALL & Γ FLIP: {flip} ", annotation_position="top right",
-                                  annotation=dict(bgcolor="rgba(88,166,255,0.3)", font_color="#ffffff", font_size=10),
-                                  row=1, col=col)
-                    fig.add_hline(y=put_wall, line_dash="solid", line_color="#f85149", line_width=2,
-                                  annotation_text=f" PUT WALL: {put_wall} ", annotation_position="bottom right",
-                                  annotation=dict(bgcolor="rgba(248,81,73,0.2)", font_color="#f85149", font_size=10),
-                                  row=1, col=col)
-                elif flip == put_wall:
-                    fig.add_hline(y=flip, line_dash="solid", line_color="#f85149", line_width=2,
-                                  annotation_text=f" PUT WALL & Γ FLIP: {flip} ", annotation_position="top right",
-                                  annotation=dict(bgcolor="rgba(248,81,73,0.3)", font_color="#ffffff", font_size=10),
-                                  row=1, col=col)
-                    fig.add_hline(y=call_wall, line_dash="solid", line_color="#58a6ff", line_width=2,
-                                  annotation_text=f" CALL WALL: {call_wall} ", annotation_position="bottom right",
-                                  annotation=dict(bgcolor="rgba(88,166,255,0.2)", font_color="#58a6ff", font_size=10),
-                                  row=1, col=col)
+# ─────────────────────────────────────────────────────────────────────────────
+# MODULE 1: VANGUARD SCREENER TERMINAL (Flagship View)
+# ─────────────────────────────────────────────────────────────────────────────
+if view_mode == "⚡ VANGUARD SCREENER TERMINAL":
+    # Screener Header
+    st.markdown(f"""
+    <div class="title-bar">
+      <span style="font-size:24px;color:#fbbf24;">⚡</span>
+      <h1>VANGUARD INSTITUTIONAL EOD TERMINAL</h1>
+      <span class="sig-badge" style="background:#091c15;color:#10b981;border:1px solid #064e3b;margin-left:15px;">DECISION LAYER ACTIVE</span>
+      <span class="ts">DATA REGIME: CHRONOLOGICAL F&O HEATMAP</span>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # ── EOD-Only global breadth and alerts loading from DuckDB ──
+    latest_breadth = {
+        "bullish_pct": 50.0, "bearish_pct": 50.0,
+        "compression_pct": 0.0, "expansion_pct": 0.0,
+        "transition_pct": 0.0, "mean_rev_pct": 100.0,
+        "total_symbols": len(all_symbols)
+    }
+    today_changes = []
+    
+    db_path = "data/compiled/vanguard.duckdb"
+    if os.path.exists(db_path):
+        try:
+            conn = duckdb.connect(db_path)
+            res_b = conn.execute("SELECT * FROM daily_market_breadth WHERE date = ?", [latest_date]).df()
+            if not res_b.empty:
+                latest_breadth = res_b.iloc[0].to_dict()
+            
+            res_c = conn.execute("SELECT * FROM daily_changes WHERE date = ?", [latest_date]).df()
+            if not res_c.empty:
+                today_changes = res_c.to_dict(orient="records")
+            conn.close()
+        except Exception:
+            pass
+            
+    # Render premium daily global breadth panels
+    render_market_breadth_panel(latest_breadth)
+    render_daily_changes_panel(today_changes)
+    
+    # Section A - flagships matrix
+    st.markdown('<p class="term-header">SECTION A — INSTITUTIONAL INVENTORY MATRIX</p>', unsafe_allow_html=True)
+    render_inventory_matrix(all_symbols, session_history, latest_date, trading_dates)
+    
+    # Section B - setups scanner loading direct from DuckDB setups registry
+    categorized_setups = {
+        "GAMMA_SQUEEZE": [], "VOLATILITY_COIL": [], "FLOOR_BOUNCE": [],
+        "DEALER_DEFENSE": [], "REGIME_SHIFT": [], "INVENTORY_MIGRATION": []
+    }
+    if os.path.exists(db_path):
+        try:
+            conn = duckdb.connect(db_path)
+            setups_df = conn.execute("SELECT * FROM daily_setups WHERE date = ? AND setup_type != 'NONE'", [latest_date]).df()
+            conn.close()
+            for _, r in setups_df.iterrows():
+                s_sym = r["symbol"]
+                s_type = r["setup_type"]
+                s_m = session_history.get(s_sym, {}).get(latest_date, {})
+                if s_m and s_type in categorized_setups:
+                     categorized_setups[s_type].append((s_sym, s_m))
+            # Sort setups: Volatility Coils sorted by Priority Score (Pty) descending; all others sorted by absolute IFS score descending
+            for s_type in categorized_setups:
+                if s_type == "VOLATILITY_COIL":
+                    categorized_setups[s_type] = sorted(
+                        categorized_setups[s_type],
+                        key=lambda x: x[1].get("priority_score", 0.0),
+                        reverse=True
+                    )
                 else:
-                    fig.add_hline(y=call_wall, line_dash="solid", line_color="#58a6ff", line_width=2,
-                                  annotation_text=f" CALL WALL: {call_wall} ", annotation_position="top right",
-                                  annotation=dict(bgcolor="rgba(88,166,255,0.2)", font_color="#58a6ff", font_size=10),
-                                  row=1, col=col)
-                    fig.add_hline(y=put_wall, line_dash="solid", line_color="#f85149", line_width=2,
-                                  annotation_text=f" PUT WALL: {put_wall} ", annotation_position="bottom right",
-                                  annotation=dict(bgcolor="rgba(248,81,73,0.2)", font_color="#f85149", font_size=10),
-                                  row=1, col=col)
-                    fig.add_hline(y=flip, line_dash="solid", line_color="yellow", 
-                                  annotation_text=f" Γ FLIP: {flip} ", annotation_position="bottom right",
-                                  annotation=dict(bgcolor="rgba(0,0,0,0.7)", font_color="yellow", font_size=10),
-                                  row=1, col=col)
+                    categorized_setups[s_type] = sorted(
+                        categorized_setups[s_type],
+                        key=lambda x: abs(x[1].get("ifs_score", 0.0)),
+                        reverse=True
+                    )
+        except Exception:
+            pass
+            
+    render_setups_grid(categorized_setups, select_stock)
 
-        draw_reference_lines(fig, cmp, gamma_flip, call_wall, put_wall)
-
-        fig.update_layout(
-            barmode="relative",
-            plot_bgcolor="#0a0a14",
-            paper_bgcolor="#020209",
-            font=dict(color="#c0ccdd", family="Courier New", size=11),
-            height=620,
-            legend=dict(
-                orientation="h", yanchor="bottom", y=1.02,
-                xanchor="right", x=1,
-                bgcolor="rgba(0,0,0,0)",
-                font=dict(size=11),
-            ),
-            margin=dict(l=10, r=10, t=40, b=10),
-        )
-        for axis in ["xaxis", "yaxis", "xaxis2", "yaxis2"]:
-            fig.update_layout(**{axis: dict(gridcolor="#1e2a4a", zerolinecolor="#2a3a5a")})
-        fig.update_layout(
-            yaxis=dict(title="Strike Price", tickformat=".0f"),
-            xaxis=dict(title="GEX (Lakhs)"),
-            yaxis2=dict(tickformat=".0f"),
-            xaxis2=dict(title="Net GEX (Lakhs)"),
-        )
-
-        st.plotly_chart(fig, use_container_width=True)
-
-
-# ── Tab 2: OI change ─────────────────────────────────────────────────────────
-with tab2:
-    oi_cols = [c for c in greeks_df.columns if "OI" in c.upper() or "CHNG" in c.upper()]
-
-    if "STRIKE_PR" in stock_greeks.columns and len(oi_cols) > 0:
-        oi_col = oi_cols[0]
-        stock_greeks[oi_col] = pd.to_numeric(stock_greeks[oi_col], errors="coerce")
-
-        oi_data = (
-            stock_greeks.groupby(["STRIKE_PR", "OPTION_TYP"])[oi_col]
-            .sum()
-            .unstack(fill_value=0)
-        )
-        if "CE" not in oi_data.columns: oi_data["CE"] = 0
-        if "PE" not in oi_data.columns: oi_data["PE"] = 0
-
-        oi_data = oi_data[
-            (oi_data.index >= cmp * 0.90) &
-            (oi_data.index <= cmp * 1.10)
-        ]
-
-        fig2 = go.Figure()
-        fig2.add_trace(go.Bar(
-            y=oi_data.index, x=-oi_data["PE"] / 1e5,
-            name="Put OI Change", orientation="h",
-            marker=dict(color=COLORS["put"], opacity=0.85),
-        ))
-        fig2.add_trace(go.Bar(
-            y=oi_data.index, x=oi_data["CE"] / 1e5,
-            name="Call OI Change", orientation="h",
-            marker=dict(color=COLORS["call"], opacity=0.85),
-        ))
-        fig2.add_hline(y=cmp, line_dash="dash", line_color=COLORS["cmp"],
-                       annotation_text=f" CMP: {cmp} ",
-                       annotation=dict(bgcolor="rgba(0,0,0,.75)", font_color=COLORS["cmp"], font_size=10))
-        fig2.update_layout(
-            barmode="overlay", height=560,
-            plot_bgcolor="#0a0a14", paper_bgcolor="#020209",
-            font=dict(color="#c0ccdd", family="Courier New", size=11),
-            yaxis=dict(title="Strike", tickformat=".0f", gridcolor="#1e2a4a"),
-            xaxis=dict(title=f"{oi_col} (Lakhs)", gridcolor="#1e2a4a"),
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1,
-                        bgcolor="rgba(0,0,0,0)"),
-            margin=dict(l=10, r=10, t=30, b=10),
-        )
-        st.plotly_chart(fig2, use_container_width=True)
+# ─────────────────────────────────────────────────────────────────────────────
+# MODULE 2: SINGLE-STOCK / INDEX DEEP DIVE (Detailed Chronology)
+# ─────────────────────────────────────────────────────────────────────────────
+else:
+    sym_sessions = session_history.get(selected_symbol, {})
+    latest_metrics = sym_sessions.get(latest_date, {})
+    ifs_score = latest_metrics.get("ifs_score", 0.0)
+    
+    # Header badges styling
+    _bg, _fc, _bc = sig_colors("bull" if ifs_score > 15 else "bear" if ifs_score < -15 else "neut")
+    ring_html = f'<span class="score-ring" style="border-color:{_fc};color:{_fc};">{ifs_score:+.0f}</span>'
+    badge_html = f'<span class="sig-badge" style="background:{_bg};color:{_fc};border:1px solid {_bc};">{latest_metrics.get("gamma_regime", "ROTATION")}</span>'
+    
+    st.markdown(f"""
+    <div class="title-bar">
+      <span style="font-size:22px;color:#a78bfa;">📊</span>
+      <h1>{selected_symbol} DEEP DIVE</h1>
+      {ring_html}&nbsp;{badge_html}
+      <span class="ts">VANGUARD INVENTORY CHRONOLOGY LEDGER</span>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    col_left, col_right = st.columns([7, 3])
+    
+    # Check if we are viewing a historical session date. If so, fall back directly to the compiled database values!
+    is_historical = (latest_date != trading_dates[-1])
+    
+    sym_greeks = greeks_df[greeks_df["SYMBOL"] == selected_symbol.upper()]
+    if not sym_greeks.empty and not is_historical:
+        if selected_expiry != "ALL EXPIRIES":
+            exp_greeks = sym_greeks[sym_greeks["EXPIRY_DT"] == selected_expiry].copy()
+        else:
+            exp_greeks = sym_greeks.copy()
+            
+        if not exp_greeks.empty:
+            cmp_val = float(exp_greeks["SPOT"].iloc[0]) if "SPOT" in exp_greeks.columns and not pd.isna(exp_greeks["SPOT"].iloc[0]) else latest_metrics.get("spot_close", 0.0)
+            
+            exp_greeks["GEX"] = pd.to_numeric(exp_greeks["GEX"], errors="coerce")
+            exp_greeks["STRIKE_PR"] = pd.to_numeric(exp_greeks["STRIKE_PR"], errors="coerce")
+            exp_greeks["OPEN_INT"] = pd.to_numeric(exp_greeks["OPEN_INT"], errors="coerce")
+            
+            ce_gex = exp_greeks[exp_greeks['OPTION_TYP'] == 'CE'].groupby('STRIKE_PR')['GEX'].sum()
+            pe_gex = exp_greeks[exp_greeks['OPTION_TYP'] == 'PE'].groupby('STRIKE_PR')['GEX'].sum().abs()
+            
+            cw_val = ce_gex.idxmax() if not ce_gex.empty and not ce_gex.isna().all() else latest_metrics.get("call_wall", 0.0)
+            pw_val = pe_gex.idxmax() if not pe_gex.empty and not pe_gex.isna().all() else latest_metrics.get("put_wall", 0.0)
+            
+            overlap = pd.concat([ce_gex, pe_gex], axis=1).min(axis=1)
+            gf_val = overlap.idxmax() if not overlap.empty and not overlap.isna().all() else latest_metrics.get("gamma_flip", 0.0)
+            
+            gex_val = exp_greeks['GEX'].sum()
+            
+            ce_oi = exp_greeks[exp_greeks['OPTION_TYP'] == 'CE']['OPEN_INT'].sum()
+            pe_oi = exp_greeks[exp_greeks['OPTION_TYP'] == 'PE']['OPEN_INT'].sum()
+            pcr_val = pe_oi / ce_oi if ce_oi > 0 else latest_metrics.get("pcr", 0.0)
+        else:
+            cmp_val = latest_metrics.get("spot_close", 0.0)
+            cw_val = latest_metrics.get("call_wall", 0.0)
+            pw_val = latest_metrics.get("put_wall", 0.0)
+            gf_val = latest_metrics.get("gamma_flip", 0.0)
+            gex_val = latest_metrics.get("gex", 0.0)
+            pcr_val = latest_metrics.get("pcr", 0.0)
     else:
-        # Fallback: show ΔCall OI / ΔPut OI from signals across all stocks
-        st.markdown('<p class="term-header">MARKET-WIDE ΔOI COMPARISON</p>', unsafe_allow_html=True)
-        oi_plot = signals_df[["SYMBOL", "Δ CALL OI", "Δ PUT OI"]].copy()
-        for c in ["Δ CALL OI", "Δ PUT OI"]:
-            if c in oi_plot.columns:
-                oi_plot[c] = pd.to_numeric(oi_plot[c].astype(str).str.replace("L", ""), errors="coerce")
-
-        fig3 = go.Figure()
-        if "Δ CALL OI" in oi_plot.columns:
-            fig3.add_trace(go.Bar(
-                x=oi_plot["SYMBOL"], y=oi_plot["Δ CALL OI"],
-                name="ΔCall OI", marker_color=COLORS["call"],
-            ))
-        if "Δ PUT OI" in oi_plot.columns:
-            fig3.add_trace(go.Bar(
-                x=oi_plot["SYMBOL"], y=oi_plot["Δ PUT OI"],
-                name="ΔPut OI", marker_color=COLORS["put"],
-            ))
-        fig3.update_layout(
-            barmode="group", height=400,
-            plot_bgcolor="#0a0a14", paper_bgcolor="#020209",
-            font=dict(color="#c0ccdd", family="Courier New", size=11),
-            xaxis=dict(gridcolor="#1e2a4a"), yaxis=dict(gridcolor="#1e2a4a", title="OI Change (L)"),
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1,
-                        bgcolor="rgba(0,0,0,0)"),
-            margin=dict(l=10, r=10, t=20, b=10),
-        )
-        st.plotly_chart(fig3, use_container_width=True)
-
-
-# ── Tab 3: Greeks table ───────────────────────────────────────────────────────
-with tab3:
-    greek_cols = ["STRIKE_PR", "OPTION_TYP", "LTP", "DELTA", "GAMMA", "THETA", "VEGA", "IV", "OI"]
-    available  = [c for c in greek_cols if c in stock_greeks.columns]
-
-    if len(available) > 2:
-        g_df = stock_greeks[available].copy()
-        for c in available[2:]:
-            g_df[c] = pd.to_numeric(g_df[c], errors="coerce")
-
-        g_df = g_df[
-            (g_df["STRIKE_PR"] >= cmp * 0.90) &
-            (g_df["STRIKE_PR"] <= cmp * 1.10)
-        ].sort_values("STRIKE_PR")
-
-        # ATM flag
-        g_df["_atm"] = (g_df["STRIKE_PR"] - cmp).abs() == (g_df["STRIKE_PR"] - cmp).abs().min()
-
-        # Build HTML table
-        rows_html = ""
-        for _, r in g_df.iterrows():
-            atm_cls = "atm" if r["_atm"] else ""
-            cells = f"<td>{r['STRIKE_PR']:.0f}</td><td>{r.get('OPTION_TYP','')}</td>"
-            for c in available[2:]:
-                v = r[c]
-                cells += f"<td>{v:.4f}</td>" if isinstance(v, float) else f"<td>{v}</td>"
-            rows_html += f"<tr class='{atm_cls}'>{cells}</tr>"
-
-        headers = "".join(f"<th>{c}</th>" for c in available)
-        st.markdown(f"""
-        <div style="overflow-x:auto; max-height:480px; overflow-y:auto;">
-          <table class="g-table">
-            <thead><tr>{headers}</tr></thead>
-            <tbody>{rows_html}</tbody>
-          </table>
-        </div>
-        <p style="font-size:10px;color:#4a5a8a;margin-top:6px;">Yellow rows = ATM strike</p>
-        """, unsafe_allow_html=True)
-    else:
-        st.info("Delta / Gamma / Theta / Vega columns not found in greeks.csv. Ensure `intelligence.py` computes them.")
-
-
-# ── Comparison panel ──────────────────────────────────────────────────────────
-if compare_mode:
-    st.markdown(f'<p class="term-header">COMPARE: {selected_symbol} vs {compare_symbol}</p>', unsafe_allow_html=True)
-
-    rows_cmp = signals_df[signals_df["SYMBOL"].isin([selected_symbol, compare_symbol])].copy()
-    rows_cmp = rows_cmp.set_index("SYMBOL")[["CMP", "CALL_WALL", "PUT_WALL", "GAMMA_FLIP", "Δ GEX (Lakhs)", "SCORE"]].T
-
-    fig_cmp = go.Figure()
-    bar_metrics = ["CMP", "CALL_WALL", "PUT_WALL", "GAMMA_FLIP"]
-    for sym in [selected_symbol, compare_symbol]:
-        if sym in rows_cmp.columns:
-            fig_cmp.add_trace(go.Bar(
-                name=sym,
-                x=bar_metrics,
-                y=[float(rows_cmp.at[m, sym]) for m in bar_metrics],
-            ))
-
-    fig_cmp.update_layout(
-        barmode="group", height=320,
-        plot_bgcolor="#0a0a14", paper_bgcolor="#020209",
-        font=dict(color="#c0ccdd", family="Courier New", size=11),
-        xaxis=dict(gridcolor="#1e2a4a"),
-        yaxis=dict(title="Price Level", gridcolor="#1e2a4a"),
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, bgcolor="rgba(0,0,0,0)"),
-        margin=dict(l=10, r=10, t=20, b=10),
+        cmp_val = latest_metrics.get("spot_close", 0.0)
+        cw_val = latest_metrics.get("call_wall", 0.0)
+        pw_val = latest_metrics.get("put_wall", 0.0)
+        gf_val = latest_metrics.get("gamma_flip", 0.0)
+        gex_val = latest_metrics.get("gex", 0.0)
+        pcr_val = latest_metrics.get("pcr", 0.0)
+    
+    # ── Left Cockpit Panel (Bloomberg cards, Playbook and detailed longitudinal charts) ──
+    col_left.markdown('<p class="term-header">KEY MARKET STRUCTURE LEVELS (LATEST CLOSE)</p>', unsafe_allow_html=True)
+    render_metric_row(cmp_val, latest_metrics.get('spot_change_pct', 0.0), cw_val, pw_val, gf_val, gex_val, pcr_val, container=col_left)
+    
+    # Actionable Tactical Playbook Sheet (NEW)
+    render_playbook_card(latest_metrics.get("playbook", {}), container=col_left)
+    
+    render_alerts(
+        cmp_val, cw_val, pw_val, gf_val, 
+        latest_metrics.get("pe_interp", "Neutral"), latest_metrics.get("ce_interp", "Neutral"), 
+        latest_metrics.get("suggested_strategy", "Wait for Setup"), container=col_left
     )
-    st.plotly_chart(fig_cmp, use_container_width=True)
-
-    st.dataframe(
-        rows_cmp.style.highlight_max(axis=1, color="#0d2b1a")
-                      .highlight_min(axis=1, color="#2b0d0d"),
-        use_container_width=True,
-    )
-
-
-# ── Global F&O Matrix ─────────────────────────────────────────────────────────
-st.markdown('<p class="term-header">GLOBAL F&O MATRIX</p>', unsafe_allow_html=True)
-
-display_df = signals_df.drop(columns=["_signal_txt", "_signal_cls"], errors="ignore").copy()
-
-# Colour-code score column
-def score_color(v):
-    try:
-        v = float(v)
-        if v >= 45: return "color: #34d399"
-        if v >= 35: return "color: #fbbf24"
-        return "color: #f87171"
-    except:
-        return ""
-
-styled = (
-    display_df
-    .set_index("RANK")
-    .style
-    .applymap(score_color, subset=["SCORE"] if "SCORE" in display_df.columns else [])
-    .set_properties(**{"background-color": "#0a0a14", "color": "#c0ccdd"})
-)
-
-st.dataframe(styled, height=420, use_container_width=True)
+    
+    # Right-hand intelligence panel
+    render_intelligence_panel(selected_symbol, latest_metrics, sym_sessions, container=col_right)
+    
+    # Render longitudinal tabs
+    col_left.markdown('<p class="term-header">DETAILED LONGITUDINAL ANALYSIS PANEL</p>', unsafe_allow_html=True)
+    tab_chrono, tab_gex, tab_oi, tab_skew, tab_table = col_left.tabs([
+        "📅  MONTHLY CHRONOLOGY", "📊  GEX PROFILE", 
+        "📈  OI CONCENTRATION", "🌡  IV SKEW", 
+        "🔢  GREEKS LEDGER"
+    ])
+    
+    # Monthly Chronology Charts
+    with tab_chrono:
+        fig_walls = render_wall_migration_chart(sym_sessions)
+        fig_cum_oi = render_cumulative_oi_chart(sym_sessions)
+        st.plotly_chart(fig_walls, use_container_width=True)
+        st.plotly_chart(fig_cum_oi, use_container_width=True)
+        
+    # GEX Profile Chart
+    with tab_gex:
+        if is_historical:
+            st.warning("⚠️ Option chain GEX profile charts are only available for the latest active trading session. Chronological metrics, wall migrations, and historical setup backtests are fully accessible for this date.")
+        else:
+            fig_gex = render_gex_profile_chart(greeks_df, selected_symbol, selected_expiry, cmp_val, gf_val, cw_val, pw_val, strike_pct)
+            if fig_gex is None:
+                st.warning("No GEX data available in system processed files for this symbol.")
+            else:
+                st.plotly_chart(fig_gex, use_container_width=True)
+            
+    # OI Concentration Chart
+    with tab_oi:
+        if is_historical:
+            st.warning("⚠️ Option chain OI concentration charts are only available for the latest active trading session. Chronological metrics, wall migrations, and historical setup backtests are fully accessible for this date.")
+        else:
+            fig_oi = render_oi_concentration_chart(greeks_df, selected_symbol, selected_expiry, cmp_val, gf_val, cw_val, pw_val, strike_pct)
+            if fig_oi is None:
+                st.warning("No option chain data available for this symbol.")
+            else:
+                st.plotly_chart(fig_oi, use_container_width=True)
+            
+    # IV Skew Chart
+    with tab_skew:
+        if is_historical:
+            st.warning("⚠️ Option chain IV skew charts are only available for the latest active trading session. Chronological metrics, wall migrations, and historical setup backtests are fully accessible for this date.")
+        else:
+            fig_iv = render_iv_skew_chart(greeks_df, selected_symbol, selected_expiry, cmp_val, gf_val, cw_val, pw_val, strike_pct)
+            if fig_iv is None:
+                st.warning("IV data unavailable for this symbol.")
+            else:
+                st.plotly_chart(fig_iv, use_container_width=True)
+            
+    # Greeks Ledger Table
+    with tab_table:
+        if is_historical:
+            st.warning("⚠️ Intraday Greeks ledgers are only available for the latest active trading session. Chronological metrics, wall migrations, and historical setup backtests are fully accessible for this date.")
+        else:
+            st_greeks_filtered = greeks_df[greeks_df["SYMBOL"] == selected_symbol.upper()].copy()
+            if selected_expiry != "ALL EXPIRIES":
+                st_greeks_filtered = st_greeks_filtered[st_greeks_filtered["EXPIRY_DT"] == selected_expiry].copy()
+                
+            if st_greeks_filtered.empty:
+                st.warning("No Greeks record compiled for this ticker.")
+            else:
+                lo_strike = cmp_val * (1 - strike_pct / 100)
+                hi_strike = cmp_val * (1 + strike_pct / 100)
+                st_greeks_filtered["STRIKE_PR"] = pd.to_numeric(st_greeks_filtered["STRIKE_PR"], errors="coerce")
+                st_greeks_filtered = st_greeks_filtered[
+                    (st_greeks_filtered["STRIKE_PR"] >= lo_strike) & 
+                    (st_greeks_filtered["STRIKE_PR"] <= hi_strike)
+                ].sort_values(["STRIKE_PR", "OPTION_TYP"])
+                
+                render_greeks_ledger(st_greeks_filtered, cmp_val)
 
 # ── Footer ────────────────────────────────────────────────────────────────────
 st.markdown("""
 <hr>
-<p style="font-size:10px;color:#2a3a5a;text-align:center;letter-spacing:1px;">
-  VANGUARD QUANTITATIVE TERMINAL · FOR INFORMATIONAL USE ONLY · NOT FINANCIAL ADVICE
+<p style="font-size:10px;color:#2a3a5a;text-align:center;letter-spacing:1px;font-family:'IBM Plex Sans';">
+  VANGUARD INSTITUTIONAL TERMINAL · dealer positioning & inventory intelligence · EOD system
 </p>
 """, unsafe_allow_html=True)

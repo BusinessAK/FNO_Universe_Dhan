@@ -7,3 +7,9 @@ pyarrow
 tqdm
 python-dateutil
 tabulate
+streamlit
+plotly
+streamlit-autorefresh
+certifi
+pnsea
+duckdb

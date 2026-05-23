@@ -29,7 +29,8 @@ class DataProcessor:
             'UndrlygPric': 'SPOT_PRICE',
             'TradDt': 'TIMESTAMP',
             'FinInstrmTp': 'INSTRUMENT',
-            'NewBrdLotQty': 'LOT_SIZE'
+            'NewBrdLotQty': 'LOT_SIZE',
+            'TtlTradgVol': 'VOLUME'
         }
         
         # Select and rename
@@ -44,7 +45,7 @@ class DataProcessor:
         df['TIMESTAMP'] = pd.to_datetime(df['TIMESTAMP'])
         
         # Clean numerical columns
-        numeric_cols = ['STRIKE_PR', 'CLOSE', 'OPEN_INT', 'CHG_IN_OI', 'SPOT_PRICE', 'LOT_SIZE']
+        numeric_cols = ['STRIKE_PR', 'CLOSE', 'OPEN_INT', 'CHG_IN_OI', 'SPOT_PRICE', 'LOT_SIZE', 'VOLUME']
         for col in numeric_cols:
             if col in df.columns:
                 df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)

@@ -44,7 +44,7 @@ class MomentumBacktester:
             
             # Load T+1 data for result checking
             processor = self.gen.intel.processor
-            df_tp1 = processor.normalize(file_tp1)
+            df_tp1, _ = processor.normalize(file_tp1)
             
             for _, sig in buying_signals.iterrows():
                 symbol = sig['SYMBOL']

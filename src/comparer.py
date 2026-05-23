@@ -12,7 +12,7 @@ def compare_days(file_current, file_prior):
     
     # Process both days
     def get_summary(file_path):
-        df = processor.normalize(file_path)
+        df, _ = processor.normalize(file_path)
         spots = processor.get_spot_prices(df)
         lots = processor.get_lot_sizes(df)
         

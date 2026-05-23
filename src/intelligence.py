@@ -33,6 +33,7 @@ class InstitutionalIntelligence:
             summary = df_greeks.groupby(['SYMBOL', 'OPTION_TYP']).agg({
                 'OPEN_INT': 'sum',
                 'CHG_IN_OI': 'sum',
+                'VOLUME': 'sum',
                 'IV': 'mean',
                 'GAMMA': 'sum',
                 'CLOSE': 'mean' # Avg option price
