@@ -5,7 +5,7 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 import os
-import duckdb
+from src.services.database_service import DatabaseService
 from src.ui.cards import render_html, format_score, get_ifs_hsl, fmt_gex
 
 def render_inventory_matrix(all_symbols: list, session_history: dict, latest_date: str, trading_dates: list):
@@ -144,30 +144,13 @@ def render_inventory_matrix(all_symbols: list, session_history: dict, latest_dat
     with m_col3:
         max_symbols = st.slider("Display Limit (Rows)", 10, 50, 15, 5)
         
-    db_path = "data/compiled/vanguard.duckdb"
-    use_db = os.path.exists(db_path)
-    
+    db_service = DatabaseService()
     matrix_rows = []
+    use_db = True
     
-    if use_db:
-        try:
-            conn = duckdb.connect(db_path)
-            # Query direct from DuckDB to optimize performance by joining structure and inventory tables
-            query = """
-                SELECT s.*, i.bullish_persistence, i.bearish_persistence 
-                FROM daily_market_structure s
-                LEFT JOIN daily_inventory i 
-                ON s.symbol = i.symbol AND s.date = i.date
-            """
-            if search_query:
-                df = conn.execute(
-                    query + " WHERE UPPER(s.symbol) LIKE ?", 
-                    [f"%{search_query}%"]
-                ).df()
-            else:
-                df = conn.execute(query).df()
-            conn.close()
-            
+    try:
+        df = db_service.get_matrix_data(search_query)
+        if not df.empty:
             # Group by symbol & date lookup
             lookup = {}
             for _, r in df.iterrows():
@@ -198,9 +181,11 @@ def render_inventory_matrix(all_symbols: list, session_history: dict, latest_dat
                     "PRIORITY_SCORE": priority_score,
                     "metrics": sym_history
                 })
-        except Exception as e:
-            st.error(f"DuckDB Query failed: {e}. Falling back to JSON loading.")
+        else:
             use_db = False
+    except Exception as e:
+        st.error(f"DuckDB Query failed: {e}. Falling back to JSON loading.")
+        use_db = False
             
     if not use_db:
         # Fallback JSON loader

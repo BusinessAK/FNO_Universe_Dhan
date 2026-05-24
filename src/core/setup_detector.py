@@ -1,50 +1,5 @@
 from typing import Dict, List, Tuple
-
-# Centralized data-driven Setup Registry containing visual styling and EOD definitions
-SETUP_REGISTRY = {
-    "GAMMA_SQUEEZE": {
-        "title": "Gamma Squeeze Setup",
-        "icon": "🔥",
-        "color": "#fca5a5",
-        "description": "Dealers delta-buying squeeze breakout above Call Wall",
-        "category": "expansion"
-    },
-    "VOLATILITY_COIL": {
-        "title": "Volatility Compression Coil",
-        "icon": "🌀",
-        "color": "#a78bfa",
-        "description": "Compressed implied volatility preparing for expansion coil",
-        "category": "expansion"
-    },
-    "FLOOR_BOUNCE": {
-        "title": "Institutional Floor Bounce",
-        "icon": "🛡️",
-        "color": "#6ee7b7",
-        "description": "Spot bouncing off high dealer-defense Put Wall support",
-        "category": "defense"
-    },
-    "DEALER_DEFENSE": {
-        "title": "Dealer Magnet Pin Zone",
-        "icon": "🧲",
-        "color": "#38bdf8",
-        "description": "Spot pinned near maximum straddle dealer-interest concentration",
-        "category": "defense"
-    },
-    "REGIME_SHIFT": {
-        "title": "Gamma Flip Regime Crossover",
-        "icon": "🔄",
-        "color": "#fbbf24",
-        "description": "Regime flip transition crossover from Short to Long Gamma",
-        "category": "regime"
-    },
-    "INVENTORY_MIGRATION": {
-        "title": "Dealer Support Floor Migration",
-        "icon": "🚀",
-        "color": "#f59e0b",
-        "description": "Upward migration and reinforcement of institutional support walls",
-        "category": "regime"
-    }
-}
+from src.config.setup_registry import SETUP_REGISTRY
 
 class SetupEngine:
     """

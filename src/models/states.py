@@ -2,6 +2,49 @@ from dataclasses import dataclass, field
 from typing import List, Dict, Any
 
 @dataclass
+class MarketState:
+    symbol: str
+    spot: float
+    call_wall: float
+    put_wall: float
+    gamma_flip: float
+    gex: float
+    pcr: float
+    ifs_score: float
+    gamma_regime: str = "ROTATION"
+    gex_intensity: float = 0.0
+
+@dataclass
+class SetupState:
+    symbol: str
+    date: str
+    setup_type: str
+    bias: str
+    trigger_strike: float
+    invalidation_strike: float
+    expected_behavior: str
+    dealer_behavior: str
+
+@dataclass
+class BreadthState:
+    date: str
+    bullish_pct: float
+    bearish_pct: float
+    compression_pct: float
+    expansion_pct: float
+    transition_pct: float
+    mean_rev_pct: float
+    total_symbols: int
+
+@dataclass
+class PlaybookState:
+    bias: str
+    trigger_strike: float
+    invalidation_strike: float
+    expected_behavior: str
+    dealer_behavior: str
+
+@dataclass
 class SignalState:
     symbol: str
     spot_close: float = 0.0

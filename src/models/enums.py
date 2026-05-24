@@ -1,14 +1,1 @@
-from enum import Enum
-
-class GammaRegime(Enum):
-    LONG_GAMMA = "LONG_GAMMA"
-    SHORT_GAMMA = "SHORT_GAMMA"
-    TRANSITION_REGIME = "TRANSITION_REGIME"
-
-class SetupType(Enum):
-    GAMMA_SQUEEZE = "GAMMA_SQUEEZE"
-    VOLATILITY_COIL = "VOLATILITY_COIL"
-    FLOOR_BOUNCE = "FLOOR_BOUNCE"
-    DEALER_DEFENSE = "DEALER_DEFENSE"
-    REGIME_SHIFT = "REGIME_SHIFT"
-    INVENTORY_MIGRATION = "INVENTORY_MIGRATION"
+from src.config.constants import GammaRegime, SetupType

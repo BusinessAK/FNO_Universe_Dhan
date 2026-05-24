@@ -2,7 +2,7 @@
 Vanguard Institutional Terminal - Tiered Setup Catalog Grid Component
 """
 import streamlit as st
-from src.core.setup_detector import SETUP_REGISTRY
+from src.config.setup_registry import SETUP_REGISTRY
 from src.ui.cards import format_score
 
 def render_setup_card(s_ticker: str, s_m: dict, s_type: str, select_stock_callback):
