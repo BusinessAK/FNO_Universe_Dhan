@@ -392,7 +392,9 @@ def render_inventory_matrix(all_symbols: list, session_history: dict, latest_dat
             </tbody>
           </table>
         </div>
+        """)
         
+        render_html(r"""
         <script>
         (function() {
             function getCellValueForSort(cell, colIndex) {
@@ -406,7 +408,7 @@ def render_inventory_matrix(all_symbols: list, session_history: dict, latest_dat
                     if (badge) {
                         const txt = badge.innerText.trim();
                         if (txt.includes("Transition")) return 1000;
-                        const match = txt.match(/\\d+/);
+                        const match = txt.match(/\d+/);
                         let val = match ? parseInt(match[0]) : 0;
                         if (txt.includes("Bear")) val = -val;
                         return val;
@@ -484,7 +486,9 @@ def render_inventory_matrix(all_symbols: list, session_history: dict, latest_dat
             setTimeout(initSort, 100);
         })();
         </script>
+        """)
         
+        render_html("""
         <div class="matrix-legend-container" style="display: flex; flex-direction: column; background: rgba(9, 9, 27, 0.4); border: 1px solid #141435; border-radius: 6px; padding: 10px 15px; margin-top: 10px; font-family: 'Inter', sans-serif; gap: 8px;">
           <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; border-bottom: 1px solid rgba(20,20,53,0.15); padding-bottom: 8px;">
             <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 15px;">
