@@ -137,8 +137,15 @@ class MarketBreadthEngine:
                     "msg": f"<b>{sym}</b>: Broke below Gamma Flip Pivot (₹{l_gf:,.0f}) — entered Short Gamma"
                 })
 
-        # Sort events: prioritize support shifts, then resistance, then flips
+        # Sort events: prioritize support shifts (rises/drops) equally at top, then flips, then resistance moves
         # Limit to top 15 most active/important structural changes for EOD digest
-        type_priority = {"support_rise": 1, "regime_flip_bullish": 2, "regime_flip_bearish": 3, "support_drop": 4, "resistance_rise": 5}
+        type_priority = {
+            "support_rise": 1,
+            "support_drop": 1,        # Bearish support collapses are equally critical!
+            "regime_flip_bearish": 2,  # Bearish flips are highly urgent risk events
+            "regime_flip_bullish": 2, 
+            "resistance_rise": 3,
+            "resistance_fall": 3       # Call wall drops are equally critical
+        }
         sorted_events = sorted(events, key=lambda x: type_priority.get(x["type"], 9))
         return sorted_events[:15]
