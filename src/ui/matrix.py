@@ -116,6 +116,11 @@ def render_inventory_matrix(all_symbols: list, session_history: dict, latest_dat
         font-weight: 700 !important;
         color: #5d6d8f !important;
         font-size: 9.5px !important;
+        transition: background-color 0.2s, color 0.2s !important;
+    }
+    .matrix-table th:hover {
+        background-color: #141435 !important;
+        color: #a78bfa !important;
     }
     .matrix-table td {
         border-bottom: 1px solid rgba(20, 20, 53, 0.3) !important;
@@ -387,6 +392,98 @@ def render_inventory_matrix(all_symbols: list, session_history: dict, latest_dat
             </tbody>
           </table>
         </div>
+        
+        <script>
+        (function() {
+            function getCellValueForSort(cell, colIndex) {
+                if (colIndex === 0) {
+                    const tickerSpan = cell.querySelector("span[style*='font-weight: 800']");
+                    return tickerSpan ? tickerSpan.innerText.trim() : cell.innerText.trim();
+                } else if (colIndex === 1) {
+                    return parseFloat(cell.innerText.trim()) || 0;
+                } else if (colIndex === 2) {
+                    const badge = cell.querySelector(".persistence-badge");
+                    if (badge) {
+                        const txt = badge.innerText.trim();
+                        if (txt.includes("Transition")) return 1000;
+                        const match = txt.match(/\\d+/);
+                        let val = match ? parseInt(match[0]) : 0;
+                        if (txt.includes("Bear")) val = -val;
+                        return val;
+                    }
+                    return 0;
+                } else {
+                    const valDiv = cell.querySelector("div > div:nth-child(2)");
+                    if (valDiv) {
+                        const num = parseFloat(valDiv.innerText);
+                        return isNaN(num) ? 0 : num;
+                    }
+                    return 0;
+                }
+            }
+
+            function sortMatrixTable(colIndex) {
+                const table = document.querySelector(".matrix-table");
+                if (!table) return;
+                const tbody = table.querySelector("tbody");
+                const rows = Array.from(tbody.querySelectorAll("tr"));
+                
+                let isAsc = table.dataset.sortedCol === String(colIndex) && table.dataset.sortedAsc === "true";
+                let nextAsc = !isAsc;
+                table.dataset.sortedCol = colIndex;
+                table.dataset.sortedAsc = nextAsc ? "true" : "false";
+                
+                rows.sort((a, b) => {
+                    const aCell = a.cells[colIndex];
+                    const bCell = b.cells[colIndex];
+                    if (!aCell || !bCell) return 0;
+                    
+                    const aVal = getCellValueForSort(aCell, colIndex);
+                    const bVal = getCellValueForSort(bCell, colIndex);
+                    
+                    if (typeof aVal === "number" && typeof bVal === "number") {
+                        return nextAsc ? aVal - bVal : bVal - aVal;
+                    } else {
+                        return nextAsc ? String(aVal).localeCompare(String(bVal)) : String(bVal).localeCompare(String(aVal));
+                    }
+                });
+                
+                rows.forEach(row => tbody.appendChild(row));
+                
+                const headers = table.querySelectorAll("th");
+                headers.forEach((h, idx) => {
+                    let text = h.innerText.replace(" ▲", "").replace(" ▼", "");
+                    if (idx === colIndex) {
+                        h.innerText = text + (nextAsc ? " ▲" : " ▼");
+                    } else {
+                        h.innerText = text;
+                    }
+                });
+            }
+
+            function initSort() {
+                const table = document.querySelector(".matrix-table");
+                if (!table) {
+                    setTimeout(initSort, 100);
+                    return;
+                }
+                
+                if (table.dataset.sortInitialized === "true") return;
+                table.dataset.sortInitialized = "true";
+                
+                const headers = table.querySelectorAll("th");
+                headers.forEach((header, index) => {
+                    header.style.cursor = "pointer";
+                    header.title = "Click to sort by this column";
+                    header.addEventListener("click", () => {
+                        sortMatrixTable(index);
+                    });
+                });
+            }
+            
+            setTimeout(initSort, 100);
+        })();
+        </script>
         
         <div class="matrix-legend-container" style="display: flex; flex-direction: column; background: rgba(9, 9, 27, 0.4); border: 1px solid #141435; border-radius: 6px; padding: 10px 15px; margin-top: 10px; font-family: 'Inter', sans-serif; gap: 8px;">
           <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; border-bottom: 1px solid rgba(20,20,53,0.15); padding-bottom: 8px;">
