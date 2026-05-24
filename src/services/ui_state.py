@@ -35,7 +35,6 @@ class UIStateService:
     @selected_symbol.setter
     def selected_symbol(self, val: str):
         st.session_state.selected_symbol = val
-        st.session_state.symbol_selector = val # Keep in sync with sidebar selector widget key!
 
     @property
     def view_mode(self) -> str:
