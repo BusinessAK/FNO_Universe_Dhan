@@ -167,8 +167,8 @@ def main():
                 if (spot_t > gamma_flip_t > 0 and 0 < spot_tm1 <= gamma_flip_tm1 and net_bull_inv_shift > 0) or (gamma_flip_t > 0 and abs(spot_t - gamma_flip_t) / spot_t <= 0.008):
                     setups.append("REGIME_SHIFT")
                 
-                # 6. INVENTORY_MIGRATION (Tier 3: Wall Migration Breakout)
-                if (put_wall_t > put_wall_tm1 > 0) or (call_wall_t > call_wall_tm1 > 0):
+                # 6. INVENTORY_MIGRATION (Tier 3: Wall Migration Breakout / Collapse)
+                if (put_wall_t != put_wall_tm1 and put_wall_t > 0 and put_wall_tm1 > 0) or (call_wall_t != call_wall_tm1 and call_wall_t > 0 and call_wall_tm1 > 0):
                     setups.append("INVENTORY_MIGRATION")
                 
                 # Ratios for conviction circle
@@ -272,7 +272,80 @@ def main():
                         invalid_val = float(call_wall_t * 0.98)
                     playbook = {"bias": "Bullish Breakout", "trigger_strike": float(call_wall_t), "invalidation_strike": invalid_val, "expected_behavior": "Gamma Squeeze Expansion", "dealer_behavior": "Short Gamma Hedging Squeeze"}
                 elif "INVENTORY_MIGRATION" in setups:
-                    playbook = {"bias": "Bullish Accumulation", "trigger_strike": float(put_wall_t), "invalidation_strike": float(put_wall_tm1) if put_wall_tm1 > 0 else float(put_wall_t * 0.98), "expected_behavior": "Support Floor Migration Breakout", "dealer_behavior": "Support Floor Upward Migration"}
+                    # Classify the specific type of wall migration dynamically!
+                    put_up = put_wall_t > put_wall_tm1 > 0
+                    put_down = 0 < put_wall_t < put_wall_tm1
+                    call_up = call_wall_t > call_wall_tm1 > 0
+                    call_down = 0 < call_wall_t < call_wall_tm1
+                    
+                    if put_up and call_up:
+                        playbook = {
+                            "bias": "Strong Bullish Momentum",
+                            "trigger_strike": float(call_wall_t),
+                            "invalidation_strike": float(put_wall_t),
+                            "expected_behavior": "Parallel Channel Upward Shift",
+                            "dealer_behavior": "Dual Wall Upward Migration"
+                        }
+                    elif put_down and call_down:
+                        playbook = {
+                            "bias": "Strong Bearish Momentum",
+                            "trigger_strike": float(put_wall_t),
+                            "invalidation_strike": float(call_wall_t),
+                            "expected_behavior": "Parallel Channel Downward Shift",
+                            "dealer_behavior": "Dual Wall Downward Migration"
+                        }
+                    elif put_up:
+                        invalid_val = float(put_wall_tm1)
+                        if invalid_val >= float(put_wall_t * 0.99):
+                            invalid_val = float(put_wall_t * 0.98)
+                        playbook = {
+                            "bias": "Bullish Accumulation",
+                            "trigger_strike": float(put_wall_t),
+                            "invalidation_strike": invalid_val,
+                            "expected_behavior": "Support Floor Upward Breakout",
+                            "dealer_behavior": "Support Floor Upward Migration"
+                        }
+                    elif put_down:
+                        invalid_val = float(put_wall_tm1)
+                        if invalid_val <= float(put_wall_t * 1.01):
+                            invalid_val = float(put_wall_t * 1.02)
+                        playbook = {
+                            "bias": "Bearish Breakdown",
+                            "trigger_strike": float(put_wall_t),
+                            "invalidation_strike": invalid_val,
+                            "expected_behavior": "Support Floor Collapse Breakdown",
+                            "dealer_behavior": "Support Floor Downward Migration"
+                        }
+                    elif call_up:
+                        invalid_val = float(call_wall_tm1)
+                        if invalid_val >= float(call_wall_t * 0.99):
+                            invalid_val = float(call_wall_t * 0.98)
+                        playbook = {
+                            "bias": "Bullish Breakout",
+                            "trigger_strike": float(call_wall_t),
+                            "invalidation_strike": invalid_val,
+                            "expected_behavior": "Resistance Ceiling Breakout Expansion",
+                            "dealer_behavior": "Call Wall Upward Migration"
+                        }
+                    elif call_down:
+                        invalid_val = float(call_wall_tm1)
+                        if invalid_val <= float(call_wall_t * 1.01):
+                            invalid_val = float(call_wall_t * 1.02)
+                        playbook = {
+                            "bias": "Bearish Consolidation",
+                            "trigger_strike": float(call_wall_t),
+                            "invalidation_strike": invalid_val,
+                            "expected_behavior": "Ceiling Weakening Compression",
+                            "dealer_behavior": "Call Wall Downward Migration"
+                        }
+                    else:
+                        playbook = {
+                            "bias": "Range Shift",
+                            "trigger_strike": float(call_wall_t),
+                            "invalidation_strike": float(put_wall_t),
+                            "expected_behavior": "Option Wall Rebalancing",
+                            "dealer_behavior": "Inventory Repositioning"
+                        }
                 elif "REGIME_SHIFT" in setups:
                     playbook = {"bias": "Regime Transition", "trigger_strike": float(gamma_flip_t), "invalidation_strike": float(gamma_flip_t * 0.99), "expected_behavior": "Volatility Stabilization", "dealer_behavior": "Hedging Crossover Transition"}
                 elif "VOLATILITY_COIL" in setups:

@@ -12,6 +12,8 @@ def render_setup_card(s_ticker: str, s_m: dict, s_type: str, select_stock_callba
     score_badge = format_score(s_m.get('ifs_score', 0.0))
     cfg = SETUP_REGISTRY.get(s_type, {})
     title = cfg.get("title", s_type.replace("_", " ").title())
+    color = cfg.get("color", "#7888aa")
+    icon = cfg.get("icon", "⇅")
     
     # Pre-calculated Actionable EOD Playbook details
     playbook = s_m.get("playbook", {})
@@ -21,6 +23,39 @@ def render_setup_card(s_ticker: str, s_m: dict, s_type: str, select_stock_callba
     invalid_strike = playbook.get("invalidation_strike", 0.0)
     invalid_strike_str = f"₹{invalid_strike:,.1f}" if invalid_strike > 0 else "N/A"
     expected_behavior = playbook.get("expected_behavior", "Mean Reversion")
+    
+    # Dynamic customization for option wall migrations (being pro in catching migrations!)
+    if s_type == "INVENTORY_MIGRATION":
+        if bias == "Strong Bullish Momentum":
+            title = "Dual Wall Upward Shift"
+            color = "#10b981"
+            icon = "🚀"
+        elif bias == "Strong Bearish Momentum":
+            title = "Dual Wall Downward Shift"
+            color = "#ef4444"
+            icon = "🩸"
+        elif bias == "Bullish Accumulation":
+            title = "Support Floor Rise"
+            color = "#34d399"
+            icon = "🛡️"
+        elif bias == "Bearish Breakdown":
+            title = "Support Floor Collapse"
+            color = "#f43f5e"
+            icon = "💥"
+        elif bias == "Bullish Breakout":
+            title = "Resistance Ceiling Rise"
+            color = "#fbbf24"
+            icon = "📈"
+        elif bias == "Bearish Consolidation":
+            title = "Resistance Ceiling Drop"
+            color = "#a78bfa"
+            icon = "📉"
+        elif bias == "Range Shift":
+            title = "Option Wall Rebalancing"
+            color = "#38bdf8"
+            icon = "🔄"
+            
+    full_title = f"{icon} {title}"
     
     spot_price = s_m.get('spot_close', 0.0)
     spot_price_str = f"₹{spot_price:,.2f}" if spot_price > 0 else "N/A"
@@ -32,7 +67,7 @@ def render_setup_card(s_ticker: str, s_m: dict, s_type: str, select_stock_callba
     status_border = "rgba(120, 136, 170, 0.2)"
     
     if spot_price > 0:
-        if "Bullish" in bias:
+        if "Bullish" in bias or bias == "Strong Bullish Momentum" or bias == "Bullish Accumulation" or bias == "Bullish Breakout":
             if trig_strike > 0 and spot_price >= trig_strike:
                 status_str = "🟢 Triggered"
                 status_color = "#10b981"
@@ -48,7 +83,7 @@ def render_setup_card(s_ticker: str, s_m: dict, s_type: str, select_stock_callba
                 status_color = "#fbbf24"
                 status_bg = "rgba(251, 191, 36, 0.08)"
                 status_border = "rgba(251, 191, 36, 0.2)"
-        elif "Bearish" in bias:
+        elif "Bearish" in bias or bias == "Strong Bearish Momentum" or bias == "Bearish Breakdown" or bias == "Bearish Consolidation":
             if trig_strike > 0 and spot_price <= trig_strike:
                 status_str = "🟢 Triggered"
                 status_color = "#10b981"
@@ -87,16 +122,16 @@ def render_setup_card(s_ticker: str, s_m: dict, s_type: str, select_stock_callba
             status_bg = "rgba(56, 189, 248, 0.08)"
             status_border = "rgba(56, 189, 248, 0.2)"
             
-    bias_color = "#10b981" if "Bullish" in bias else "#ef4444" if "Bearish" in bias else "#fbbf24"
+    bias_color = "#10b981" if ("Bullish" in bias or bias == "Strong Bullish Momentum" or bias == "Bullish Accumulation" or bias == "Bullish Breakout") else "#ef4444" if ("Bearish" in bias or bias == "Strong Bearish Momentum" or bias == "Bearish Breakdown" or bias == "Bearish Consolidation") else "#fbbf24"
     
     st.markdown(f"""
-    <div class="setup-card">
+    <div class="setup-card" style="border-left: 3.5px solid {color}; box-shadow: inset 3px 0 6px rgba(0, 0, 0, 0.25);">
         <div class="card-header-flex">
             <span class="card-ticker">{s_ticker}</span>
             <span style="background:{status_bg}; color:{status_color}; border:1px solid {status_border}; font-size:9.5px; font-weight:700; padding:2px 6px; border-radius:4px; letter-spacing:0.5px; font-family:'Inter Tight', sans-serif;">{status_str}</span>
             {score_badge}
         </div>
-        <div class="card-desc">{title}</div>
+        <div class="card-desc" style="color: {color};">{full_title}</div>
         <div class="card-stat-row"><span>Latest Price:</span><span class="card-stat-val" style="color:#e2e8f0; font-weight:bold;">{spot_price_str}</span></div>
         <div class="card-stat-row"><span>Tactical Bias:</span><span class="card-stat-val" style="color:{bias_color}; font-weight:bold;">{bias}</span></div>
         <div class="card-stat-row"><span>Expected Behavior:</span><span class="card-stat-val" style="color:#6ee7b7;">{expected_behavior}</span></div>
@@ -176,8 +211,8 @@ def render_setups_grid(categorized_setups: dict, select_stock_callback):
             for sym, s_m in rs_items[:3]:
                 render_setup_card(sym, s_m, "REGIME_SHIFT", select_stock_callback)
                 
-        # Support Floor Migrations
-        st.markdown('<p style="font-size:11px;font-weight:bold;color:#f59e0b;margin:15px 0 5px;">🚀 INVENTORY MIGRATION BREAKOUTS</p>', unsafe_allow_html=True)
+        # F&O Wall Inventory Migrations
+        st.markdown('<p style="font-size:11px;font-weight:bold;color:#fbbf24;margin:15px 0 5px;">📊 INVENTORY WALL MIGRATIONS</p>', unsafe_allow_html=True)
         im_items = categorized_setups.get("INVENTORY_MIGRATION", [])
         if not im_items:
             st.markdown('<p style="font-size:11px;color:#4a5a8a;font-style:italic;">No active inventory wall migrations.</p>', unsafe_allow_html=True)
