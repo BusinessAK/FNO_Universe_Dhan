@@ -146,88 +146,92 @@ def render_setup_card(s_ticker: str, s_m: dict, s_type: str, select_stock_callba
 
 def render_setups_grid(categorized_setups: dict, select_stock_callback):
     """
-    Renders the setup setups catalog deck in 3 columns (Tier 1, 2, 3).
+    Renders the setup setups catalog deck in a perfectly aligned row-by-row structure.
     """
     st.markdown('<p class="term-header">SECTION B — VANGUARD QUANTITATIVE SETUP ENGINE</p>', unsafe_allow_html=True)
-    c1, c2, c3 = st.columns(3)
-
-    # 1. TIER 1 — EXPANSION SETUPS
-    with c1:
+    
+    # ── ROW 1: TIER COLUMN HEADERS ──
+    h1, h2, h3 = st.columns(3)
+    with h1:
         st.markdown("""
         <div style="height: 65px; border-bottom: 1px solid #141435; margin-bottom: 10px;">
             <h4 style="color:#a78bfa; margin:0; padding:0; font-size: 15px;">⚡ TIER 1 — EXPANSION</h4>
             <p style="font-size:10px; color:#7888aa; text-transform:uppercase; letter-spacing:0.5px; margin: 4px 0 0 0; padding:0;">Short-term momentum breakouts</p>
         </div>
         """, unsafe_allow_html=True)
-        
-        # Gamma Squeezes
-        st.markdown('<p style="font-size:11px;font-weight:bold;color:#fca5a5;margin:10px 0 5px;">🔥 GAMMA SQUEEZE CANDIDATES</p>', unsafe_allow_html=True)
-        sq_items = categorized_setups.get("GAMMA_SQUEEZE", [])
-        if not sq_items:
-            st.markdown('<p style="font-size:11px;color:#4a5a8a;font-style:italic;">No active gamma squeeze triggers today.</p>', unsafe_allow_html=True)
-        else:
-            for sym, s_m in sq_items[:3]:
-                render_setup_card(sym, s_m, "GAMMA_SQUEEZE", select_stock_callback)
-                
-        # Volatility Coils
-        st.markdown('<p style="font-size:11px;font-weight:bold;color:#a78bfa;margin:15px 0 5px;">🌀 VOLATILITY EXPANSION COILS</p>', unsafe_allow_html=True)
-        vc_items = categorized_setups.get("VOLATILITY_COIL", [])
-        if not vc_items:
-            st.markdown('<p style="font-size:11px;color:#4a5a8a;font-style:italic;">No compressed volatility coils observed.</p>', unsafe_allow_html=True)
-        else:
-            for sym, s_m in vc_items[:3]:
-                render_setup_card(sym, s_m, "VOLATILITY_COIL", select_stock_callback)
-
-    # 2. TIER 2 — SUPPORT/DEFENSE SETUPS
-    with c2:
+    with h2:
         st.markdown("""
         <div style="height: 65px; border-bottom: 1px solid #141435; margin-bottom: 10px;">
             <h4 style="color:#34d399; margin:0; padding:0; font-size: 15px;">🛡️ TIER 2 — SUPPORT/DEFENSE</h4>
             <p style="font-size:10px; color:#7888aa; text-transform:uppercase; letter-spacing:0.5px; margin: 4px 0 0 0; padding:0;">Institutional floors & hedging zones</p>
         </div>
         """, unsafe_allow_html=True)
-        
-        # Floor Bounces
-        st.markdown('<p style="font-size:11px;font-weight:bold;color:#6ee7b7;margin:10px 0 5px;">🛡️ INSTITUTIONAL FLOOR BOUNCE</p>', unsafe_allow_html=True)
-        fb_items = categorized_setups.get("FLOOR_BOUNCE", [])
-        if not fb_items:
-            st.markdown('<p style="font-size:11px;color:#4a5a8a;font-style:italic;">No symbols at institutional floor bounds.</p>', unsafe_allow_html=True)
-        else:
-            for sym, s_m in fb_items[:3]:
-                render_setup_card(sym, s_m, "FLOOR_BOUNCE", select_stock_callback)
-                
-        # Dealer Defense
-        st.markdown('<p style="font-size:11px;font-weight:bold;color:#38bdf8;margin:15px 0 5px;">🧲 DEALER DEFENSE PIN ZONES</p>', unsafe_allow_html=True)
-        dd_items = categorized_setups.get("DEALER_DEFENSE", [])
-        if not dd_items:
-            st.markdown('<p style="font-size:11px;color:#4a5a8a;font-style:italic;">No dealer straddle magnet pins detected.</p>', unsafe_allow_html=True)
-        else:
-            for sym, s_m in dd_items[:3]:
-                render_setup_card(sym, s_m, "DEALER_DEFENSE", select_stock_callback)
-
-    # 3. TIER 3 — REGIME CHANGE SETUPS
-    with c3:
+    with h3:
         st.markdown("""
         <div style="height: 65px; border-bottom: 1px solid #141435; margin-bottom: 10px;">
             <h4 style="color:#f59e0b; margin:0; padding:0; font-size: 15px;">🔄 TIER 3 — REGIME CHANGE</h4>
             <p style="font-size:10px; color:#7888aa; text-transform:uppercase; letter-spacing:0.5px; margin: 4px 0 0 0; padding:0;">Long-term repositioning signals</p>
         </div>
         """, unsafe_allow_html=True)
-        
-        # Regime Shifts
+
+    # ── ROW 2: PRIMARY SETUPS (Gamma Squeeze vs Floor Bounce vs Regime Shift) ──
+    r1_c1, r1_c2, r1_c3 = st.columns(3)
+    
+    with r1_c1:
+        st.markdown('<p style="font-size:11px;font-weight:bold;color:#fca5a5;margin:10px 0 5px;">🔥 GAMMA SQUEEZE CANDIDATES</p>', unsafe_allow_html=True)
+        sq_items = categorized_setups.get("GAMMA_SQUEEZE", [])
+        if not sq_items:
+            st.markdown('<p style="font-size:11px;color:#4a5a8a;font-style:italic;min-height:80px;">No active gamma squeeze triggers today.</p>', unsafe_allow_html=True)
+        else:
+            for sym, s_m in sq_items[:3]:
+                render_setup_card(sym, s_m, "GAMMA_SQUEEZE", select_stock_callback)
+                
+    with r1_c2:
+        st.markdown('<p style="font-size:11px;font-weight:bold;color:#6ee7b7;margin:10px 0 5px;">🛡️ INSTITUTIONAL FLOOR BOUNCE</p>', unsafe_allow_html=True)
+        fb_items = categorized_setups.get("FLOOR_BOUNCE", [])
+        if not fb_items:
+            st.markdown('<p style="font-size:11px;color:#4a5a8a;font-style:italic;min-height:80px;">No symbols at institutional floor bounds.</p>', unsafe_allow_html=True)
+        else:
+            for sym, s_m in fb_items[:3]:
+                render_setup_card(sym, s_m, "FLOOR_BOUNCE", select_stock_callback)
+                
+    with r1_c3:
         st.markdown('<p style="font-size:11px;font-weight:bold;color:#fbbf24;margin:10px 0 5px;">🔄 REGIME SHIFT CROSSOVERS</p>', unsafe_allow_html=True)
         rs_items = categorized_setups.get("REGIME_SHIFT", [])
         if not rs_items:
-            st.markdown('<p style="font-size:11px;color:#4a5a8a;font-style:italic;">No recent regime flip crossovers detected.</p>', unsafe_allow_html=True)
+            st.markdown('<p style="font-size:11px;color:#4a5a8a;font-style:italic;min-height:80px;">No recent regime flip crossovers detected.</p>', unsafe_allow_html=True)
         else:
             for sym, s_m in rs_items[:3]:
                 render_setup_card(sym, s_m, "REGIME_SHIFT", select_stock_callback)
+
+    # ── ROW 3: SECONDARY SETUPS (Volatility Coils vs Dealer Defense vs Inventory Migrations) ──
+    # Added some vertical spacing between rows
+    st.markdown('<div style="margin-top: 15px;"></div>', unsafe_allow_html=True)
+    r2_c1, r2_c2, r2_c3 = st.columns(3)
+    
+    with r2_c1:
+        st.markdown('<p style="font-size:11px;font-weight:bold;color:#a78bfa;margin:10px 0 5px;">🌀 VOLATILITY EXPANSION COILS</p>', unsafe_allow_html=True)
+        vc_items = categorized_setups.get("VOLATILITY_COIL", [])
+        if not vc_items:
+            st.markdown('<p style="font-size:11px;color:#4a5a8a;font-style:italic;min-height:80px;">No compressed volatility coils observed.</p>', unsafe_allow_html=True)
+        else:
+            for sym, s_m in vc_items[:3]:
+                render_setup_card(sym, s_m, "VOLATILITY_COIL", select_stock_callback)
                 
-        # F&O Wall Inventory Migrations
-        st.markdown('<p style="font-size:11px;font-weight:bold;color:#fbbf24;margin:15px 0 5px;">📊 INVENTORY WALL MIGRATIONS</p>', unsafe_allow_html=True)
+    with r2_c2:
+        st.markdown('<p style="font-size:11px;font-weight:bold;color:#38bdf8;margin:10px 0 5px;">🧲 DEALER DEFENSE PIN ZONES</p>', unsafe_allow_html=True)
+        dd_items = categorized_setups.get("DEALER_DEFENSE", [])
+        if not dd_items:
+            st.markdown('<p style="font-size:11px;color:#4a5a8a;font-style:italic;min-height:80px;">No dealer straddle magnet pins detected.</p>', unsafe_allow_html=True)
+        else:
+            for sym, s_m in dd_items[:3]:
+                render_setup_card(sym, s_m, "DEALER_DEFENSE", select_stock_callback)
+                
+    with r2_c3:
+        st.markdown('<p style="font-size:11px;font-weight:bold;color:#fbbf24;margin:10px 0 5px;">📊 INVENTORY WALL MIGRATIONS</p>', unsafe_allow_html=True)
         im_items = categorized_setups.get("INVENTORY_MIGRATION", [])
         if not im_items:
-            st.markdown('<p style="font-size:11px;color:#4a5a8a;font-style:italic;">No active inventory wall migrations.</p>', unsafe_allow_html=True)
+            st.markdown('<p style="font-size:11px;color:#4a5a8a;font-style:italic;min-height:80px;">No active inventory wall migrations.</p>', unsafe_allow_html=True)
         else:
             for sym, s_m in im_items[:3]:
                 render_setup_card(sym, s_m, "INVENTORY_MIGRATION", select_stock_callback)
