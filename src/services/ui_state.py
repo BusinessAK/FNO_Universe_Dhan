@@ -26,7 +26,8 @@ class UIStateService:
 
     @selected_date.setter
     def selected_date(self, val: str):
-        st.session_state.selected_date = val
+        if st.session_state.get("selected_date") != val:
+            st.session_state.selected_date = val
 
     @property
     def selected_symbol(self) -> str:
@@ -34,7 +35,8 @@ class UIStateService:
 
     @selected_symbol.setter
     def selected_symbol(self, val: str):
-        st.session_state.selected_symbol = val
+        if st.session_state.get("selected_symbol") != val:
+            st.session_state.selected_symbol = val
 
     @property
     def view_mode(self) -> str:
@@ -42,4 +44,6 @@ class UIStateService:
 
     @view_mode.setter
     def view_mode(self, val: str):
-        st.session_state.view_mode = val
+        if st.session_state.get("view_mode") != val:
+            st.session_state.view_mode = val
+
