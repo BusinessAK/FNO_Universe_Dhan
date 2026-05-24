@@ -153,8 +153,12 @@ def render_setups_grid(categorized_setups: dict, select_stock_callback):
 
     # 1. TIER 1 — EXPANSION SETUPS
     with c1:
-        st.markdown('<h4 style="color:#a78bfa;border-bottom:1px solid #141435;padding-bottom:5px;">⚡ TIER 1 — EXPANSION SETUPS</h4>', unsafe_allow_html=True)
-        st.markdown('<p style="font-size:10px;color:#7888aa;text-transform:uppercase;letter-spacing:0.5px;">Short-term high momentum volatility breakouts</p>', unsafe_allow_html=True)
+        st.markdown("""
+        <div style="height: 65px; border-bottom: 1px solid #141435; margin-bottom: 10px;">
+            <h4 style="color:#a78bfa; margin:0; padding:0; font-size: 15px;">⚡ TIER 1 — EXPANSION</h4>
+            <p style="font-size:10px; color:#7888aa; text-transform:uppercase; letter-spacing:0.5px; margin: 4px 0 0 0; padding:0;">Short-term momentum breakouts</p>
+        </div>
+        """, unsafe_allow_html=True)
         
         # Gamma Squeezes
         st.markdown('<p style="font-size:11px;font-weight:bold;color:#fca5a5;margin:10px 0 5px;">🔥 GAMMA SQUEEZE CANDIDATES</p>', unsafe_allow_html=True)
@@ -176,8 +180,12 @@ def render_setups_grid(categorized_setups: dict, select_stock_callback):
 
     # 2. TIER 2 — SUPPORT/DEFENSE SETUPS
     with c2:
-        st.markdown('<h4 style="color:#34d399;border-bottom:1px solid #141435;padding-bottom:5px;">🛡️ TIER 2 — SUPPORT/DEFENSE SETUPS</h4>', unsafe_allow_html=True)
-        st.markdown('<p style="font-size:10px;color:#7888aa;text-transform:uppercase;letter-spacing:0.5px;">Institutional floors and dealer hedging zones</p>', unsafe_allow_html=True)
+        st.markdown("""
+        <div style="height: 65px; border-bottom: 1px solid #141435; margin-bottom: 10px;">
+            <h4 style="color:#34d399; margin:0; padding:0; font-size: 15px;">🛡️ TIER 2 — SUPPORT/DEFENSE</h4>
+            <p style="font-size:10px; color:#7888aa; text-transform:uppercase; letter-spacing:0.5px; margin: 4px 0 0 0; padding:0;">Institutional floors & hedging zones</p>
+        </div>
+        """, unsafe_allow_html=True)
         
         # Floor Bounces
         st.markdown('<p style="font-size:11px;font-weight:bold;color:#6ee7b7;margin:10px 0 5px;">🛡️ INSTITUTIONAL FLOOR BOUNCE</p>', unsafe_allow_html=True)
@@ -199,8 +207,12 @@ def render_setups_grid(categorized_setups: dict, select_stock_callback):
 
     # 3. TIER 3 — REGIME CHANGE SETUPS
     with c3:
-        st.markdown('<h4 style="color:#f59e0b;border-bottom:1px solid #141435;padding-bottom:5px;">🔄 TIER 3 — REGIME CHANGE SETUPS</h4>', unsafe_allow_html=True)
-        st.markdown('<p style="font-size:10px;color:#7888aa;text-transform:uppercase;letter-spacing:0.5px;">Long-term institutional repositioning signals</p>', unsafe_allow_html=True)
+        st.markdown("""
+        <div style="height: 65px; border-bottom: 1px solid #141435; margin-bottom: 10px;">
+            <h4 style="color:#f59e0b; margin:0; padding:0; font-size: 15px;">🔄 TIER 3 — REGIME CHANGE</h4>
+            <p style="font-size:10px; color:#7888aa; text-transform:uppercase; letter-spacing:0.5px; margin: 4px 0 0 0; padding:0;">Long-term repositioning signals</p>
+        </div>
+        """, unsafe_allow_html=True)
         
         # Regime Shifts
         st.markdown('<p style="font-size:11px;font-weight:bold;color:#fbbf24;margin:10px 0 5px;">🔄 REGIME SHIFT CROSSOVERS</p>', unsafe_allow_html=True)
