@@ -136,6 +136,26 @@ def render_inventory_matrix(all_symbols: list, session_history: dict, latest_dat
     </style>
     """)
 
+    # Format dates for sorting options
+    date_options = []
+    date_map = {}
+    for d in reversed(trading_dates):
+        try:
+            formatted = datetime.strptime(d, "%Y-%m-%d").strftime("%d %b")
+        except Exception:
+            formatted = d
+        opt_text = f"IFS Score on {formatted}"
+        date_options.append(opt_text)
+        date_map[opt_text] = d
+        
+    sort_options = [
+        "Vanguard Priority Score (Recommended)", 
+        "Vanguard Conviction Score (IFS)", 
+        "Bullish Persistence Count", 
+        "Bearish Persistence Count", 
+        "Alphabetical"
+    ] + date_options
+
     # Search and filtration for the matrix
     m_col1, m_col2, m_col3 = st.columns([4, 3, 3])
     with m_col1:
@@ -143,7 +163,7 @@ def render_inventory_matrix(all_symbols: list, session_history: dict, latest_dat
     with m_col2:
         sort_by = st.selectbox(
             "Sort Inventory Grid By",
-            ["Vanguard Priority Score (Recommended)", "Vanguard Conviction Score (IFS)", "Bullish Persistence Count", "Bearish Persistence Count", "Alphabetical"],
+            sort_options,
             index=0
         )
     with m_col3:
@@ -228,8 +248,15 @@ def render_inventory_matrix(all_symbols: list, session_history: dict, latest_dat
         matrix_rows = sorted(matrix_rows, key=lambda x: x["BULL_PERSIST"], reverse=True)
     elif sort_by == "Bearish Persistence Count":
         matrix_rows = sorted(matrix_rows, key=lambda x: x["BEAR_PERSIST"], reverse=True)
-    else: # Alphabetical
+    elif sort_by == "Alphabetical":
         matrix_rows = sorted(matrix_rows, key=lambda x: x["SYMBOL"])
+    elif sort_by in date_map:
+        target_date = date_map[sort_by]
+        matrix_rows = sorted(
+            matrix_rows,
+            key=lambda x: x["metrics"].get(target_date, {}).get("ifs_score", 0.0),
+            reverse=True
+        )
         
     # Slice rows
     sliced_rows = matrix_rows[:max_symbols]
