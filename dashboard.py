@@ -236,7 +236,7 @@ else:
     render_alerts(
         market_state.spot, market_state.call_wall, market_state.put_wall, market_state.gamma_flip, 
         latest_metrics.get("pe_interp", "Neutral"), latest_metrics.get("ce_interp", "Neutral"), 
-        latest_metrics.get("suggested_strategy", "Wait for Setup"), container=col_left
+        latest_metrics.get("suggested_strategy", "Wait for Setup"), latest_metrics=latest_metrics, container=col_left
     )
     
     # Right-hand intelligence panel

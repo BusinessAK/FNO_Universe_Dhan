@@ -103,7 +103,7 @@ def render_metric_row(cmp_val: float, spot_change_pct: float, cw_val: float, pw_
     """
     render_html(metrics_html, container=container)
 
-def render_alerts(cmp_val: float, cw_val: float, pw_val: float, gf_val: float, pe_interp: str, ce_interp: str, suggested_strategy: str, container=st):
+def render_alerts(cmp_val: float, cw_val: float, pw_val: float, gf_val: float, pe_interp: str, ce_interp: str, suggested_strategy: str, latest_metrics: dict = None, container=st):
     """
     Renders segmented structure interpretation alert cards.
     """
@@ -143,7 +143,31 @@ def render_alerts(cmp_val: float, cw_val: float, pw_val: float, gf_val: float, p
                     st.markdown(f'<div class="alert-box warn">⚠️ PUT WALL (₹{pw_val:,.0f}) is ₹{abs(g_put):.1f} above — spot has breached support floor. Hedging may accelerate downmoves.</div>', unsafe_allow_html=True)
 
     with a3:
-        st.markdown(f'<div class="alert-box info">🤖 SUGGESTED STRATEGY: <b>{suggested_strategy}</b><br>Put Flow: {pe_interp} | Call Flow: {ce_interp}</div>', unsafe_allow_html=True)
+        # Compute recommended strikes dynamically based on option walls and playbook invalidation
+        strike_recommendation = ""
+        if latest_metrics:
+            playbook = latest_metrics.get("playbook", {})
+            invalid_strike = playbook.get("invalidation_strike", 0.0)
+            
+            if "Bull Put Spread" in suggested_strategy:
+                sell_strike = pw_val
+                # Use invalidation strike if valid, else standard 2.5% hedge
+                buy_strike = invalid_strike if invalid_strike > 0 and invalid_strike < sell_strike else (sell_strike - 10 if sell_strike > 100 else sell_strike - 5)
+                strike_recommendation = f'<div style="margin-top:6px; font-size:9.5px; color:#a78bfa; font-family:\'JetBrains Mono\', monospace; border-top:1px solid rgba(167, 139, 250, 0.15); padding-top:4px;">🎯 Rec. Strikes:<br><b>SELL ₹{sell_strike:.0f} PE</b> (Put Wall)<br><b>BUY ₹{buy_strike:.0f} PE</b> (Hedge)</div>'
+            elif "Bear Call Spread" in suggested_strategy:
+                sell_strike = cw_val
+                buy_strike = invalid_strike if invalid_strike > 0 and invalid_strike > sell_strike else (sell_strike + 10 if sell_strike > 100 else sell_strike + 5)
+                strike_recommendation = f'<div style="margin-top:6px; font-size:9.5px; color:#f43f5e; font-family:\'JetBrains Mono\', monospace; border-top:1px solid rgba(244, 63, 94, 0.15); padding-top:4px;">🎯 Rec. Strikes:<br><b>SELL ₹{sell_strike:.0f} CE</b> (Call Wall)<br><b>BUY ₹{buy_strike:.0f} CE</b> (Hedge)</div>'
+            elif "Bull Call Spread" in suggested_strategy:
+                buy_strike = pw_val
+                sell_strike = cw_val
+                strike_recommendation = f'<div style="margin-top:6px; font-size:9.5px; color:#38bdf8; font-family:\'JetBrains Mono\', monospace; border-top:1px solid rgba(56, 189, 248, 0.15); padding-top:4px;">🎯 Rec. Strikes:<br><b>BUY ₹{buy_strike:.0f} CE</b> (Support)<br><b>SELL ₹{sell_strike:.0f} CE</b> (Ceiling)</div>'
+            elif "Bear Put Spread" in suggested_strategy:
+                buy_strike = cw_val
+                sell_strike = pw_val
+                strike_recommendation = f'<div style="margin-top:6px; font-size:9.5px; color:#fbbf24; font-family:\'JetBrains Mono\', monospace; border-top:1px solid rgba(251, 191, 36, 0.15); padding-top:4px;">🎯 Rec. Strikes:<br><b>BUY ₹{buy_strike:.0f} PE</b> (Ceiling)<br><b>SELL ₹{sell_strike:.0f} PE</b> (Support)</div>'
+                
+        st.markdown(f'<div class="alert-box info">🤖 SUGGESTED STRATEGY: <b>{suggested_strategy}</b><br>Put Flow: {pe_interp} | Call Flow: {ce_interp}{strike_recommendation}</div>', unsafe_allow_html=True)
 
 def render_intelligence_panel(selected_symbol: str, latest_metrics: dict, sym_sessions: dict, container=st):
     """
