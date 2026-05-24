@@ -162,10 +162,12 @@ def is_invalidated(s_m: dict) -> bool:
                 return True
     return False
 
+INDEX_SYMBOLS = {"NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY"}
+
 def render_setups_grid(categorized_setups: dict, select_stock_callback):
     """
     Renders the setup setups catalog deck in a perfectly aligned row-by-row structure,
-    completely excluding invalidated setups.
+    completely excluding invalidated setups and index symbols (which are kept strictly in Deep Dive).
     """
     st.markdown('<p class="term-header">SECTION B — VANGUARD QUANTITATIVE SETUP ENGINE</p>', unsafe_allow_html=True)
     
@@ -198,7 +200,7 @@ def render_setups_grid(categorized_setups: dict, select_stock_callback):
     
     with r1_c1:
         st.markdown('<p style="font-size:11px;font-weight:bold;color:#fca5a5;margin:10px 0 5px;">🔥 GAMMA SQUEEZE CANDIDATES</p>', unsafe_allow_html=True)
-        sq_items = [x for x in categorized_setups.get("GAMMA_SQUEEZE", []) if not is_invalidated(x[1])]
+        sq_items = [x for x in categorized_setups.get("GAMMA_SQUEEZE", []) if x[0] not in INDEX_SYMBOLS and not is_invalidated(x[1])]
         if not sq_items:
             st.markdown('<p style="font-size:11px;color:#4a5a8a;font-style:italic;min-height:80px;">No active gamma squeeze triggers today.</p>', unsafe_allow_html=True)
         else:
@@ -207,7 +209,7 @@ def render_setups_grid(categorized_setups: dict, select_stock_callback):
                 
     with r1_c2:
         st.markdown('<p style="font-size:11px;font-weight:bold;color:#6ee7b7;margin:10px 0 5px;">🛡️ INSTITUTIONAL FLOOR BOUNCE</p>', unsafe_allow_html=True)
-        fb_items = [x for x in categorized_setups.get("FLOOR_BOUNCE", []) if not is_invalidated(x[1])]
+        fb_items = [x for x in categorized_setups.get("FLOOR_BOUNCE", []) if x[0] not in INDEX_SYMBOLS and not is_invalidated(x[1])]
         if not fb_items:
             st.markdown('<p style="font-size:11px;color:#4a5a8a;font-style:italic;min-height:80px;">No symbols at institutional floor bounds.</p>', unsafe_allow_html=True)
         else:
@@ -216,7 +218,7 @@ def render_setups_grid(categorized_setups: dict, select_stock_callback):
                 
     with r1_c3:
         st.markdown('<p style="font-size:11px;font-weight:bold;color:#fbbf24;margin:10px 0 5px;">🔄 REGIME SHIFT CROSSOVERS</p>', unsafe_allow_html=True)
-        rs_items = [x for x in categorized_setups.get("REGIME_SHIFT", []) if not is_invalidated(x[1])]
+        rs_items = [x for x in categorized_setups.get("REGIME_SHIFT", []) if x[0] not in INDEX_SYMBOLS and not is_invalidated(x[1])]
         if not rs_items:
             st.markdown('<p style="font-size:11px;color:#4a5a8a;font-style:italic;min-height:80px;">No recent regime flip crossovers detected.</p>', unsafe_allow_html=True)
         else:
@@ -230,7 +232,7 @@ def render_setups_grid(categorized_setups: dict, select_stock_callback):
     
     with r2_c1:
         st.markdown('<p style="font-size:11px;font-weight:bold;color:#a78bfa;margin:10px 0 5px;">🌀 VOLATILITY EXPANSION COILS</p>', unsafe_allow_html=True)
-        vc_items = [x for x in categorized_setups.get("VOLATILITY_COIL", []) if not is_invalidated(x[1])]
+        vc_items = [x for x in categorized_setups.get("VOLATILITY_COIL", []) if x[0] not in INDEX_SYMBOLS and not is_invalidated(x[1])]
         if not vc_items:
             st.markdown('<p style="font-size:11px;color:#4a5a8a;font-style:italic;min-height:80px;">No compressed volatility coils observed.</p>', unsafe_allow_html=True)
         else:
@@ -239,7 +241,7 @@ def render_setups_grid(categorized_setups: dict, select_stock_callback):
                 
     with r2_c2:
         st.markdown('<p style="font-size:11px;font-weight:bold;color:#38bdf8;margin:10px 0 5px;">🧲 DEALER DEFENSE PIN ZONES</p>', unsafe_allow_html=True)
-        dd_items = [x for x in categorized_setups.get("DEALER_DEFENSE", []) if not is_invalidated(x[1])]
+        dd_items = [x for x in categorized_setups.get("DEALER_DEFENSE", []) if x[0] not in INDEX_SYMBOLS and not is_invalidated(x[1])]
         if not dd_items:
             st.markdown('<p style="font-size:11px;color:#4a5a8a;font-style:italic;min-height:80px;">No dealer straddle magnet pins detected.</p>', unsafe_allow_html=True)
         else:
@@ -248,7 +250,7 @@ def render_setups_grid(categorized_setups: dict, select_stock_callback):
                 
     with r2_c3:
         st.markdown('<p style="font-size:11px;font-weight:bold;color:#fbbf24;margin:10px 0 5px;">📊 INVENTORY WALL MIGRATIONS</p>', unsafe_allow_html=True)
-        im_items = [x for x in categorized_setups.get("INVENTORY_MIGRATION", []) if not is_invalidated(x[1])]
+        im_items = [x for x in categorized_setups.get("INVENTORY_MIGRATION", []) if x[0] not in INDEX_SYMBOLS and not is_invalidated(x[1])]
         if not im_items:
             st.markdown('<p style="font-size:11px;color:#4a5a8a;font-style:italic;min-height:80px;">No active inventory wall migrations.</p>', unsafe_allow_html=True)
         else:

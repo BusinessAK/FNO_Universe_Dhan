@@ -50,11 +50,11 @@ class DataProcessor:
             if col in df.columns:
                 df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
             
-        # Filter for Options (STO and IXO)
-        df_options = df[df['INSTRUMENT'].isin(['STO', 'IXO'])].copy()
+        # Filter for Options (STO and IDO)
+        df_options = df[df['INSTRUMENT'].isin(['STO', 'IDO'])].copy()
         
         # Calculate Future Prices separately (to calculate Cost of Carry)
-        df_futures = df[df['INSTRUMENT'].isin(['STF', 'IXF'])].copy()
+        df_futures = df[df['INSTRUMENT'].isin(['STF', 'IDF'])].copy()
         
         return df_options, df_futures
 

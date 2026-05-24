@@ -141,8 +141,8 @@ class GreeksEngine:
         """
         results = []
         
-        # Filter for options only (UDiFF codes: STO, IXO)
-        options_df = df[df['INSTRUMENT'].isin(['STO', 'IXO'])].copy()
+        # Filter for options only (UDiFF codes: STO, IDO)
+        options_df = df[df['INSTRUMENT'].isin(['STO', 'IDO'])].copy()
         
         # Calculate Time to Expiry (T) in years
         options_df['T'] = (options_df['EXPIRY_DT'] - options_df['TIMESTAMP']).dt.days / 365.0
