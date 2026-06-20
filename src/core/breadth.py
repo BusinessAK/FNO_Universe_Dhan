@@ -71,8 +71,7 @@ class MarketBreadthEngine:
     def detect_daily_changes(self, latest_date: str, prev_date: str, session_history: dict) -> list:
         """
         Scans all symbols to identify critical market structure changes from previous session to latest session.
-        Returns a list of structured event dictionaries:
-        e.g., {"symbol": "SBIN", "icon": "🟢", "msg": "Support shifted higher (₹720 → ₹740)"}
+        Returns a list of ranked structured event dictionaries with rank and shift magnitude.
         """
         events = []
         if not prev_date or not latest_date:
@@ -88,45 +87,138 @@ class MarketBreadthEngine:
             p_cw, l_cw = prev_m.get("call_wall", 0.0), lat_m.get("call_wall", 0.0)
             p_gf, l_gf = prev_m.get("gamma_flip", 0.0), lat_m.get("gamma_flip", 0.0)
             p_reg, l_reg = prev_m.get("gamma_regime"), lat_m.get("gamma_regime")
+            pty_score = lat_m.get("priority_score", 0.0)
+            
+            p_gex_int = prev_m.get("gex_intensity", 0.0)
+            l_gex_int = lat_m.get("gex_intensity", 0.0)
 
-            # 1. Put Wall Migrations (Support Changes)
-            if l_pw > p_pw > 0:
+            # --- 1. DUAL WALL SHIFTS VS INDIVIDUAL WALL SHIFTS ---
+            dual_shifted = False
+            
+            # Detect Synchronized shifts
+            if l_pw > p_pw > 0 and l_cw > p_cw > 0:
+                # Dual Wall Rise (Strong Bullish Migration)
+                mag_pw = abs(l_pw - p_pw) / p_pw
+                mag_cw = abs(l_cw - p_cw) / p_cw
+                magnitude = max(mag_pw, mag_cw)
                 events.append({
                     "symbol": sym,
-                    "icon": "🟢",
-                    "type": "support_rise",
-                    "msg": f"<b>{sym}</b>: Support shifted higher (₹{p_pw:,.0f} → ₹{l_pw:,.0f})"
+                    "icon": "🚀",
+                    "type": "dual_wall_rise",
+                    "magnitude": magnitude,
+                    "priority_score": pty_score,
+                    "msg": f"<b>{sym}</b>: <b>Dual Option Walls migrated higher</b> (Support: ₹{p_pw:,.0f} → ₹{l_pw:,.0f} | Resistance: ₹{p_cw:,.0f} → ₹{l_cw:,.0f})"
                 })
-            elif l_pw < p_pw > 0:
+                dual_shifted = True
+            elif l_pw < p_pw > 0 and l_cw < p_cw > 0:
+                # Dual Wall Fall (Strong Bearish Migration)
+                mag_pw = abs(l_pw - p_pw) / p_pw
+                mag_cw = abs(l_cw - p_cw) / p_cw
+                magnitude = max(mag_pw, mag_cw)
                 events.append({
                     "symbol": sym,
-                    "icon": "🔴",
-                    "type": "support_drop",
-                    "msg": f"<b>{sym}</b>: Support weakened lower (₹{p_pw:,.0f} → ₹{l_pw:,.0f})"
+                    "icon": "🩸",
+                    "type": "dual_wall_fall",
+                    "magnitude": magnitude,
+                    "priority_score": pty_score,
+                    "msg": f"<b>{sym}</b>: <b>Dual Option Walls migrated lower</b> (Support: ₹{p_pw:,.0f} → ₹{l_pw:,.0f} | Resistance: ₹{p_cw:,.0f} → ₹{l_cw:,.0f})"
                 })
+                dual_shifted = True
+                
+            # If not dual-shifted, check for individual wall shifts
+            if not dual_shifted:
+                # Put Wall Migrations (Support Changes)
+                if l_pw > p_pw > 0:
+                    magnitude = abs(l_pw - p_pw) / p_pw
+                    events.append({
+                        "symbol": sym,
+                        "icon": "🟢",
+                        "type": "support_rise",
+                        "magnitude": magnitude,
+                        "priority_score": pty_score,
+                        "msg": f"<b>{sym}</b>: Support shifted higher (₹{p_pw:,.0f} → ₹{l_pw:,.0f})"
+                    })
+                elif l_pw < p_pw > 0:
+                    magnitude = abs(l_pw - p_pw) / p_pw
+                    events.append({
+                        "symbol": sym,
+                        "icon": "🔴",
+                        "type": "support_drop",
+                        "magnitude": magnitude,
+                        "priority_score": pty_score,
+                        "msg": f"<b>{sym}</b>: Support weakened lower (₹{p_pw:,.0f} → ₹{l_pw:,.0f})"
+                    })
 
-            # 2. Call Wall Migrations (Resistance Changes)
-            if l_cw > p_cw > 0:
-                events.append({
-                    "symbol": sym,
-                    "icon": "⚡",
-                    "type": "resistance_rise",
-                    "msg": f"<b>{sym}</b>: Resistance expanded higher (₹{p_cw:,.0f} → ₹{l_cw:,.0f})"
-                })
-            elif l_cw < p_cw > 0:
-                events.append({
-                    "symbol": sym,
-                    "icon": "🟢",
-                    "type": "resistance_fall",
-                    "msg": f"<b>{sym}</b>: Resistance weakened lower (₹{p_cw:,.0f} → ₹{l_cw:,.0f})"
-                })
+                # Call Wall Migrations (Resistance Changes)
+                if l_cw > p_cw > 0:
+                    magnitude = abs(l_cw - p_cw) / p_cw
+                    events.append({
+                        "symbol": sym,
+                        "icon": "⚡",
+                        "type": "resistance_rise",
+                        "magnitude": magnitude,
+                        "priority_score": pty_score,
+                        "msg": f"<b>{sym}</b>: Resistance expanded higher (₹{p_cw:,.0f} → ₹{l_cw:,.0f})"
+                    })
+                elif l_cw < p_cw > 0:
+                    magnitude = abs(l_cw - p_cw) / p_cw
+                    events.append({
+                        "symbol": sym,
+                        "icon": "🔴",
+                        "type": "resistance_fall",
+                        "magnitude": magnitude,
+                        "priority_score": pty_score,
+                        "msg": f"<b>{sym}</b>: Resistance weakened lower (₹{p_cw:,.0f} → ₹{l_cw:,.0f})"
+                    })
 
-            # 3. Gamma Flip Crossover
+            # --- 2. OPTION WALL RANGE PINCH / EXPANSION (Volatility Coiling) ---
+            p_range = abs(p_cw - p_pw)
+            l_range = abs(l_cw - l_pw)
+            if p_range > 0.05 * p_pw: # Check if yesterday was non-coiling
+                ratio = l_range / p_range
+                if ratio <= 0.40: # Compressed by 60% or more
+                    magnitude = 1.0 - ratio
+                    events.append({
+                        "symbol": sym,
+                        "icon": "🌀",
+                        "type": "option_wall_pinch",
+                        "magnitude": magnitude,
+                        "priority_score": pty_score,
+                        "msg": f"<b>{sym}</b>: Option walls <b>pinched/converged by {magnitude*100:.1f}%</b> (Pinch Strike: ₹{l_cw:,.0f}) — extreme volatility coiling"
+                    })
+                elif ratio >= 2.0: # Expanded by 100% or more
+                    magnitude = ratio - 1.0
+                    events.append({
+                        "symbol": sym,
+                        "icon": "💥",
+                        "type": "option_wall_expansion",
+                        "magnitude": magnitude,
+                        "priority_score": pty_score,
+                        "msg": f"<b>{sym}</b>: Option walls <b>expanded by {ratio*100:.1f}%</b> (Range: ₹{l_pw:,.0f} → ₹{l_cw:,.0f}) — volatility expansion"
+                    })
+
+            # --- 3. GEX INTENSITY EXPLOSION (Institutional Block Additions) ---
+            if p_gex_int > 1.0 and l_gex_int > 1.0:
+                ratio = l_gex_int / p_gex_int
+                if ratio >= 3.0: # Surge by 300% or more
+                    magnitude = min(1.0, (ratio - 1.0) / 10.0)
+                    events.append({
+                        "symbol": sym,
+                        "icon": "⚡",
+                        "type": "gex_intensity_explosion",
+                        "magnitude": magnitude,
+                        "priority_score": pty_score,
+                        "msg": f"<b>{sym}</b>: <b>GEX Concentration Spike of {int(ratio*100):d}%</b> (Intensity: {l_gex_int:.3f}), signaling heavy institutional block additions"
+                    })
+
+            # --- 4. GAMMA FLIP CROSSOVER ---
             if p_reg == "SHORT_GAMMA" and l_reg == "LONG_GAMMA":
                 events.append({
                     "symbol": sym,
                     "icon": "🔋",
                     "type": "regime_flip_bullish",
+                    "magnitude": 0.05,
+                    "priority_score": pty_score,
                     "msg": f"<b>{sym}</b>: Breached Gamma Flip Trigger (₹{l_gf:,.0f}) — entered Long Gamma"
                 })
             elif p_reg == "LONG_GAMMA" and l_reg == "SHORT_GAMMA":
@@ -134,18 +226,35 @@ class MarketBreadthEngine:
                     "symbol": sym,
                     "icon": "⚠",
                     "type": "regime_flip_bearish",
+                    "magnitude": 0.05,
+                    "priority_score": pty_score,
                     "msg": f"<b>{sym}</b>: Broke below Gamma Flip Pivot (₹{l_gf:,.0f}) — entered Short Gamma"
                 })
 
-        # Sort events: prioritize support shifts (rises/drops) equally at top, then flips, then resistance moves
-        # Limit to top 15 most active/important structural changes for EOD digest
+        # Priority categorization weights
         type_priority = {
-            "support_rise": 1,
-            "support_drop": 1,        # Bearish support collapses are equally critical!
-            "regime_flip_bearish": 2,  # Bearish flips are highly urgent risk events
-            "regime_flip_bullish": 2, 
-            "resistance_rise": 3,
-            "resistance_fall": 3       # Call wall drops are equally critical
+            "dual_wall_rise": 1,
+            "dual_wall_fall": 1,
+            "support_rise": 2,
+            "support_drop": 2,
+            "regime_flip_bearish": 3,
+            "regime_flip_bullish": 3,
+            "option_wall_pinch": 4,
+            "option_wall_expansion": 4,
+            "gex_intensity_explosion": 4,
+            "resistance_rise": 5,
+            "resistance_fall": 5
         }
-        sorted_events = sorted(events, key=lambda x: type_priority.get(x["type"], 9))
-        return sorted_events[:15]
+
+        # Sort: magnitude (descending), priority type (ascending), priority score (descending)
+        sorted_events = sorted(
+            events,
+            key=lambda x: (-x["magnitude"], type_priority.get(x["type"], 9), -x["priority_score"])
+        )
+
+        # Inject sequential Rank
+        for rank, event in enumerate(sorted_events, 1):
+            event["rank"] = rank
+
+        return sorted_events
+

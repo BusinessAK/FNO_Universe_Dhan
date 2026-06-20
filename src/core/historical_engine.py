@@ -21,5 +21,5 @@ class HistoricalSessionResolver:
     def get_session_warning(self, active_date: str) -> str:
         """Returns visual warnings if viewing an offline historical session."""
         if self.is_historical(active_date):
-            return "⚠️ Option chain GEX profile, OI concentration, and Greeks skew charts are only available for the latest active trading session. Chronological metrics, wall migrations, and historical setup backtests are fully accessible for this date."
+            return "⚠️ Option chain GEX profile, OI concentration, and Greeks skew charts are only available for the latest active trading session. Chronological metrics, wall migrations, and historical setups are fully accessible for this date."
         return ""

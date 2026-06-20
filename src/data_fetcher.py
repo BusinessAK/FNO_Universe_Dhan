@@ -9,6 +9,7 @@ from typing import Optional
 class NSEDataFetcher:
     # New UDiFF URL Pattern
     BASE_URL = "https://nsearchives.nseindia.com/content/fo/BhavCopy_NSE_FO_0_0_0_{date_str}_F_0000.csv.zip"
+    CM_URL = "https://nsearchives.nseindia.com/content/cm/BhavCopy_NSE_CM_0_0_0_{date_str}_F_0000.csv.zip"
     MAIN_URL = "https://www.nseindia.com/"
     HEADERS = {
         "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -26,8 +27,9 @@ class NSEDataFetcher:
 
     def _init_session(self):
         try:
-            print(f"[*] Initializing session via {self.MAIN_URL}")
-            self.session.get(self.MAIN_URL, timeout=10)
+            url = "https://www.nseindia.com/all-reports-derivatives"
+            print(f"[*] Initializing session via {url}")
+            self.session.get(url, timeout=10)
         except Exception as e:
             print(f"[!] Warning: Session init failed: {e}")
 
@@ -104,7 +106,7 @@ class NSEDataFetcher:
             url = self.BASE_URL.format(date_str=date_str)
             
             # Check if file already exists locally
-            expected_file = f"BhavCopy_NSE_FO_0_0_0_{date_str}_F_0000.csv"
+            expected_file = f"FO_BhavCopy_NSE_FO_0_0_0_{date_str}_F_0000.csv"
             expected_path = os.path.join(self.raw_data_dir, expected_file)
             if os.path.exists(expected_path):
                 print(f"[*] Found local: {expected_file}")

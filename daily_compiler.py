@@ -57,6 +57,32 @@ def main():
     session_history = {}
     persistence_tracker = {}
     
+    # Incremental Compile Layer: Load pre-existing session history to skip completed days
+    output_dir = "data/compiled"
+    session_history_path = os.path.join(output_dir, "session_history.json")
+    force_compile = "--force" in sys.argv
+    
+    compiled_dates = set()
+    if not force_compile and os.path.exists(session_history_path):
+        try:
+            with open(session_history_path) as f:
+                session_history = json.load(f)
+            print(f"[*] Loaded existing session history with {len(session_history)} symbols (Incremental Mode).")
+            if session_history:
+                # Union compiled dates from benchmark indices first, then fall back to all symbols.
+                # Using a single symbol is risky — if it has a data gap, valid dates get skipped.
+                compiled_dates = set()
+                for bench in ["NIFTY", "BANKNIFTY"]:
+                    if bench in session_history:
+                        compiled_dates.update(session_history[bench].keys())
+                # Final fallback: if neither index present, union all symbols
+                if not compiled_dates:
+                    for sym in session_history:
+                        compiled_dates.update(session_history[sym].keys())
+        except Exception as e:
+            print(f"[!] Warning: Failed to load session history: {e}. Re-building database from scratch.")
+            session_history = {}
+            
     # Loop adjacent pairs chronologically
     for i in range(1, len(files)):
         file_tm1_name = files[i-1]
@@ -65,6 +91,19 @@ def main():
         date_tm1 = extract_date(file_tm1_name)
         date_t = extract_date(file_t_name)
         
+        # Check if this trading day is already processed and compiled
+        if not force_compile and date_t in compiled_dates:
+            # Restore persistence counters to preserve consecutive trend states
+            for symbol in session_history:
+                if date_t in session_history[symbol]:
+                    day_data = session_history[symbol][date_t]
+                    persistence_tracker[symbol] = {
+                        "bullish_days": int(day_data.get("bullish_persistence", 0)),
+                        "bearish_days": int(day_data.get("bearish_persistence", 0))
+                    }
+            print(f"[*] Session {date_t} already compiled. Bypassing raw Greeks processing.")
+            continue
+            
         print(f"[+] Compiling Session: {date_t} (T) vs {date_tm1} (T-1)...")
         
         file_tm1_path = os.path.join(raw_dir, file_tm1_name)
@@ -105,6 +144,13 @@ def main():
                 iv_shift = float(row.get('IV_SHIFT', 0.0))
                 
                 net_bull_inv_shift = float(row.get('NET_BULL_INV_SHIFT', 0.0))
+
+                # Expiry rollover metadata — populated by intelligence.py when a weekly
+                # index series was stripped from T-1 before delta computation.
+                # Same value for all symbols on a given day (it's a session-level event).
+                expiry_filtered      = bool(row.get('EXPIRY_FILTERED', False))
+                dropped_expiry_dates = str(row.get('DROPPED_EXPIRY_DATES', ''))
+
                 
                 # IFS Score Computation
                 vol_ce_t = float(row.get('VOLUME_CE_T', 0.0))
@@ -145,6 +191,28 @@ def main():
                 elif gex_t < -10000:
                     gamma_regime = "SHORT_GAMMA"
                 
+                # Fetch history compiled so far to run true longitudinal models
+                sym_history_list = []
+                if symbol in session_history:
+                    sorted_pd_dates = sorted(list(session_history[symbol].keys()))
+                    for pd_date in sorted_pd_dates:
+                        sym_history_list.append(session_history[symbol][pd_date])
+
+                # ── IV Rank Calculation ──
+                iv_history = [s.get("iv", 0.0) for s in sym_history_list]
+                if iv_history:
+                    iv_min = min(iv_history)
+                    iv_max = max(iv_history)
+                    iv_rank = ((iv_t - iv_min) / (iv_max - iv_min) * 100.0) if iv_max > iv_min else 50.0
+                else:
+                    iv_rank = 50.0
+
+                # ── Skew Slope Check (OTM Call vs ATM Call Ratio) ──
+                skew_slope = 1.0
+                # Using average option prices close CE vs PE to approximate skew slope
+                if row.get('CLOSE_CE_T', 0.0) > 0 and row.get('CLOSE_PE_T', 0.0) > 0:
+                    skew_slope = float(row.get('CLOSE_CE_T') / row.get('CLOSE_PE_T'))
+
                 # Setup screener scan rules
                 setups = []
                 # 1. GAMMA_SQUEEZE (Tier 1: Volatility Expansion)
@@ -171,19 +239,36 @@ def main():
                 if (put_wall_t != put_wall_tm1 and put_wall_t > 0 and put_wall_tm1 > 0) or (call_wall_t != call_wall_tm1 and call_wall_t > 0 and call_wall_tm1 > 0):
                     setups.append("INVENTORY_MIGRATION")
                 
+                # 7. PINCH_ZONE (Tier 2: All walls converged — Compression Breakout Setup)
+                # Fires only when INVENTORY_MIGRATION did NOT trigger (walls static but all pinched)
+                if (
+                    "INVENTORY_MIGRATION" not in setups
+                    and call_wall_t > 0 and put_wall_t > 0 and gamma_flip_t > 0
+                    and abs(call_wall_t - put_wall_t) < 1.0
+                    and abs(call_wall_t - gamma_flip_t) < 1.0
+                    and spot_t > 0
+                    and abs(spot_t - gamma_flip_t) / spot_t <= 0.04
+                ):
+                    setups.append("PINCH_ZONE")
+
+                # 8. IV_SPIKE Setup (Vol Spike - Premium Rich)
+                if iv_shift > 4.5 and iv_rank > 70:
+                    setups.append("IV_SPIKE")
+
+                # 9. IV_CRUSH Setup (Vol Crush - Post Event)
+                if iv_shift < -4.5 and iv_rank < 35:
+                    setups.append("IV_CRUSH")
+
+                # 10. IV_SKEW_ACCUMULATION Setup (Speculative Skew Chase)
+                if spot_t > 0 and call_wall_t > 0 and 0 < (call_wall_t - spot_t) / spot_t <= 0.03 and skew_slope > 1.15:
+                    setups.append("IV_SKEW_ACCUMULATION")
+                
                 # Ratios for conviction circle
                 instab_factor = min(10.0, abs(gex_intensity) / 15.0) / 10.0
                 asym_factor = min(10.0, abs(pcr_t - 1.0) / 0.5) / 10.0
                 price_factor = min(10.0, abs(spot_chg) / (iv_t * 100 + 0.1)) / 10.0
                 vol_factor = min(10.0, vol_t / 5e5) / 10.0
-                
-                # Fetch history compiled so far to run true longitudinal models
-                sym_history_list = []
-                if symbol in session_history:
-                    sorted_pd_dates = sorted(list(session_history[symbol].keys()))
-                    for pd_date in sorted_pd_dates:
-                        sym_history_list.append(session_history[symbol][pd_date])
-                
+
                 # Dynamic Setup Details
                 setups_details = {}
                 for setup in setups:
@@ -199,12 +284,16 @@ def main():
                         setups_details["REGIME_SHIFT"] = {"expected_range": f"₹{spot_t * 0.99:,.1f} to ₹{spot_t * (1 + iv_t * 0.7):,.1f}", "trigger_strike": float(gamma_flip_t), "risk_zone": f"Below ₹{gamma_flip_t:,.0f}"}
                     elif setup == "INVENTORY_MIGRATION":
                         setups_details["INVENTORY_MIGRATION"] = {"expected_range": f"₹{spot_t * 0.99:,.1f} to ₹{spot_t * (1 + iv_t * 0.6):,.1f}", "trigger_strike": float(put_wall_t), "risk_zone": f"Below ₹{put_wall_t:,.0f}"}
+                    elif setup == "PINCH_ZONE":
+                        setups_details["PINCH_ZONE"] = {"expected_range": f"₹{gamma_flip_t * 0.97:,.1f} to ₹{gamma_flip_t * 1.03:,.1f}", "trigger_strike": float(gamma_flip_t), "risk_zone": f"Break ₹{gamma_flip_t:,.0f} — above=bull, below=bear"}
                 
                 # Base snapshot data
                 day_data = {
                     "date": date_t,
                     "spot_close": spot_t,
                     "spot_change_pct": spot_chg,
+                    "futures_oi": float(row.get('FUT_OI_T', 0.0)),
+                    "futures_oi_chg": float(row.get('FUT_CHG_OI_T', 0.0)),
                     "pcr": pcr_t,
                     "total_ce_oi": oi_ce_t,
                     "total_pe_oi": oi_pe_t,
@@ -229,7 +318,11 @@ def main():
                     "setups_details": setups_details,
                     "ce_interp": row.get('CE_INTERP', 'Neutral'),
                     "pe_interp": row.get('PE_INTERP', 'Neutral'),
-                    "suggested_strategy": row.get('SUGGESTED_STRATEGY', 'Wait for Setup')
+                    "suggested_strategy": row.get('SUGGESTED_STRATEGY', 'Wait for Setup'),
+                    # Expiry rollover flag — True on days when an index weekly series
+                    # expired overnight and was stripped from T-1 before delta computation.
+                    "expiry_filtered": expiry_filtered,
+                    "dropped_expiry_dates": dropped_expiry_dates,
                 }
                 
                 # ── True Longitudinal Engine Mappings ──
@@ -270,7 +363,7 @@ def main():
                     invalid_val = float(gamma_flip_t)
                     if invalid_val >= float(call_wall_t * 0.99):
                         invalid_val = float(call_wall_t * 0.98)
-                    playbook = {"bias": "Bullish Breakout", "trigger_strike": float(call_wall_t), "invalidation_strike": invalid_val, "expected_behavior": "Gamma Squeeze Expansion", "dealer_behavior": "Short Gamma Hedging Squeeze"}
+                    playbook = {"bias": "Bullish Breakout", "trigger_strike": float(call_wall_t), "invalidation_strike": invalid_val, "expected_behavior": "Short Squeeze Breakout", "dealer_behavior": "Short Gamma Hedging Squeeze"}
                 elif "INVENTORY_MIGRATION" in setups:
                     # Classify the specific type of wall migration dynamically!
                     put_up = put_wall_t > put_wall_tm1 > 0
@@ -283,7 +376,7 @@ def main():
                             "bias": "Strong Bullish Momentum",
                             "trigger_strike": float(call_wall_t),
                             "invalidation_strike": float(put_wall_t),
-                            "expected_behavior": "Parallel Channel Upward Shift",
+                            "expected_behavior": "Bullish Trend Extension",
                             "dealer_behavior": "Dual Wall Upward Migration"
                         }
                     elif put_down and call_down:
@@ -291,7 +384,7 @@ def main():
                             "bias": "Strong Bearish Momentum",
                             "trigger_strike": float(put_wall_t),
                             "invalidation_strike": float(call_wall_t),
-                            "expected_behavior": "Parallel Channel Downward Shift",
+                            "expected_behavior": "Bearish Trend Extension",
                             "dealer_behavior": "Dual Wall Downward Migration"
                         }
                     elif put_up:
@@ -302,20 +395,31 @@ def main():
                             "bias": "Bullish Accumulation",
                             "trigger_strike": float(put_wall_t),
                             "invalidation_strike": invalid_val,
-                            "expected_behavior": "Support Floor Upward Breakout",
+                            "expected_behavior": "Support Floor Rise",
                             "dealer_behavior": "Support Floor Upward Migration"
                         }
                     elif put_down:
                         invalid_val = float(put_wall_tm1)
                         if invalid_val <= float(put_wall_t * 1.01):
                             invalid_val = float(put_wall_t * 1.02)
-                        playbook = {
-                            "bias": "Bearish Breakdown",
-                            "trigger_strike": float(put_wall_t),
-                            "invalidation_strike": invalid_val,
-                            "expected_behavior": "Support Floor Collapse Breakdown",
-                            "dealer_behavior": "Support Floor Downward Migration"
-                        }
+                        
+                        # If spot price is rising and remains above the new Put Wall, this is support normalization, not a breakdown!
+                        if spot_t > put_wall_t and spot_chg > 0:
+                            playbook = {
+                                "bias": "Support Normalization",
+                                "trigger_strike": float(put_wall_t),
+                                "invalidation_strike": float(put_wall_t * 0.985),
+                                "expected_behavior": "Bullish Rebalancing",
+                                "dealer_behavior": "Support Floor Normalization"
+                            }
+                        else:
+                            playbook = {
+                                "bias": "Bearish Breakdown",
+                                "trigger_strike": float(put_wall_t),
+                                "invalidation_strike": invalid_val,
+                                "expected_behavior": "Support Floor Collapse",
+                                "dealer_behavior": "Support Floor Downward Migration"
+                            }
                     elif call_up:
                         invalid_val = float(call_wall_tm1)
                         if invalid_val >= float(call_wall_t * 0.99):
@@ -324,7 +428,7 @@ def main():
                             "bias": "Bullish Breakout",
                             "trigger_strike": float(call_wall_t),
                             "invalidation_strike": invalid_val,
-                            "expected_behavior": "Resistance Ceiling Breakout Expansion",
+                            "expected_behavior": "Resistance Ceiling Rise",
                             "dealer_behavior": "Call Wall Upward Migration"
                         }
                     elif call_down:
@@ -335,7 +439,7 @@ def main():
                             "bias": "Bearish Consolidation",
                             "trigger_strike": float(call_wall_t),
                             "invalidation_strike": invalid_val,
-                            "expected_behavior": "Ceiling Weakening Compression",
+                            "expected_behavior": "Ceiling Drop (Bearish)",
                             "dealer_behavior": "Call Wall Downward Migration"
                         }
                     else:
@@ -343,21 +447,122 @@ def main():
                             "bias": "Range Shift",
                             "trigger_strike": float(call_wall_t),
                             "invalidation_strike": float(put_wall_t),
-                            "expected_behavior": "Option Wall Rebalancing",
+                            "expected_behavior": "Wall Rebalancing",
                             "dealer_behavior": "Inventory Repositioning"
                         }
                 elif "REGIME_SHIFT" in setups:
                     playbook = {"bias": "Regime Transition", "trigger_strike": float(gamma_flip_t), "invalidation_strike": float(gamma_flip_t * 0.99), "expected_behavior": "Volatility Stabilization", "dealer_behavior": "Hedging Crossover Transition"}
                 elif "VOLATILITY_COIL" in setups:
-                    playbook = {"bias": "Volatility Expansion", "trigger_strike": float(gamma_flip_t), "invalidation_strike": float(spot_t * 0.985), "expected_behavior": "Symmetric Squeeze Expansion", "dealer_behavior": "Inventory Compression Coil"}
+                    playbook = {"bias": "Volatility Expansion", "trigger_strike": float(gamma_flip_t), "invalidation_strike": float(spot_t * 0.985), "expected_behavior": "Coil Breakout Watch", "dealer_behavior": "Inventory Compression Coil"}
                 elif "DEALER_DEFENSE" in setups:
-                    playbook = {"bias": "Mean Reversion", "trigger_strike": float(gamma_flip_t), "invalidation_strike": float(gamma_flip_t * 0.98), "expected_behavior": "Dealer Pin Straddle Pin", "dealer_behavior": "Straddle Pin Defense"}
+                    playbook = {"bias": "Mean Reversion", "trigger_strike": float(gamma_flip_t), "invalidation_strike": float(gamma_flip_t * 0.98), "expected_behavior": "Institutional Pin Target", "dealer_behavior": "Straddle Pin Defense"}
                 elif "FLOOR_BOUNCE" in setups:
-                    playbook = {"bias": "Bullish Mean Reversion", "trigger_strike": float(put_wall_t), "invalidation_strike": float(put_wall_t * 0.985), "expected_behavior": "Floor Defense Bounce", "dealer_behavior": "Put Wall Support Hedging"}
+                    playbook = {"bias": "Bullish Mean Reversion", "trigger_strike": float(put_wall_t), "invalidation_strike": float(put_wall_t * 0.985), "expected_behavior": "Key Support Bounce", "dealer_behavior": "Put Wall Support Hedging"}
+                elif "PINCH_ZONE" in setups:
+                    # All walls converged — breakout direction determined by spot price relative to the pinch wall (gamma_flip_t)
+                    is_bullish = (spot_t >= gamma_flip_t) if spot_t > 0 and gamma_flip_t > 0 else (ifs_final >= 0)
+                    if is_bullish:
+                        pz_bias = "Compression — Bullish Breakout Watch"
+                        pz_behavior = "Bullish Breakout Watch"
+                        invalid_val = float(spot_t * 0.985)
+                    else:
+                        pz_bias = "Compression — Bearish Breakdown Watch"
+                        pz_behavior = "Bearish Breakdown Watch"
+                        invalid_val = float(spot_t * 1.015)
+                    playbook = {
+                        "bias": pz_bias,
+                        "trigger_strike": float(gamma_flip_t),
+                        "invalidation_strike": invalid_val,
+                        "expected_behavior": pz_behavior,
+                        "dealer_behavior": "Long Gamma Pin Defense"
+                    }
+                elif "IV_SPIKE" in setups:
+                    playbook = {
+                        "bias": "Volatility Mean Reversion",
+                        "trigger_strike": float(spot_t),
+                        "invalidation_strike": float(spot_t * 1.05) if ifs_final < 0 else float(spot_t * 0.95),
+                        "expected_behavior": "IV Contraction Reversion",
+                        "dealer_behavior": "Premium Rich Straddle Selling"
+                    }
+                elif "IV_CRUSH" in setups:
+                    playbook = {
+                        "bias": "Volatility Stable Range",
+                        "trigger_strike": float(spot_t),
+                        "invalidation_strike": float(spot_t * 1.03),
+                        "expected_behavior": "IV Collapse Flatline",
+                        "dealer_behavior": "Post Event Unwinding"
+                    }
+                elif "IV_SKEW_ACCUMULATION" in setups:
+                    playbook = {
+                        "bias": "Bullish Breakout",
+                        "trigger_strike": float(call_wall_t),
+                        "invalidation_strike": float(spot_t * 0.97),
+                        "expected_behavior": "Upside Skew Chase Breakout",
+                        "dealer_behavior": "Speculative Call Buying Squeeze"
+                    }
                 elif ifs_final > 15:
                     playbook = {"bias": "Bullish Bias", "trigger_strike": float(call_wall_t), "invalidation_strike": float(put_wall_t), "expected_behavior": "Support Floor Building", "dealer_behavior": "Put Writing Support"}
                 elif ifs_final < -15:
                     playbook = {"bias": "Bearish Bias", "trigger_strike": float(put_wall_t), "invalidation_strike": float(call_wall_t), "expected_behavior": "Ceiling Reinforcement", "dealer_behavior": "Call Writing Reinforcement"}
+
+                # ── Setup-Aware High-Fidelity Suggested Strategy Override ──
+                s_strat = row.get('SUGGESTED_STRATEGY', 'Wait for Setup')
+                p_bias = playbook.get("bias", "Neutral")
+                
+                if "GAMMA_SQUEEZE" in setups:
+                    s_strat = "ATM Option Buying (Call)"
+                elif "IV_SPIKE" in setups:
+                    s_strat = "Bear Call Spread (Credit)" if ifs_final < 0 else "Bull Put Spread (Credit)"
+                elif "IV_CRUSH" in setups:
+                    s_strat = "Iron Condor / Short Straddle"
+                elif "VOLATILITY_COIL" in setups:
+                    s_strat = "Long Straddle (Breakout Watch)"
+                elif "FLOOR_BOUNCE" in setups:
+                    s_strat = "Bull Put Spread (Credit)"
+                elif "DEALER_DEFENSE" in setups:
+                    s_strat = "Iron Condor / Short Straddle"
+                elif "PINCH_ZONE" in setups:
+                    is_pz_bullish = (spot_t >= gamma_flip_t) if spot_t > 0 and gamma_flip_t > 0 else (ifs_final >= 0)
+                    if is_pz_bullish:
+                        s_strat = "Bull Call Spread (Debit)"
+                    else:
+                        s_strat = "Bear Put Spread (Debit)"
+                elif "INVENTORY_MIGRATION" in setups:
+                    if p_bias == "Strong Bullish Momentum" or p_bias == "Bullish Breakout":
+                        s_strat = "Bull Call Spread (Debit)"
+                    elif p_bias == "Bullish Accumulation" or p_bias == "Support Normalization":
+                        s_strat = "Bull Put Spread (Credit)"
+                    elif p_bias == "Bearish Consolidation":
+                        s_strat = "Bear Call Spread (Credit)"
+                    elif p_bias == "Bearish Breakdown" or p_bias == "Strong Bearish Momentum":
+                        s_strat = "Bear Put Spread (Debit)"
+                    else:
+                        s_strat = "Wait for Setup"
+                elif "IV_SKEW_ACCUMULATION" in setups:
+                    # Bias direction takes precedence; gamma_regime is a secondary tie-breaker
+                    # for neutral/transition cases where direction is unclear.
+                    if "Bullish" in p_bias:
+                        # Spot above gamma flip + call skew building → buy the breakout
+                        s_strat = "Bull Call Spread (Debit)"
+                    elif "Bearish" in p_bias:
+                        # Spot below gamma flip + put skew building → sell the rally cap
+                        s_strat = "Bear Call Spread (Credit)"
+                    else:
+                        # Neutral / Regime Transition — defer to gamma_regime
+                        s_strat = "Bull Call Spread (Debit)" if gamma_regime == "LONG_GAMMA" else "Bear Call Spread (Credit)"
+                elif "REGIME_SHIFT" in setups:
+                    if p_bias == "Regime Transition" and ifs_final >= 0:
+                        s_strat = "Bull Put Spread (Credit)"
+                    elif p_bias == "Regime Transition" and ifs_final < 0:
+                        s_strat = "Bear Call Spread (Credit)"
+                elif ifs_final > 15:
+                    s_strat = "Bull Put Spread (Credit)"
+                elif ifs_final < -15:
+                    s_strat = "Bear Call Spread (Credit)"
+                else:
+                    s_strat = "Wait for Setup"
+                
+                day_data["suggested_strategy"] = s_strat
 
                 # Save updated longitudinal stats
                 day_data["conviction_score"] = conviction_score
@@ -420,6 +625,8 @@ def main():
                 "date": d_t,
                 "spot_close": day_data["spot_close"],
                 "spot_change_pct": day_data["spot_change_pct"],
+                "futures_oi": day_data.get("futures_oi", 0.0),
+                "futures_oi_chg": day_data.get("futures_oi_chg", 0.0),
                 "pcr": day_data["pcr"],
                 "total_ce_oi": day_data["total_ce_oi"],
                 "total_pe_oi": day_data["total_pe_oi"],
@@ -511,7 +718,8 @@ def main():
                 "symbol": a["symbol"],
                 "icon": a["icon"],
                 "type": a["type"],
-                "msg": a["msg"]
+                "msg": a["msg"],
+                "rank": a.get("rank", 999)
             })
 
     # Convert to DataFrames
@@ -519,7 +727,7 @@ def main():
     df_setups = pd.DataFrame(setups_rows)
     df_inventory = pd.DataFrame(inventory_rows)
     df_breadth = pd.DataFrame(breadth_rows)
-    df_changes = pd.DataFrame(changes_rows) if changes_rows else pd.DataFrame(columns=["date", "symbol", "icon", "type", "msg"])
+    df_changes = pd.DataFrame(changes_rows) if changes_rows else pd.DataFrame(columns=["date", "symbol", "icon", "type", "msg", "rank"])
 
     # ─────────────────────────────────────────────────────────────────────────────
     # EXPORTING TO COLUMNAR PARQUET & DUCKDB INDEX

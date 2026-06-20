@@ -37,12 +37,12 @@ class DataProcessor:
         df = df.rename(columns=mapping)
         
         # Strip string columns
-        for col in df.select_dtypes(include=['object']).columns:
+        for col in df.select_dtypes(include=['object', 'string']).columns:
             df[col] = df[col].astype(str).str.strip()
         
         # Ensure dates are datetime
-        df['EXPIRY_DT'] = pd.to_datetime(df['EXPIRY_DT'])
-        df['TIMESTAMP'] = pd.to_datetime(df['TIMESTAMP'])
+        df['EXPIRY_DT'] = pd.to_datetime(df['EXPIRY_DT'], errors='coerce')
+        df['TIMESTAMP'] = pd.to_datetime(df['TIMESTAMP'], errors='coerce')
         
         # Clean numerical columns
         numeric_cols = ['STRIKE_PR', 'CLOSE', 'OPEN_INT', 'CHG_IN_OI', 'SPOT_PRICE', 'LOT_SIZE', 'VOLUME']
@@ -74,3 +74,47 @@ class DataProcessor:
         """
         lots = df.groupby('SYMBOL')['LOT_SIZE'].max().to_dict()
         return lots
+
+    def get_common_expiries(self, df_t: pd.DataFrame, df_tm1: pd.DataFrame) -> tuple:
+        """
+        For index options (IDO), finds expiry dates present in BOTH T and T-1.
+        When a weekly series expires overnight, it exists in T-1 but not in T.
+        This is used to filter T-1 before computing OI deltas, so the system
+        compares apples-to-apples instead of including the vanished weekly's OI.
+
+        Returns:
+            common_expiries (set): Expiry dates present in both T and T-1 for IDO.
+            dropped_expiries (set): Expiry dates in T-1 but gone from T (expired weeklies).
+        """
+        ido_t   = df_t[df_t['INSTRUMENT'] == 'IDO']
+        ido_tm1 = df_tm1[df_tm1['INSTRUMENT'] == 'IDO']
+
+        expiries_t   = set(ido_t['EXPIRY_DT'].dropna().unique())
+        expiries_tm1 = set(ido_tm1['EXPIRY_DT'].dropna().unique())
+
+        common  = expiries_t & expiries_tm1
+        dropped = expiries_tm1 - expiries_t   # In T-1 but vanished from T = expired
+
+        return common, dropped
+
+    def filter_tm1_to_common_expiries(self, df_tm1: pd.DataFrame, common_expiries: set) -> pd.DataFrame:
+        """
+        Strips expired weekly index series from T-1 before OI delta computation.
+
+        Rules:
+          - STO (stocks): unchanged — they roll to next month naturally, no issue.
+          - IDO (indices): keep only expiry dates that still exist in T.
+          - STF/IDF (futures): not processed here, passed through unchanged.
+
+        This ensures that when an index weekly expires (e.g. NIFTY Thu weekly,
+        BANKNIFTY Wed weekly, FINNIFTY Tue weekly, MIDCPNIFTY Mon weekly), the
+        large OI block of the expired series is excluded from T-1 aggregates.
+        The resulting delta then reflects genuine institutional activity in the
+        surviving series, not calendar settlement noise.
+        """
+        sto_rows = df_tm1['INSTRUMENT'] == 'STO'
+        ido_rows = (df_tm1['INSTRUMENT'] == 'IDO') & (df_tm1['EXPIRY_DT'].isin(common_expiries))
+        # Futures rows — not used in options delta, but preserve for completeness
+        fut_rows = df_tm1['INSTRUMENT'].isin(['STF', 'IDF'])
+
+        return df_tm1[sto_rows | ido_rows | fut_rows].copy()

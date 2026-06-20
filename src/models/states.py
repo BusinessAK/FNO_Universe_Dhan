@@ -49,6 +49,8 @@ class SignalState:
     symbol: str
     spot_close: float = 0.0
     spot_change_pct: float = 0.0
+    futures_oi: float = 0.0
+    futures_oi_chg: float = 0.0
     pcr: float = 0.0
     total_ce_oi: float = 0.0
     total_pe_oi: float = 0.0
@@ -84,6 +86,8 @@ class SignalState:
             symbol=symbol,
             spot_close=float(d.get("spot_close", 0.0)),
             spot_change_pct=float(d.get("spot_change_pct", 0.0)),
+            futures_oi=float(d.get("futures_oi", 0.0)),
+            futures_oi_chg=float(d.get("futures_oi_chg", 0.0)),
             pcr=float(d.get("pcr", 0.0)),
             total_ce_oi=float(d.get("total_ce_oi", 0.0)),
             total_pe_oi=float(d.get("total_pe_oi", 0.0)),

@@ -31,10 +31,17 @@ class MarketStructureEngine:
         if not greeks_slice.empty:
             try:
                 g_slice = greeks_slice.copy()
-                
-                # Fetch Spot Close from greeks dataframe
-                if "SPOT" in g_slice.columns and not pd.isna(g_slice["SPOT"].iloc[0]):
-                    spot_close = float(g_slice["SPOT"].iloc[0])
+
+                # ── Spot Price Priority ──────────────────────────────────────
+                # Authoritative source: session_history.spot_close (compiled from
+                # the official NSE EOD settlement price in the raw bhav file).
+                # greeks.csv SPOT is only used as a fallback when the compiled
+                # value is missing or zero — it may reflect an intraday snapshot
+                # or a different pipeline pass and should never override EOD truth.
+                if spot_close == 0.0 or pd.isna(spot_close):
+                    if "SPOT" in g_slice.columns and not pd.isna(g_slice["SPOT"].iloc[0]):
+                        spot_close = float(g_slice["SPOT"].iloc[0])
+                # ────────────────────────────────────────────────────────────
                 
                 g_slice["GEX"] = pd.to_numeric(g_slice["GEX"], errors="coerce").fillna(0.0)
                 g_slice["STRIKE_PR"] = pd.to_numeric(g_slice["STRIKE_PR"], errors="coerce").fillna(0.0)
@@ -43,18 +50,27 @@ class MarketStructureEngine:
                 ce_gex = g_slice[g_slice['OPTION_TYP'] == 'CE'].groupby('STRIKE_PR')['GEX'].sum()
                 pe_gex = g_slice[g_slice['OPTION_TYP'] == 'PE'].groupby('STRIKE_PR')['GEX'].sum().abs()
                 
+                # Initialize walls to 0.0 before dynamic calculation so we don't bleed all-expiry values
+                call_wall = 0.0
+                put_wall = 0.0
+
                 # Call Wall = Strike of maximum positive Call GEX
-                if not ce_gex.empty and not ce_gex.isna().all():
-                    call_wall = float(ce_gex.idxmax())
+                # Filter > 0 to avoid garbage idxmax() on zero-GEX series (BUG-3 fix)
+                ce_gex_pos = ce_gex[ce_gex > 0]
+                if not ce_gex_pos.empty:
+                    call_wall = float(ce_gex_pos.idxmax())
                 
-                # Put Wall = Strike of maximum negative Put GEX
-                if not pe_gex.empty and not pe_gex.isna().all():
-                    put_wall = float(pe_gex.idxmax())
+                # Put Wall = Strike of maximum absolute Put GEX
+                pe_gex_pos = pe_gex[pe_gex > 0]
+                if not pe_gex_pos.empty:
+                    put_wall = float(pe_gex_pos.idxmax())
                 
-                # Gamma Flip = Overlap strike maximizing simultaneously min(Call GEX, Put GEX)
-                overlap = pd.concat([ce_gex, pe_gex], axis=1).min(axis=1)
-                if not overlap.empty and not overlap.isna().all():
-                    gamma_flip = float(overlap.idxmax())
+                # ── Gamma Flip: ALWAYS use compiled ALL-EXPIRY value from latest_metrics ──
+                # Gamma Flip is a full-chain structural pivot (where aggregate dealer net gamma
+                # crosses zero). Filtering to a single expiry distorts this — near-expiry gamma
+                # is exponentially amplified, anchoring the flip to a different strike.
+                # The compiled value (from intelligence.py, full chain) is the canonical one.
+                # gamma_flip is intentionally NOT overridden here.
                 
                 # Combined Net GEX Exposure
                 gex_total = float(g_slice['GEX'].sum())
@@ -64,13 +80,20 @@ class MarketStructureEngine:
                 pe_oi = g_slice[g_slice['OPTION_TYP'] == 'PE']['OPEN_INT'].sum()
                 pcr_index = float(pe_oi / ce_oi) if ce_oi > 0 else pcr_index
                 
-                # Regime Mapping
-                if gex_total > 200000:
-                    gamma_regime = "LONG_GAMMA"
-                elif gex_total < -10000:
-                    gamma_regime = "SHORT_GAMMA"
+                # Regime Mapping based on true mathematical Flip zone boundary
+                if gamma_flip > 0:
+                    if abs(spot_close - gamma_flip) / spot_close <= 0.008:
+                        gamma_regime = "TRANSITION_REGIME"
+                    elif spot_close > gamma_flip:
+                        gamma_regime = "LONG_GAMMA"
+                    else:
+                        gamma_regime = "SHORT_GAMMA"
                 else:
                     gamma_regime = "TRANSITION_REGIME"
+                    if gex_total > 200000:
+                        gamma_regime = "LONG_GAMMA"
+                    elif gex_total < -10000:
+                        gamma_regime = "SHORT_GAMMA"
                     
             except Exception:
                 # Silently fall back to pre-compiled values if any dynamic math parsing fails

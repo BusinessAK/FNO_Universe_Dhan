@@ -94,7 +94,12 @@ if not session_history:
 all_symbols = sorted(list(session_history.keys()))
 trading_dates = []
 if all_symbols:
-    trading_dates = sorted(list(session_history[all_symbols[0]].keys()))
+    # Union dates across ALL symbols — avoids silent gaps if any leading symbol
+    # was absent from a particular bhav (lot expiry, delisting, etc.)
+    all_date_set = set()
+    for sym in all_symbols:
+        all_date_set.update(session_history[sym].keys())
+    trading_dates = sorted(list(all_date_set))
 
 if not trading_dates:
     st.error("⚠ No compiled dates found in session history database.")
@@ -148,14 +153,63 @@ if view_mode == "⚡ VANGUARD SCREENER TERMINAL":
     render_market_breadth_panel(latest_breadth)
     render_daily_changes_panel(today_changes)
     
+    # ── Weekly Expiry Rollover Banner ─────────────────────────────────────────
+    # Check if today's session had an index weekly expiry filtered out.
+    # We read from any index symbol present in session_history.
+    _index_syms = [s for s in ["NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY", "NIFTYNXT50"] if s in session_history]
+    _expiry_filtered = False
+    _dropped_dates = ""
+    for _isym in _index_syms:
+        _m = session_history.get(_isym, {}).get(latest_date, {})
+        if _m.get("expiry_filtered", False):
+            _expiry_filtered = True
+            _dropped_dates = _m.get("dropped_expiry_dates", "")
+            break
+
+    if _expiry_filtered:
+        _dropped_label = f" ({_dropped_dates})" if _dropped_dates else ""
+        st.markdown(f"""
+        <div style="
+            background: linear-gradient(90deg, rgba(120,80,0,0.25), rgba(251,191,36,0.08));
+            border: 1px solid rgba(251,191,36,0.35);
+            border-left: 4px solid #fbbf24;
+            border-radius: 6px;
+            padding: 10px 16px;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-family: 'IBM Plex Sans', sans-serif;
+        ">
+            <span style="font-size:18px;">🔄</span>
+            <div>
+                <span style="font-weight:700;color:#fbbf24;font-size:12px;letter-spacing:0.5px;">
+                    WEEKLY INDEX EXPIRY ROLLOVER
+                </span>
+                <span style="color:#a0a0c0;font-size:11px;margin-left:10px;">
+                    Expired series stripped from T-1 before delta computation{_dropped_label}
+                </span>
+                <br>
+                <span style="color:#6b7a99;font-size:10px;">
+                    ✅ Stock signals unaffected &nbsp;|&nbsp;
+                    ✅ Index IFS computed on surviving series only &nbsp;|&nbsp;
+                    ✅ Persistence counters preserved
+                </span>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+    # ──────────────────────────────────────────────────────────────────────────
+
     # Section A - flagships matrix
     st.markdown('<p class="term-header">SECTION A — INSTITUTIONAL INVENTORY MATRIX</p>', unsafe_allow_html=True)
     render_inventory_matrix(all_symbols, session_history, latest_date, trading_dates)
+
     
     # Section B - setups scanner loading direct from DatabaseService
     categorized_setups = {
-        "GAMMA_SQUEEZE": [], "VOLATILITY_COIL": [], "FLOOR_BOUNCE": [],
-        "DEALER_DEFENSE": [], "REGIME_SHIFT": [], "INVENTORY_MIGRATION": []
+        "GAMMA_SQUEEZE": [], "VOLATILITY_COIL": [], "PINCH_ZONE": [], "FLOOR_BOUNCE": [],
+        "DEALER_DEFENSE": [], "REGIME_SHIFT": [], "INVENTORY_MIGRATION": [],
+        "IV_SPIKE": [], "IV_CRUSH": [], "IV_SKEW_ACCUMULATION": []
     }
     
     setups_df = db_service.get_setups(latest_date)
@@ -166,41 +220,57 @@ if view_mode == "⚡ VANGUARD SCREENER TERMINAL":
         if s_m and s_type in categorized_setups:
              categorized_setups[s_type].append((s_sym, s_m))
              
-    # Sort setups: Volatility Coils sorted by Priority Score (Pty) descending; all others sorted by absolute IFS score descending
+    # Sort setups: Volatility Coils and Pinch Zones sorted by Priority Score (Pty) descending; all others sorted by absolute IFS score descending
     for s_type in categorized_setups:
-        if s_type == "VOLATILITY_COIL":
+        if s_type in ["VOLATILITY_COIL", "PINCH_ZONE", "IV_SKEW_ACCUMULATION"]:
             categorized_setups[s_type] = sorted(
                 categorized_setups[s_type],
-                key=lambda x: x[1].get("priority_score", 0.0),
+                key=lambda x: float(x[1].get("priority_score") or 0.0),
                 reverse=True
             )
         else:
             categorized_setups[s_type] = sorted(
                 categorized_setups[s_type],
-                key=lambda x: abs(x[1].get("ifs_score", 0.0)),
+                key=lambda x: abs(float(x[1].get("ifs_score") or 0.0)),
                 reverse=True
             )
             
-    render_setups_grid(categorized_setups, select_stock)
+    render_setups_grid(categorized_setups, select_stock, selected_symbol)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # MODULE 2: SINGLE-STOCK / INDEX DEEP DIVE (Detailed Chronology)
 # ─────────────────────────────────────────────────────────────────────────────
-else:
+elif view_mode == "📊 SINGLE-STOCK / INDEX DEEP DIVE":
     sym_sessions = session_history.get(selected_symbol, {})
     latest_metrics = sym_sessions.get(latest_date, {})
-    ifs_score = latest_metrics.get("ifs_score", 0.0)
+    ifs_score = float(latest_metrics.get("ifs_score") or 0.0)
     
     # Header badges styling
     _bg, _fc, _bc = sig_colors("bull" if ifs_score > 15 else "bear" if ifs_score < -15 else "neut")
     ring_html = f'<span class="score-ring" style="border-color:{_fc};color:{_fc};">{ifs_score:+.0f}</span>'
     badge_html = f'<span class="sig-badge" style="background:{_bg};color:{_fc};border:1px solid {_bc};">{latest_metrics.get("gamma_regime", "ROTATION")}</span>'
     
+    # Format active date and expiry for display
+    try:
+        active_date_formatted = pd.to_datetime(latest_date).strftime('%d %b %Y')
+    except Exception:
+        active_date_formatted = str(latest_date)
+        
+    if selected_expiry != "ALL EXPIRIES":
+        try:
+            expiry_formatted = pd.to_datetime(selected_expiry).strftime('%d %b %Y')
+        except Exception:
+            expiry_formatted = str(selected_expiry)
+    else:
+        expiry_formatted = "ALL EXPIRIES"
+
     st.markdown(f"""
     <div class="title-bar">
       <span style="font-size:22px;color:#a78bfa;">📊</span>
       <h1>{selected_symbol} DEEP DIVE</h1>
       {ring_html}&nbsp;{badge_html}
+      <span class="sig-badge" style="background:#091c15;color:#fbbf24;border:1px solid #78350f;margin-left:10px;">📅 {active_date_formatted}</span>
+      <span class="sig-badge" style="background:#091c15;color:#a78bfa;border:1px solid #2e1065;margin-left:5px;">⏳ EXPIRY: {expiry_formatted}</span>
       <span class="ts">VANGUARD INVENTORY CHRONOLOGY LEDGER</span>
     </div>
     """, unsafe_allow_html=True)
@@ -225,7 +295,7 @@ else:
     # ── Left Cockpit Panel (Bloomberg cards, Playbook and detailed longitudinal charts) ──
     col_left.markdown('<p class="term-header">KEY MARKET STRUCTURE LEVELS (LATEST CLOSE)</p>', unsafe_allow_html=True)
     render_metric_row(
-        market_state.spot, latest_metrics.get('spot_change_pct', 0.0), 
+        market_state.spot, float(latest_metrics.get('spot_change_pct') or 0.0), 
         market_state.call_wall, market_state.put_wall, market_state.gamma_flip, 
         market_state.gex, market_state.pcr, container=col_left
     )

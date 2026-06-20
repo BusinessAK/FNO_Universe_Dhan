@@ -164,12 +164,28 @@ def is_invalidated(s_m: dict) -> bool:
 
 INDEX_SYMBOLS = {"NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY"}
 
-def render_setups_grid(categorized_setups: dict, select_stock_callback):
+def render_setups_grid(categorized_setups: dict, select_stock_callback, selected_symbol: str = None):
     """
     Renders the setup setups catalog deck in a perfectly aligned row-by-row structure,
     completely excluding invalidated setups and index symbols (which are kept strictly in Deep Dive).
     """
     st.markdown('<p class="term-header">SECTION B — VANGUARD QUANTITATIVE SETUP ENGINE</p>', unsafe_allow_html=True)
+    
+    # ── Highlight Selected Ticker Setup if Active ──
+    if selected_symbol and selected_symbol not in INDEX_SYMBOLS:
+        active_setups = []
+        for s_type, items in categorized_setups.items():
+            for sym, s_m in items:
+                if sym == selected_symbol and not is_invalidated(s_m):
+                    active_setups.append((s_type, s_m))
+        
+        if active_setups:
+            st.markdown(f'<p style="font-size:12px;font-weight:bold;color:#fbbf24;margin-bottom:8px;letter-spacing:0.5px;">🔍 ACTIVE SETUP FOR SELECTED TICKER: {selected_symbol}</p>', unsafe_allow_html=True)
+            col_sel, _ = st.columns([1, 2])
+            with col_sel:
+                for s_type, s_m in active_setups:
+                    render_setup_card(selected_symbol, s_m, s_type, select_stock_callback)
+            st.markdown('<hr style="margin: 15px 0; border-color: #141435;">', unsafe_allow_html=True)
     
     # ── ROW 1: TIER COLUMN HEADERS ──
     h1, h2, h3 = st.columns(3)
@@ -201,29 +217,32 @@ def render_setups_grid(categorized_setups: dict, select_stock_callback):
     with r1_c1:
         st.markdown('<p style="font-size:11px;font-weight:bold;color:#fca5a5;margin:10px 0 5px;">🔥 GAMMA SQUEEZE CANDIDATES</p>', unsafe_allow_html=True)
         sq_items = [x for x in categorized_setups.get("GAMMA_SQUEEZE", []) if x[0] not in INDEX_SYMBOLS and not is_invalidated(x[1])]
-        if not sq_items:
-            st.markdown('<p style="font-size:11px;color:#4a5a8a;font-style:italic;min-height:80px;">No active gamma squeeze triggers today.</p>', unsafe_allow_html=True)
-        else:
-            for sym, s_m in sq_items[:3]:
-                render_setup_card(sym, s_m, "GAMMA_SQUEEZE", select_stock_callback)
+        with st.container(height=400):
+            if not sq_items:
+                st.markdown('<p style="font-size:11px;color:#4a5a8a;font-style:italic;">No active gamma squeeze triggers today.</p>', unsafe_allow_html=True)
+            else:
+                for sym, s_m in sq_items:
+                    render_setup_card(sym, s_m, "GAMMA_SQUEEZE", select_stock_callback)
                 
     with r1_c2:
         st.markdown('<p style="font-size:11px;font-weight:bold;color:#6ee7b7;margin:10px 0 5px;">🛡️ INSTITUTIONAL FLOOR BOUNCE</p>', unsafe_allow_html=True)
         fb_items = [x for x in categorized_setups.get("FLOOR_BOUNCE", []) if x[0] not in INDEX_SYMBOLS and not is_invalidated(x[1])]
-        if not fb_items:
-            st.markdown('<p style="font-size:11px;color:#4a5a8a;font-style:italic;min-height:80px;">No symbols at institutional floor bounds.</p>', unsafe_allow_html=True)
-        else:
-            for sym, s_m in fb_items[:3]:
-                render_setup_card(sym, s_m, "FLOOR_BOUNCE", select_stock_callback)
+        with st.container(height=400):
+            if not fb_items:
+                st.markdown('<p style="font-size:11px;color:#4a5a8a;font-style:italic;">No symbols at institutional floor bounds.</p>', unsafe_allow_html=True)
+            else:
+                for sym, s_m in fb_items:
+                    render_setup_card(sym, s_m, "FLOOR_BOUNCE", select_stock_callback)
                 
     with r1_c3:
         st.markdown('<p style="font-size:11px;font-weight:bold;color:#fbbf24;margin:10px 0 5px;">🔄 REGIME SHIFT CROSSOVERS</p>', unsafe_allow_html=True)
         rs_items = [x for x in categorized_setups.get("REGIME_SHIFT", []) if x[0] not in INDEX_SYMBOLS and not is_invalidated(x[1])]
-        if not rs_items:
-            st.markdown('<p style="font-size:11px;color:#4a5a8a;font-style:italic;min-height:80px;">No recent regime flip crossovers detected.</p>', unsafe_allow_html=True)
-        else:
-            for sym, s_m in rs_items[:3]:
-                render_setup_card(sym, s_m, "REGIME_SHIFT", select_stock_callback)
+        with st.container(height=400):
+            if not rs_items:
+                st.markdown('<p style="font-size:11px;color:#4a5a8a;font-style:italic;">No recent regime flip crossovers detected.</p>', unsafe_allow_html=True)
+            else:
+                for sym, s_m in rs_items:
+                    render_setup_card(sym, s_m, "REGIME_SHIFT", select_stock_callback)
 
     # ── ROW 3: SECONDARY SETUPS (Volatility Coils vs Dealer Defense vs Inventory Migrations) ──
     # Added some vertical spacing between rows
@@ -231,28 +250,64 @@ def render_setups_grid(categorized_setups: dict, select_stock_callback):
     r2_c1, r2_c2, r2_c3 = st.columns(3)
     
     with r2_c1:
-        st.markdown('<p style="font-size:11px;font-weight:bold;color:#a78bfa;margin:10px 0 5px;">🌀 VOLATILITY EXPANSION COILS</p>', unsafe_allow_html=True)
+        st.markdown('<p style="font-size:11px;font-weight:bold;color:#a78bfa;margin:10px 0 5px;">🌀 VOLATILITY COILS & SKEW CHASE</p>', unsafe_allow_html=True)
         vc_items = [x for x in categorized_setups.get("VOLATILITY_COIL", []) if x[0] not in INDEX_SYMBOLS and not is_invalidated(x[1])]
-        if not vc_items:
-            st.markdown('<p style="font-size:11px;color:#4a5a8a;font-style:italic;min-height:80px;">No compressed volatility coils observed.</p>', unsafe_allow_html=True)
-        else:
-            for sym, s_m in vc_items[:3]:
-                render_setup_card(sym, s_m, "VOLATILITY_COIL", select_stock_callback)
+        pz_items = [x for x in categorized_setups.get("PINCH_ZONE", []) if x[0] not in INDEX_SYMBOLS and not is_invalidated(x[1])]
+        sk_items = [x for x in categorized_setups.get("IV_SKEW_ACCUMULATION", []) if x[0] not in INDEX_SYMBOLS and not is_invalidated(x[1])]
+        
+        combined_coils = []
+        for item in vc_items:
+            combined_coils.append((item[0], item[1], "VOLATILITY_COIL"))
+        for item in pz_items:
+            combined_coils.append((item[0], item[1], "PINCH_ZONE"))
+        for item in sk_items:
+            combined_coils.append((item[0], item[1], "IV_SKEW_ACCUMULATION"))
+            
+        combined_coils = sorted(combined_coils, key=lambda x: float(x[1].get("priority_score") or 0.0), reverse=True)
+        
+        with st.container(height=400):
+            if not combined_coils:
+                st.markdown('<p style="font-size:11px;color:#4a5a8a;font-style:italic;">No compressed volatility or skew setups.</p>', unsafe_allow_html=True)
+            else:
+                for sym, s_m, s_type in combined_coils:
+                    render_setup_card(sym, s_m, s_type, select_stock_callback)
                 
     with r2_c2:
-        st.markdown('<p style="font-size:11px;font-weight:bold;color:#38bdf8;margin:10px 0 5px;">🧲 DEALER DEFENSE PIN ZONES</p>', unsafe_allow_html=True)
+        st.markdown('<p style="font-size:11px;font-weight:bold;color:#38bdf8;margin:10px 0 5px;">🧲 DEALER DEFENSE & VOL SPIKES</p>', unsafe_allow_html=True)
         dd_items = [x for x in categorized_setups.get("DEALER_DEFENSE", []) if x[0] not in INDEX_SYMBOLS and not is_invalidated(x[1])]
-        if not dd_items:
-            st.markdown('<p style="font-size:11px;color:#4a5a8a;font-style:italic;min-height:80px;">No dealer straddle magnet pins detected.</p>', unsafe_allow_html=True)
-        else:
-            for sym, s_m in dd_items[:3]:
-                render_setup_card(sym, s_m, "DEALER_DEFENSE", select_stock_callback)
+        vs_items = [x for x in categorized_setups.get("IV_SPIKE", []) if x[0] not in INDEX_SYMBOLS and not is_invalidated(x[1])]
+        
+        combined_defense = []
+        for item in dd_items:
+            combined_defense.append((item[0], item[1], "DEALER_DEFENSE"))
+        for item in vs_items:
+            combined_defense.append((item[0], item[1], "IV_SPIKE"))
+            
+        combined_defense = sorted(combined_defense, key=lambda x: abs(float(x[1].get("ifs_score") or 0.0)), reverse=True)
+        
+        with st.container(height=400):
+            if not combined_defense:
+                st.markdown('<p style="font-size:11px;color:#4a5a8a;font-style:italic;">No dealer defense or vol spikes active.</p>', unsafe_allow_html=True)
+            else:
+                for sym, s_m, s_type in combined_defense:
+                    render_setup_card(sym, s_m, s_type, select_stock_callback)
                 
     with r2_c3:
-        st.markdown('<p style="font-size:11px;font-weight:bold;color:#fbbf24;margin:10px 0 5px;">📊 INVENTORY WALL MIGRATIONS</p>', unsafe_allow_html=True)
+        st.markdown('<p style="font-size:11px;font-weight:bold;color:#fbbf24;margin:10px 0 5px;">📊 INVENTORY MIGRATIONS & CRUSH</p>', unsafe_allow_html=True)
         im_items = [x for x in categorized_setups.get("INVENTORY_MIGRATION", []) if x[0] not in INDEX_SYMBOLS and not is_invalidated(x[1])]
-        if not im_items:
-            st.markdown('<p style="font-size:11px;color:#4a5a8a;font-style:italic;min-height:80px;">No active inventory wall migrations.</p>', unsafe_allow_html=True)
-        else:
-            for sym, s_m in im_items[:3]:
-                render_setup_card(sym, s_m, "INVENTORY_MIGRATION", select_stock_callback)
+        vc_crush = [x for x in categorized_setups.get("IV_CRUSH", []) if x[0] not in INDEX_SYMBOLS and not is_invalidated(x[1])]
+        
+        combined_mig = []
+        for item in im_items:
+            combined_mig.append((item[0], item[1], "INVENTORY_MIGRATION"))
+        for item in vc_crush:
+            combined_mig.append((item[0], item[1], "IV_CRUSH"))
+            
+        combined_mig = sorted(combined_mig, key=lambda x: abs(float(x[1].get("ifs_score") or 0.0)), reverse=True)
+        
+        with st.container(height=400):
+            if not combined_mig:
+                st.markdown('<p style="font-size:11px;color:#4a5a8a;font-style:italic;">No active migrations or vol crushes.</p>', unsafe_allow_html=True)
+            else:
+                for sym, s_m, s_type in combined_mig:
+                    render_setup_card(sym, s_m, s_type, select_stock_callback)

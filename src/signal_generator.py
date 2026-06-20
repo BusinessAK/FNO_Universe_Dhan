@@ -21,7 +21,7 @@ class SignalGenerator:
             if col not in results.columns:
                 results[col] = 0
                 
-        df_final = results[columns_to_keep].copy()
+        df_final = results[columns_to_keep].copy().fillna(0)
         
         # Calculate Net Imbalances
         df_final['NET_INV_SHIFT'] = df_final['CHG_IN_OI_PE_T'] - df_final['CHG_IN_OI_CE_T']

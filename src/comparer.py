@@ -1,5 +1,11 @@
 import pandas as pd
 import os
+import sys
+
+# Setup package paths to run standalone
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, os.path.dirname(__file__))
+
 from src.processor import DataProcessor
 from src.greeks_engine import GreeksEngine
 from src.analyzer import GammaAnalyzer
@@ -32,14 +38,15 @@ def compare_days(file_current, file_prior):
     merged = pd.merge(sum_curr, sum_prio, on='SYMBOL', suffixes=('_T', '_T-1'))
     
     # Calculate Deltas
+    import numpy as np
     merged['OI_CHANGE_ABS'] = merged['OPEN_INT_T'] - merged['OPEN_INT_T-1']
-    merged['OI_CHANGE_PCT'] = (merged['OI_CHANGE_ABS'] / merged['OPEN_INT_T-1']) * 100
+    merged['OI_CHANGE_PCT'] = (merged['OI_CHANGE_ABS'] / merged['OPEN_INT_T-1'].replace(0, np.nan)).fillna(0.0) * 100
     merged['GEX_SHIFT'] = merged['GEX_T'] - merged['GEX_T-1']
     
     # Spot Price Change
     merged['PRICE_T'] = merged['SYMBOL'].map(spots_curr)
     merged['PRICE_T-1'] = merged['SYMBOL'].map(spots_prio)
-    merged['PRICE_CHG_PCT'] = ((merged['PRICE_T'] - merged['PRICE_T-1']) / merged['PRICE_T-1']) * 100
+    merged['PRICE_CHG_PCT'] = ((merged['PRICE_T'] - merged['PRICE_T-1']) / merged['PRICE_T-1'].replace(0, np.nan)).fillna(0.0) * 100
     
     # Ranking by OI Accumulation and GEX Shift
     # "Inventory Building" = High OI Change + High GEX Shift
@@ -48,8 +55,8 @@ def compare_days(file_current, file_prior):
     return merged
 
 if __name__ == "__main__":
-    file_curr = "data/raw/BhavCopy_NSE_FO_0_0_0_20260515_F_0000.csv"
-    file_prio = "data/raw/BhavCopy_NSE_FO_0_0_0_20260514_F_0000.csv"
+    file_curr = "data/raw/FO_BhavCopy_NSE_FO_0_0_0_20260515_F_0000.csv"
+    file_prio = "data/raw/FO_BhavCopy_NSE_FO_0_0_0_20260514_F_0000.csv"
     
     comparison = compare_days(file_curr, file_prio)
     

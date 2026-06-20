@@ -55,5 +55,42 @@ SETUP_REGISTRY = {
         "category": "regime",
         "priority_weight": 0.95,
         "default_bias": "Range Shift"
+    },
+    "PINCH_ZONE": {
+        "title": "Wall Convergence Pinch",
+        "icon": "🌀",
+        "color": "#c084fc",
+        "description": "All option walls converged, preparing for breakout/breakdown expansion",
+        "category": "expansion",
+        "priority_weight": 0.88,
+        "default_bias": "Neutral"
+    },
+    "IV_SPIKE": {
+        "title": "Volatility Spike",
+        "icon": "⚡",
+        "color": "#fca5a5",
+        "description": "Implied volatility spiked to historical extremes, premium rich",
+        "category": "defense",
+        "priority_weight": 0.76,
+        "default_bias": "Neutral"
+    },
+    "IV_CRUSH": {
+        "title": "Volatility Crush",
+        "icon": "📉",
+        "color": "#38bdf8",
+        "description": "Implied volatility collapsed post-event, premium deflating",
+        "category": "regime",
+        "priority_weight": 0.72,
+        "default_bias": "Neutral"
+    },
+    "IV_SKEW_ACCUMULATION": {
+        "title": "Speculative Skew Chase",
+        "icon": "🌡️",
+        "color": "#c084fc",
+        "description": "OTM Calls being aggressively bid up, speculative upside buying",
+        "category": "expansion",
+        "priority_weight": 0.82,
+        "default_bias": "Bullish Breakout"
     }
 }
+

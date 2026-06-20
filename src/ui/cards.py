@@ -149,22 +149,51 @@ def render_alerts(cmp_val: float, cw_val: float, pw_val: float, gf_val: float, p
             playbook = latest_metrics.get("playbook", {})
             invalid_strike = playbook.get("invalidation_strike", 0.0)
             
+            # Determine dynamic interval for spacing hedges (default to 2.5% of wall or price)
+            spacing = cw_val * 0.025 if cw_val > 10 else 5.0
+            # Round spacing to nearest clean strike multiple (5, 10, 50, 100)
+            if spacing > 50:
+                spacing = 100.0
+            elif spacing > 25:
+                spacing = 50.0
+            elif spacing > 7:
+                spacing = 10.0
+            else:
+                spacing = 5.0
+
             if "Bull Put Spread" in suggested_strategy:
                 sell_strike = pw_val
-                # Use invalidation strike if valid, else standard 2.5% hedge
-                buy_strike = invalid_strike if invalid_strike > 0 and invalid_strike < sell_strike else (sell_strike - 10 if sell_strike > 100 else sell_strike - 5)
+                if cw_val == pw_val:
+                    # Concentrated Wall Case
+                    buy_strike = sell_strike - spacing
+                else:
+                    buy_strike = invalid_strike if invalid_strike > 0 and invalid_strike < sell_strike else (sell_strike - spacing)
                 strike_recommendation = f'<div style="margin-top:6px; font-size:9.5px; color:#a78bfa; font-family:\'JetBrains Mono\', monospace; border-top:1px solid rgba(167, 139, 250, 0.15); padding-top:4px;">🎯 Rec. Strikes:<br><b>SELL ₹{sell_strike:.0f} PE</b> (Put Wall)<br><b>BUY ₹{buy_strike:.0f} PE</b> (Hedge)</div>'
             elif "Bear Call Spread" in suggested_strategy:
                 sell_strike = cw_val
-                buy_strike = invalid_strike if invalid_strike > 0 and invalid_strike > sell_strike else (sell_strike + 10 if sell_strike > 100 else sell_strike + 5)
+                if cw_val == pw_val:
+                    # Concentrated Wall Case
+                    buy_strike = sell_strike + spacing
+                else:
+                    buy_strike = invalid_strike if invalid_strike > 0 and invalid_strike > sell_strike else (sell_strike + spacing)
                 strike_recommendation = f'<div style="margin-top:6px; font-size:9.5px; color:#f43f5e; font-family:\'JetBrains Mono\', monospace; border-top:1px solid rgba(244, 63, 94, 0.15); padding-top:4px;">🎯 Rec. Strikes:<br><b>SELL ₹{sell_strike:.0f} CE</b> (Call Wall)<br><b>BUY ₹{buy_strike:.0f} CE</b> (Hedge)</div>'
             elif "Bull Call Spread" in suggested_strategy:
-                buy_strike = pw_val
-                sell_strike = cw_val
+                if cw_val == pw_val:
+                    # Concentrated Wall Case
+                    buy_strike = cw_val
+                    sell_strike = cw_val + spacing
+                else:
+                    buy_strike = pw_val
+                    sell_strike = cw_val
                 strike_recommendation = f'<div style="margin-top:6px; font-size:9.5px; color:#38bdf8; font-family:\'JetBrains Mono\', monospace; border-top:1px solid rgba(56, 189, 248, 0.15); padding-top:4px;">🎯 Rec. Strikes:<br><b>BUY ₹{buy_strike:.0f} CE</b> (Support)<br><b>SELL ₹{sell_strike:.0f} CE</b> (Ceiling)</div>'
             elif "Bear Put Spread" in suggested_strategy:
-                buy_strike = cw_val
-                sell_strike = pw_val
+                if cw_val == pw_val:
+                    # Concentrated Wall Case
+                    buy_strike = pw_val
+                    sell_strike = pw_val - spacing
+                else:
+                    buy_strike = cw_val
+                    sell_strike = pw_val
                 strike_recommendation = f'<div style="margin-top:6px; font-size:9.5px; color:#fbbf24; font-family:\'JetBrains Mono\', monospace; border-top:1px solid rgba(251, 191, 36, 0.15); padding-top:4px;">🎯 Rec. Strikes:<br><b>BUY ₹{buy_strike:.0f} PE</b> (Ceiling)<br><b>SELL ₹{sell_strike:.0f} PE</b> (Support)</div>'
                 
         st.markdown(f'<div class="alert-box info">🤖 SUGGESTED STRATEGY: <b>{suggested_strategy}</b><br>Put Flow: {pe_interp} | Call Flow: {ce_interp}{strike_recommendation}</div>', unsafe_allow_html=True)
@@ -444,21 +473,74 @@ def render_daily_changes_panel(changes_list: list, container=st):
         container.markdown('<div class="alert-box info">ℹ️ No major wall migrations or gamma flip crossovers detected in today\'s session. Market structure is consolidating.</div>', unsafe_allow_html=True)
         return
         
-    # Render in a clean two-column grid inside Streamlit
-    c1, c2 = container.columns(2)
-    half = (len(changes_list) + 1) // 2
-    
-    with c1:
-        for change in changes_list[:half]:
-            msg = change.get("msg", "")
-            icon = change.get("icon", "🟢")
-            st.markdown(f'<div class="alert-box info" style="border-left-color:#38bdf8; color:#cbd5e1; padding: 6px 12px; margin: 4px 0; font-size:11px;">{icon} {msg}</div>', unsafe_allow_html=True)
+    # Interactive filters deck (Search box, Tab selector, Slider)
+    col_ctrl1, col_ctrl2, col_ctrl3 = container.columns([3, 5, 2])
+    with col_ctrl1:
+        search_query = st.text_input(
+            "Search Symbol",
+            value="",
+            placeholder="🔍 Enter symbol (e.g. 360ONE)...",
+            label_visibility="collapsed",
+            key="structure_change_search"
+        )
+    with col_ctrl2:
+        selected_category = st.radio(
+            "Category",
+            options=["🏆 All Shifts", "🟢 Support Shifts", "🔋 Regime Flips", "⚡ Resistance Shifts"],
+            horizontal=True,
+            label_visibility="collapsed",
+            key="structure_change_category"
+        )
+    with col_ctrl3:
+        depth_limit = st.slider(
+            "Limit",
+            min_value=5,
+            max_value=max(len(changes_list), 10),
+            value=min(15, len(changes_list)),
+            step=5,
+            label_visibility="collapsed",
+            key="structure_change_limit"
+        )
+        
+    # 1. Filter by category
+    filtered = changes_list
+    if selected_category == "🟢 Support Shifts":
+        filtered = [c for c in filtered if c.get("type") in ["support_rise", "support_drop", "dual_wall_rise", "dual_wall_fall"]]
+    elif selected_category == "🔋 Regime Flips":
+        filtered = [c for c in filtered if c.get("type") in ["regime_flip_bullish", "regime_flip_bearish", "option_wall_pinch", "option_wall_expansion", "gex_intensity_explosion"]]
+    elif selected_category == "⚡ Resistance Shifts":
+        filtered = [c for c in filtered if c.get("type") in ["resistance_rise", "resistance_fall", "dual_wall_rise", "dual_wall_fall"]]
+        
+    # 2. Filter by search query
+    if search_query:
+        query = search_query.strip().upper()
+        filtered = [c for c in filtered if query in c.get("symbol", "").upper()]
+
+    if not filtered:
+        container.markdown('<div class="alert-box info" style="margin-top: 10px;">ℹ️ No matching structural changes found. Adjust your filters or search query.</div>', unsafe_allow_html=True)
+        return
+
+    # Render changes in a beautiful glassmorphic container with strict scroll cap
+    changes_html = ""
+    for change in filtered[:depth_limit]:
+        msg = change.get("msg", "")
+        icon = change.get("icon", "🟢")
+        rank = change.get("rank", 999)
+        
+        # Premium Rank Badge coloring based on urgency
+        if rank <= 5:
+            badge_style = "border: 1px solid #fbbf24; background: rgba(251, 191, 36, 0.15); color: #fbbf24;"
+        elif rank <= 15:
+            badge_style = "border: 1px solid #a78bfa; background: rgba(167, 139, 250, 0.15); color: #a78bfa;"
+        else:
+            badge_style = "border: 1px solid #475569; background: rgba(71, 85, 105, 0.15); color: #94a3b8;"
             
-    with c2:
-        for change in changes_list[half:]:
-            msg = change.get("msg", "")
-            icon = change.get("icon", "🟢")
-            st.markdown(f'<div class="alert-box info" style="border-left-color:#38bdf8; color:#cbd5e1; padding: 6px 12px; margin: 4px 0; font-size:11px;">{icon} {msg}</div>', unsafe_allow_html=True)
+        rank_badge = f'<span style="padding: 2px 6px; border-radius: 4px; font-size: 9px; font-weight: bold; font-family: \'JetBrains Mono\'; {badge_style} margin-right: 10px;">#{rank:02d}</span>'
+        
+        item_html = f'<div class="alert-box info" style="border-left-color: #38bdf8; color: #cbd5e1; padding: 8px 12px; margin: 5px 0; font-size: 11px; display: flex; align-items: center; background: rgba(30, 41, 59, 0.3);"><span style="font-size: 13px; margin-right: 8px;">{icon}</span>{rank_badge}<span style="flex-grow: 1;">{msg}</span></div>'
+        changes_html += item_html
+        
+    container.markdown(f'<div style="max-height: 380px; overflow-y: auto; padding-right: 6px; margin-top: 12px; scrollbar-width: thin; scrollbar-color: #3b82f6 #0f172a;">{changes_html}</div>', unsafe_allow_html=True)
 
 def render_playbook_card(playbook: dict, container=st):
     """

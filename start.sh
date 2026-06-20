@@ -17,13 +17,22 @@ case "$MODE" in
   # ── EOD Mode: Download + Process BhavCopy → Dashboard ──────────────────────
   eod)
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo "  VANGUARD EOD MODE — BhavCopy Pipeline"
+    echo "  VANGUARD EOD MODE — EOD Downloader & Compiler Pipeline"
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo "[1/2] Running BhavCopy signal pipeline..."
-    python3 main.py
-    echo ""
-    echo "[2/2] Launching Streamlit dashboard..."
-    streamlit run dashboard.py --server.port 8501
+    if [ -n "$2" ]; then
+      python3 poll_eod.py "$2"
+    else
+      python3 poll_eod.py
+    fi
+    # Check if port 8501 is already occupied by a running Streamlit instance
+    if lsof -Pi :8501 -sTCP:LISTEN -t >/dev/null ; then
+      echo "⚡ Streamlit dashboard is already active on port 8501!"
+      echo "🚀 The database update has successfully triggered a dynamic hot-reload in your browser."
+      echo "🔗 Open http://localhost:8501 to view the compiled data instantly!"
+    else
+      echo "[2/2] Launching Streamlit dashboard..."
+      streamlit run dashboard.py --server.port 8501
+    fi
     ;;
 
   # ── Live Mode: NSE Polling in background + Dashboard ───────────────────────

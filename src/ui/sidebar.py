@@ -40,42 +40,44 @@ def render_sidebar(all_symbols: list, selected_date: str, session_history: dict,
 
         st.markdown("---")
 
-        # 2. Selected symbol fallback/initialisation
-        if "selected_symbol" not in st.session_state:
-            st.session_state.selected_symbol = "NIFTY" if "NIFTY" in all_symbols else all_symbols[0]
+        # 2. Selected symbol fallback/initialisation & selector rendering
+        if "symbol_selector" not in st.session_state:
+            st.session_state.symbol_selector = "NIFTY" if "NIFTY" in all_symbols else all_symbols[0]
 
-        selected_symbol = st.selectbox(
-            "ACTIVE SYMBOL",
-            options=all_symbols,
-            index=all_symbols.index(st.session_state.selected_symbol),
-            key="symbol_selector"
-        )
-        st.session_state.selected_symbol = selected_symbol
-
-        # 3. Dynamic Expiry Selector
+        selected_symbol = st.session_state.symbol_selector
         selected_expiry = "ALL EXPIRIES"
-        if view_mode == "📊 SINGLE-STOCK / INDEX DEEP DIVE" and not greeks_df.empty:
-            sym_greeks = greeks_df[greeks_df["SYMBOL"] == selected_symbol.upper()]
-            if not sym_greeks.empty:
-                unique_expiries = sorted(sym_greeks["EXPIRY_DT"].dropna().unique())
-                expiry_options = ["ALL EXPIRIES"]
-                expiry_map = {"ALL EXPIRIES": "ALL EXPIRIES"}
-                for exp in unique_expiries:
-                    try:
-                        formatted_exp = pd.to_datetime(exp).strftime('%d %b %Y')
-                    except Exception:
-                        formatted_exp = str(exp)
-                    expiry_options.append(formatted_exp)
-                    expiry_map[formatted_exp] = exp
 
-                st.markdown("---")
-                selected_expiry_formatted = st.selectbox(
-                    "ACTIVE EXPIRY",
-                    options=expiry_options,
-                    index=0,
-                    key=f"expiry_selector_{selected_symbol}"
-                )
-                selected_expiry = expiry_map[selected_expiry_formatted]
+        if view_mode == "📊 SINGLE-STOCK / INDEX DEEP DIVE":
+            selected_symbol = st.selectbox(
+                "ACTIVE SYMBOL",
+                options=all_symbols,
+                key="symbol_selector"
+            )
+            st.session_state.selected_symbol = selected_symbol
+
+            # 3. Dynamic Expiry Selector
+            if not greeks_df.empty:
+                sym_greeks = greeks_df[greeks_df["SYMBOL"] == selected_symbol.upper()]
+                if not sym_greeks.empty:
+                    unique_expiries = sorted(sym_greeks["EXPIRY_DT"].dropna().unique())
+                    expiry_options = ["ALL EXPIRIES"]
+                    expiry_map = {"ALL EXPIRIES": "ALL EXPIRIES"}
+                    for exp in unique_expiries:
+                        try:
+                            formatted_exp = pd.to_datetime(exp).strftime('%d %b %Y')
+                        except Exception:
+                            formatted_exp = str(exp)
+                        expiry_options.append(formatted_exp)
+                        expiry_map[formatted_exp] = exp
+
+                    st.markdown("---")
+                    selected_expiry_formatted = st.selectbox(
+                        "ACTIVE EXPIRY",
+                        options=expiry_options,
+                        index=0,
+                        key=f"expiry_selector_{selected_symbol}"
+                    )
+                    selected_expiry = expiry_map[selected_expiry_formatted]
 
         # 4. Strike percentage range adjustments
         st.markdown("---")

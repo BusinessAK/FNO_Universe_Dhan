@@ -5,7 +5,7 @@ class GammaAnalyzer:
     def __init__(self, lot_sizes: dict = None):
         # Default lot sizes for some major stocks if not provided
         self.lot_sizes = lot_sizes or {
-            'NIFTY': 50,
+            'NIFTY': 65,
             'BANKNIFTY': 15,
             'RELIANCE': 250,
             'TCS': 175,
@@ -48,7 +48,7 @@ class GammaAnalyzer:
             'IV': 'mean'
         }).reset_index()
         
-        summary['GEX_INTENSITY'] = summary['GEX'] / summary['OPEN_INT']
+        summary['GEX_INTENSITY'] = ((summary['GEX'] / summary['OPEN_INT'].replace(0, np.nan)).fillna(0.0) * 1000.0)
         
         return summary
 
@@ -69,7 +69,11 @@ class GammaAnalyzer:
             coc_spread = ((fut - spot) / spot) * 100
             
             # 2. OI Concentration (Strike with Max GEX vs Spot)
-            max_gex_strike = opt_rows.loc[opt_rows['GEX'].abs().idxmax()]['STRIKE_PR']
+            if 'GEX' in opt_rows.columns:
+                max_gex_strike = opt_rows.loc[opt_rows['GEX'].abs().idxmax()]['STRIKE_PR']
+            else:
+                # Fallback to Strike with Max Open Interest (OI Wall)
+                max_gex_strike = opt_rows.loc[opt_rows['OPEN_INT'].idxmax()]['STRIKE_PR']
             distance_to_wall = abs(max_gex_strike - spot) / spot * 100
             
             results.append({

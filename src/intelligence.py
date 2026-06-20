@@ -16,7 +16,23 @@ class InstitutionalIntelligence:
         # 1. Get Base Data
         df_t, df_fut_t = self.processor.normalize(file_t)
         df_tm1, df_fut_tm1 = self.processor.normalize(file_t_minus_1)
-        
+
+        # ── Expiry-Aware Filter ──────────────────────────────────────────────────
+        # For index options (IDO), a weekly expiry series disappears overnight
+        # every week (MIDCPNIFTY Mon, FINNIFTY Tue, BANKNIFTY Wed, NIFTY Thu).
+        # Without this filter the system would subtract a huge expired-weekly OI
+        # block from T-1, producing a massive false delta signal for every index.
+        # STO (stocks) are left untouched — they roll naturally to the next month.
+        common_expiries, dropped_expiries = self.processor.get_common_expiries(df_t, df_tm1)
+        expiry_filtered = len(dropped_expiries) > 0
+
+        if expiry_filtered:
+            dropped_str = ", ".join(sorted([str(d.date()) for d in dropped_expiries]))
+            print(f"[*] Weekly Expiry Rollover Detected — filtering {len(dropped_expiries)} expired series from T-1:")
+            print(f"    Dropped: {dropped_str}")
+            df_tm1 = self.processor.filter_tm1_to_common_expiries(df_tm1, common_expiries)
+        # ────────────────────────────────────────────────────────────────────────
+
         spots_t = self.processor.get_spot_prices(df_t)
         spots_tm1 = self.processor.get_spot_prices(df_tm1)
         lots = self.processor.get_lot_sizes(df_t)
@@ -44,6 +60,21 @@ class InstitutionalIntelligence:
 
         metrics_t = get_detailed_metrics(greeks_t, spots_t)
         metrics_tm1 = get_detailed_metrics(greeks_tm1, spots_tm1)
+        
+        # Defensive check: Inject zero-filled fallbacks for missing columns in one-sided option chains
+        expected_cols = [
+            'OPEN_INT_CE', 'OPEN_INT_PE',
+            'CHG_IN_OI_CE', 'CHG_IN_OI_PE',
+            'VOLUME_CE', 'VOLUME_PE',
+            'IV_CE', 'IV_PE',
+            'GAMMA_CE', 'GAMMA_PE',
+            'CLOSE_CE', 'CLOSE_PE'
+        ]
+        for col in expected_cols:
+            if col not in metrics_t.columns:
+                metrics_t[col] = 0.0
+            if col not in metrics_tm1.columns:
+                metrics_tm1[col] = 0.0
         
         # 4b. Find Structural Walls and Gamma Flip
         structural_data = []
@@ -79,6 +110,20 @@ class InstitutionalIntelligence:
         final['SPOT_TM1'] = final.index.map(spots_tm1)
         final['SPOT_CHG_PCT'] = ((final['SPOT_T'] - final['SPOT_TM1']) / final['SPOT_TM1']) * 100
 
+        # Aggregate and merge futures open interest metrics
+        if not df_fut_t.empty:
+            fut_t_grouped = df_fut_t.groupby('SYMBOL').agg({
+                'OPEN_INT': 'sum',
+                'CHG_IN_OI': 'sum'
+            }).rename(columns={'OPEN_INT': 'FUT_OI_T', 'CHG_IN_OI': 'FUT_CHG_OI_T'})
+            final = pd.merge(final, fut_t_grouped, on='SYMBOL', how='left')
+        else:
+            final['FUT_OI_T'] = 0.0
+            final['FUT_CHG_OI_T'] = 0.0
+            
+        final['FUT_OI_T'] = final['FUT_OI_T'].fillna(0.0)
+        final['FUT_CHG_OI_T'] = final['FUT_CHG_OI_T'].fillna(0.0)
+
         # --- INVENTORY IMBALANCE METRICS ---
         # 1. PCR Calculation (Put OI / Call OI)
         final['PCR_T'] = final['OPEN_INT_PE_T'] / final['OPEN_INT_CE_T'].replace(0, 1)
@@ -93,14 +138,14 @@ class InstitutionalIntelligence:
             price_chg = row['SPOT_CHG_PCT']
             
             # CE Interpretation
-            ce_oi_chg = row['OPEN_INT_CE_T'] - row['OPEN_INT_CE_TM1']
+            ce_oi_chg = row['CHG_IN_OI_CE_T']
             if price_chg > 0.5 and ce_oi_chg > 0: ce_interp = "Call Buying (Long Build-up)"
             elif price_chg < -0.5 and ce_oi_chg > 0: ce_interp = "Call Writing (Short Build-up)"
             elif price_chg > 0.5 and ce_oi_chg < 0: ce_interp = "Short Covering"
             else: ce_interp = "Neutral / Unwinding"
 
             # PE Interpretation
-            pe_oi_chg = row['OPEN_INT_PE_T'] - row['OPEN_INT_PE_TM1']
+            pe_oi_chg = row['CHG_IN_OI_PE_T']
             if price_chg < -0.5 and pe_oi_chg > 0: pe_interp = "Put Buying (Long Build-up)"
             elif price_chg > 0.5 and pe_oi_chg > 0: pe_interp = "Put Writing (Short Build-up)"
             elif price_chg < -0.5 and pe_oi_chg < 0: pe_interp = "Short Covering"
@@ -165,17 +210,32 @@ class InstitutionalIntelligence:
             ce_gex = group[group['OPTION_TYP'] == 'CE'].groupby('STRIKE_PR')['GEX'].sum()
             pe_gex = group[group['OPTION_TYP'] == 'PE'].groupby('STRIKE_PR')['GEX'].sum().abs()
             
-            # Max Positive GEX for Calls, Max Negative GEX for Puts
-            call_wall = ce_gex.idxmax() if not ce_gex.empty else 0
-            put_wall = pe_gex.idxmax() if not pe_gex.empty else 0
+            # Max Positive GEX for Calls, Max Absolute GEX for Puts
+            # Filter to only strikes with meaningful GEX to avoid garbage idxmax() on zero-series
+            ce_gex_pos = ce_gex[ce_gex > 0]
+            pe_gex_pos = pe_gex[pe_gex > 0]
+            call_wall = ce_gex_pos.idxmax() if not ce_gex_pos.empty else 0
+            put_wall = pe_gex_pos.idxmax() if not pe_gex_pos.empty else 0
             
             # Gamma Flip: The strike with the highest overlapping Dealer Gamma Risk
             overlap = pd.concat([ce_gex, pe_gex], axis=1).min(axis=1)
-            gamma_flip = overlap.idxmax() if not overlap.empty and not overlap.isna().all() else 0
+            overlap_pos = overlap[overlap > 0]
+            gamma_flip = overlap_pos.idxmax() if not overlap_pos.empty else 0
             
             final.loc[final['SYMBOL'] == symbol, 'CALL_WALL_T'] = call_wall
             final.loc[final['SYMBOL'] == symbol, 'PUT_WALL_T'] = put_wall
             final.loc[final['SYMBOL'] == symbol, 'GAMMA_FLIP_T'] = gamma_flip
+
+        # ── Attach expiry rollover metadata ─────────────────────────────────────
+        # Downstream (daily_compiler.py) reads these to persist the flag in
+        # session_history so the UI can show a "Weekly Expiry Rollover" banner
+        # on the exact days the filter was active.
+        final['EXPIRY_FILTERED'] = expiry_filtered
+        final['DROPPED_EXPIRY_DATES'] = (
+            ", ".join(sorted([str(d.date()) for d in dropped_expiries]))
+            if expiry_filtered else ""
+        )
+        # ────────────────────────────────────────────────────────────────────────
 
         return final
 

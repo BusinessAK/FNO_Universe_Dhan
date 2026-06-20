@@ -57,6 +57,6 @@ class StructureClassifier:
         if ifs > 15:
             return "Support Building"
         elif ifs < -15:
-            return "Expansion"
+            return "Resistance Weakening"
         else:
             return "Dealer Controlled"

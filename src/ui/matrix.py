@@ -122,42 +122,37 @@ def render_inventory_matrix(all_symbols: list, session_history: dict, latest_dat
         background-color: #141435 !important;
         color: #a78bfa !important;
     }
-    .matrix-table td {
-        border-bottom: 1px solid rgba(20, 20, 53, 0.3) !important;
-    }
     .matrix-table td:first-child {
-        background-color: #050512 !important;
-        border-right: 2px solid rgba(20, 20, 53, 0.7) !important;
-    }
-    .matrix-table th:first-child {
+        position: -webkit-sticky !important;
+        position: sticky !important;
+        left: 0px !important;
+        z-index: 10 !important;
         background-color: #050514 !important;
         border-right: 2px solid rgba(20, 20, 53, 0.7) !important;
+        box-shadow: 4px 0 8px rgba(0, 0, 0, 0.4) !important;
+    }
+    .matrix-table th:first-child {
+        position: -webkit-sticky !important;
+        position: sticky !important;
+        left: 0px !important;
+        z-index: 11 !important;
+        background-color: #050514 !important;
+        border-right: 2px solid rgba(20, 20, 53, 0.7) !important;
+        box-shadow: 4px 0 8px rgba(0, 0, 0, 0.4) !important;
     }
     </style>
     """)
 
-    # Format dates for sorting options
-    date_options = []
-    date_map = {}
-    for d in reversed(trading_dates):
-        try:
-            formatted = datetime.strptime(d, "%Y-%m-%d").strftime("%d %b")
-        except Exception:
-            formatted = d
-        opt_text = f"IFS Score on {formatted}"
-        date_options.append(opt_text)
-        date_map[opt_text] = d
-        
     sort_options = [
         "Vanguard Priority Score (Recommended)", 
         "Vanguard Conviction Score (IFS)", 
         "Bullish Persistence Count", 
         "Bearish Persistence Count", 
         "Alphabetical"
-    ] + date_options
+    ]
 
     # Search and filtration for the matrix
-    m_col1, m_col2, m_col3 = st.columns([4, 3, 3])
+    m_col1, m_col2, m_col3, m_col4 = st.columns([3, 3, 2, 2])
     with m_col1:
         search_query = st.text_input("🔍 Filter Symbols", "", placeholder="Enter symbol name...").upper().strip()
     with m_col2:
@@ -167,11 +162,21 @@ def render_inventory_matrix(all_symbols: list, session_history: dict, latest_dat
             index=0
         )
     with m_col3:
-        max_symbols = st.slider("Display Limit (Rows)", 10, 50, 15, 5)
+        instrument_filter = st.radio(
+            "Filter Type",
+            ["All", "Stocks", "Indices"],
+            horizontal=True,
+            index=0
+        )
+    with m_col4:
+        max_symbols = st.slider("Limit (Rows)", 10, 50, 15, 5)
         
     db_service = DatabaseService()
     matrix_rows = []
     use_db = True
+    
+    # Define index ticker sets for filtering
+    index_tickers = {"NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY", "NIFTYNXT50"}
     
     try:
         df = db_service.get_matrix_data(search_query)
@@ -187,6 +192,12 @@ def render_inventory_matrix(all_symbols: list, session_history: dict, latest_dat
                 
             db_symbols = df["symbol"].unique()
             for sym in db_symbols:
+                # Apply instrument type filtering
+                if instrument_filter == "Stocks" and sym in index_tickers:
+                    continue
+                if instrument_filter == "Indices" and sym not in index_tickers:
+                    continue
+
                 sym_history = lookup.get(sym, {})
                 latest_sym_metrics = sym_history.get(latest_date, {})
                 if not latest_sym_metrics:
@@ -215,6 +226,12 @@ def render_inventory_matrix(all_symbols: list, session_history: dict, latest_dat
     if not use_db:
         # Fallback JSON loader
         for sym in all_symbols:
+            # Apply instrument type filtering
+            if instrument_filter == "Stocks" and sym in index_tickers:
+                continue
+            if instrument_filter == "Indices" and sym not in index_tickers:
+                continue
+
             sym_history = session_history.get(sym, {})
             latest_sym_metrics = sym_history.get(latest_date, {})
             if not latest_sym_metrics:
@@ -250,13 +267,6 @@ def render_inventory_matrix(all_symbols: list, session_history: dict, latest_dat
         matrix_rows = sorted(matrix_rows, key=lambda x: x["BEAR_PERSIST"], reverse=True)
     elif sort_by == "Alphabetical":
         matrix_rows = sorted(matrix_rows, key=lambda x: x["SYMBOL"])
-    elif sort_by in date_map:
-        target_date = date_map[sort_by]
-        matrix_rows = sorted(
-            matrix_rows,
-            key=lambda x: x["metrics"].get(target_date, {}).get("ifs_score", 0.0),
-            reverse=True
-        )
         
     # Slice rows
     sliced_rows = matrix_rows[:max_symbols]
@@ -322,21 +332,19 @@ def render_inventory_matrix(all_symbols: list, session_history: dict, latest_dat
                 p_wall = d_metrics.get("put_wall", 0.0)
                 
                 spot_chg = d_metrics.get("spot_change_pct", 0.0)
-                chg_ce = d_metrics.get("delta_ce_oi", 0.0)
-                chg_pe = d_metrics.get("delta_pe_oi", 0.0)
-                delta_oi = chg_ce + chg_pe
+                delta_oi = d_metrics.get("futures_oi_chg", 0.0)
                 
                 # Determine buildup type
-                if spot_chg > 0.02 and delta_oi > 0:
+                if spot_chg > 0.5 and delta_oi > 0:
                     buildup_tag = "LB"
                     buildup_color = "#00ff66"  # Bright Emerald
-                elif spot_chg < -0.02 and delta_oi > 0:
+                elif spot_chg < -0.5 and delta_oi > 0:
                     buildup_tag = "SB"
                     buildup_color = "#ff3333"  # Bright Crimson
-                elif spot_chg < -0.02 and delta_oi < 0:
+                elif spot_chg < -0.5 and delta_oi < 0:
                     buildup_tag = "LU"
                     buildup_color = "#fb923c"  # Amber Orange
-                elif spot_chg > 0.02 and delta_oi < 0:
+                elif spot_chg > 0.5 and delta_oi < 0:
                     buildup_tag = "SC"
                     buildup_color = "#2dd4bf"  # Ice Teal
                 else:
@@ -364,7 +372,7 @@ def render_inventory_matrix(all_symbols: list, session_history: dict, latest_dat
                     f"Symbol: {sym} | Date: {d}\\n"
                     f"IFS score: {val:+.1f}\\n"
                     f"Spot price: ₹{spot_cl:,.2f} ({spot_chg:+.2f}%)\\n"
-                    f"Options OI Shift: {delta_oi/100000:+.1f} Lakh contracts ({buildup_tag})\\n"
+                    f"Futures OI Shift: {delta_oi/100000:+.1f} Lakh shares ({buildup_tag})\\n"
                     f"Net OI Shift: {net_inv/100000:+.1f} Lakh shares\\n"
                     f"Delta Vol: {delta_vol/100000:+.1f} Lakh contracts\\n"
                     f"Dealer GEX: {fmt_gex(gex)}\\n"
@@ -377,9 +385,9 @@ def render_inventory_matrix(all_symbols: list, session_history: dict, latest_dat
                     f'<td class="matrix-cell" style="{cell_style}" title="{tooltip_txt}">'
                     f'<div style="position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 44px; min-width: 48px; padding: 2px;">'
                     f'  <div style="position: absolute; top: 1px; left: 2px; font-size: 8px; color: {text_color}; opacity: 0.8; font-weight: 700;">{arrow}</div>'
+                    f'  <div style="position: absolute; top: 4px; right: 4px; width: 4px; height: 4px; background-color: {buildup_color}; border-radius: 50%;" title="{buildup_tag} buildup"></div>'
                     f'  <div style="font-size: 11px; font-weight: 800; margin-top: 4px; line-height: 1.1;">{val:+.0f}</div>'
-                    f'  <div style="font-size: 7.5px; font-weight: 700; color: {buildup_color}; opacity: 0.95; margin-top: 1px; font-family: \'Inter Tight\', sans-serif;">{buildup_tag}</div>'
-                    f'  <div style="width: 100%; height: 3px; background-color: rgba(255,255,255,0.08); border-radius: 1px; margin-top: 4px; overflow: hidden;">'
+                    f'  <div style="width: 100%; height: 3px; background-color: rgba(255,255,255,0.08); border-radius: 1px; margin-top: 6px; overflow: hidden;">'
                     f'    <div style="width: {vol_ratio}%; height: 100%; background-color: {bar_color};"></div>'
                     f'  </div>'
                     f'</div>'
@@ -389,7 +397,7 @@ def render_inventory_matrix(all_symbols: list, session_history: dict, latest_dat
             # Render Row
             table_rows_html += f"""
             <tr>
-              <td class="{sym_cell_class}" style="padding: 10px 12px; background-color: #050512 !important;">
+              <td class="{sym_cell_class}" style="padding: 10px 12px;">
                 <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 2px; min-width: 100px;">
                   <span style="font-size: 13px; font-weight: 800; color: #ffffff; letter-spacing: 0.5px;">{sym}</span>
                   {pulse_dot_html}
@@ -517,7 +525,7 @@ def render_inventory_matrix(all_symbols: list, session_history: dict, latest_dat
         
         render_html("""
         <div class="matrix-legend-container" style="display: flex; flex-direction: column; background: rgba(9, 9, 27, 0.4); border: 1px solid #141435; border-radius: 6px; padding: 10px 15px; margin-top: 10px; font-family: 'Inter', sans-serif; gap: 8px;">
-          <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; border-bottom: 1px solid rgba(20,20,53,0.15); padding-bottom: 8px;">
+          <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px;">
             <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 15px;">
               <span style="font-size: 10px; font-weight: 700; color: #4a5a8a; letter-spacing: 0.5px; text-transform: uppercase;">Grid Flow:</span>
               <div style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: #7888aa;">
@@ -541,14 +549,6 @@ def render_inventory_matrix(all_symbols: list, session_history: dict, latest_dat
                 <span>Bottom Bar = Session Volume Delta (Green: Active, Red: Contracting)</span>
               </div>
             </div>
-          </div>
-          <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 15px; font-size: 10px; color: #7888aa;">
-            <span style="font-size: 10px; font-weight: 700; color: #4a5a8a; letter-spacing: 0.5px; text-transform: uppercase;">F&O Buildup:</span>
-            <span>🟢 <b style="color:#00ff66;">LB</b> = Long Buildup</span>
-            <span>🔴 <b style="color:#ff3333;">SB</b> = Short Buildup</span>
-            <span>🟠 <b style="color:#fb923c;">LU</b> = Long Unwinding</span>
-            <span>🔵 <b style="color:#2dd4bf;">SC</b> = Short Covering</span>
-            <span>⇅ <b style="color:#7888aa;">ROT</b> = Rotation</span>
           </div>
         </div>
         """)
