@@ -260,7 +260,9 @@ def main():
                     setups.append("IV_CRUSH")
 
                 # 10. IV_SKEW_ACCUMULATION Setup (Speculative Skew Chase)
-                if spot_t > 0 and call_wall_t > 0 and 0 < (call_wall_t - spot_t) / spot_t <= 0.03 and skew_slope > 1.15:
+                is_bullish_skew = spot_t > 0 and call_wall_t > 0 and 0 < (call_wall_t - spot_t) / spot_t <= 0.03 and skew_slope > 1.15
+                is_bearish_skew = spot_t > 0 and put_wall_t > 0 and 0 < (spot_t - put_wall_t) / spot_t <= 0.03 and skew_slope < 0.85
+                if is_bullish_skew or is_bearish_skew:
                     setups.append("IV_SKEW_ACCUMULATION")
                 
                 # Ratios for conviction circle
@@ -493,13 +495,23 @@ def main():
                         "dealer_behavior": "Post Event Unwinding"
                     }
                 elif "IV_SKEW_ACCUMULATION" in setups:
-                    playbook = {
-                        "bias": "Bullish Breakout",
-                        "trigger_strike": float(call_wall_t),
-                        "invalidation_strike": float(spot_t * 0.97),
-                        "expected_behavior": "Upside Skew Chase Breakout",
-                        "dealer_behavior": "Speculative Call Buying Squeeze"
-                    }
+                    is_bullish_skew = spot_t > 0 and call_wall_t > 0 and 0 < (call_wall_t - spot_t) / spot_t <= 0.03 and skew_slope > 1.15
+                    if is_bullish_skew:
+                        playbook = {
+                            "bias": "Bullish Breakout",
+                            "trigger_strike": float(call_wall_t),
+                            "invalidation_strike": float(spot_t * 0.97),
+                            "expected_behavior": "Upside Skew Chase Breakout",
+                            "dealer_behavior": "Speculative Call Buying Squeeze"
+                        }
+                    else:
+                        playbook = {
+                            "bias": "Bearish Breakdown",
+                            "trigger_strike": float(put_wall_t),
+                            "invalidation_strike": float(spot_t * 1.03),
+                            "expected_behavior": "Downside Skew Chase Breakdown",
+                            "dealer_behavior": "Speculative Put Buying Squeeze"
+                        }
                 elif ifs_final > 15:
                     playbook = {"bias": "Bullish Bias", "trigger_strike": float(call_wall_t), "invalidation_strike": float(put_wall_t), "expected_behavior": "Support Floor Building", "dealer_behavior": "Put Writing Support"}
                 elif ifs_final < -15:
@@ -545,11 +557,11 @@ def main():
                         # Spot above gamma flip + call skew building → buy the breakout
                         s_strat = "Bull Call Spread (Debit)"
                     elif "Bearish" in p_bias:
-                        # Spot below gamma flip + put skew building → sell the rally cap
-                        s_strat = "Bear Call Spread (Credit)"
+                        # Spot below gamma flip + put skew building → buy the breakdown
+                        s_strat = "Bear Put Spread (Debit)"
                     else:
                         # Neutral / Regime Transition — defer to gamma_regime
-                        s_strat = "Bull Call Spread (Debit)" if gamma_regime == "LONG_GAMMA" else "Bear Call Spread (Credit)"
+                        s_strat = "Bull Call Spread (Debit)" if gamma_regime == "LONG_GAMMA" else "Bear Put Spread (Debit)"
                 elif "REGIME_SHIFT" in setups:
                     if p_bias == "Regime Transition" and ifs_final >= 0:
                         s_strat = "Bull Put Spread (Credit)"

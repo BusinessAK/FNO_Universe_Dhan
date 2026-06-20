@@ -54,6 +54,15 @@ def render_setup_card(s_ticker: str, s_m: dict, s_type: str, select_stock_callba
             title = "Option Wall Rebalancing"
             color = "#38bdf8"
             icon = "🔄"
+    elif s_type == "IV_SKEW_ACCUMULATION":
+        if "Bearish" in bias:
+            title = "Downside Skew Chase"
+            color = "#f43f5e"
+            icon = "📉"
+        else:
+            title = "Upside Skew Chase"
+            color = "#c084fc"
+            icon = "📈"
             
     full_title = f"{icon} {title}"
     
