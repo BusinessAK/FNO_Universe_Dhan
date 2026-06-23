@@ -149,6 +149,14 @@ if view_mode == "⚡ VANGUARD SCREENER TERMINAL":
         
     today_changes = db_service.get_daily_changes(latest_date)
     
+    # Filter daily changes by sector
+    from src.config.sector_mapping import get_sector
+    if selected_sectors and "ALL" not in selected_sectors:
+        today_changes = [
+            c for c in today_changes 
+            if get_sector(c.get("symbol")) in selected_sectors
+        ]
+    
     # Render premium daily global breadth panels
     render_market_breadth_panel(latest_breadth)
     render_daily_changes_panel(today_changes)
