@@ -83,6 +83,21 @@ def render_sidebar(all_symbols: list, selected_date: str, session_history: dict,
         st.markdown("---")
         strike_pct = st.slider("STRIKE RANGE (% ± CMP)", 5, 25, 12, 1)
 
+        # 4.5. Sector filter
+        st.markdown("---")
+        available_sectors = [
+            "ALL", "BFSI", "IT & Telecom", "Energy & Power", "Capital Goods & Infra",
+            "Automobile", "Healthcare & Pharma", "FMCG & Consumer Goods",
+            "Metals & Mining", "Chemicals", "Real Estate & Cement", "Logistics & Transport",
+            "Diversified", "Other"
+        ]
+        selected_sectors = st.multiselect(
+            "FILTER BY SECTOR",
+            options=available_sectors,
+            default=["ALL"],
+            key="selected_sectors_filter"
+        )
+
         # 5. Database metadata tags
         st.markdown("---")
         st.markdown(f'<div style="font-size:10px;color:#4a5a8a;">'
@@ -91,4 +106,4 @@ def render_sidebar(all_symbols: list, selected_date: str, session_history: dict,
                     f'TOTAL F&O SYMBOLS: {len(all_symbols)}</div>',
                     unsafe_allow_html=True)
 
-    return view_mode, selected_symbol, selected_expiry, strike_pct, active_date
+    return view_mode, selected_symbol, selected_expiry, strike_pct, active_date, selected_sectors

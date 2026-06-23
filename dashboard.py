@@ -115,7 +115,7 @@ resolver = HistoricalSessionResolver(trading_dates[-1] if trading_dates else "")
 # ─────────────────────────────────────────────────────────────────────────────
 # SIDEBAR CONTROLLER DECK
 # ─────────────────────────────────────────────────────────────────────────────
-view_mode, selected_symbol, selected_expiry, strike_pct, active_date = render_sidebar(
+view_mode, selected_symbol, selected_expiry, strike_pct, active_date, selected_sectors = render_sidebar(
     all_symbols, ui_state.selected_date, session_history, greeks_df, trading_dates
 )
 ui_state.selected_date = active_date
@@ -202,7 +202,7 @@ if view_mode == "⚡ VANGUARD SCREENER TERMINAL":
 
     # Section A - flagships matrix
     st.markdown('<p class="term-header">SECTION A — INSTITUTIONAL INVENTORY MATRIX</p>', unsafe_allow_html=True)
-    render_inventory_matrix(all_symbols, session_history, latest_date, trading_dates)
+    render_inventory_matrix(all_symbols, session_history, latest_date, trading_dates, selected_sectors)
 
     
     # Section B - setups scanner loading direct from DatabaseService
@@ -216,6 +216,13 @@ if view_mode == "⚡ VANGUARD SCREENER TERMINAL":
     for _, r in setups_df.iterrows():
         s_sym = r["symbol"]
         s_type = r["setup_type"]
+        s_sector = r.get("sector", "Other")
+        
+        # Apply sector filtering
+        if selected_sectors and "ALL" not in selected_sectors:
+            if s_sector not in selected_sectors:
+                continue
+                
         s_m = session_history.get(s_sym, {}).get(latest_date, {})
         if s_m and s_type in categorized_setups:
              categorized_setups[s_type].append((s_sym, s_m))

@@ -20,6 +20,7 @@ from src.intelligence import InstitutionalIntelligence
 from src.core.longitudinal import LongitudinalEngine
 from src.core.classifier import StructureClassifier
 from src.core.breadth import MarketBreadthEngine
+from src.config.sector_mapping import get_sector
 
 def extract_date(filename):
     """Extracts YYYY-MM-DD from NSE bhavcopy filename."""
@@ -634,6 +635,7 @@ def main():
             # A. Structure records
             structure_rows.append({
                 "symbol": sym,
+                "sector": get_sector(sym),
                 "date": d_t,
                 "spot_close": day_data["spot_close"],
                 "spot_change_pct": day_data["spot_change_pct"],
@@ -674,6 +676,7 @@ def main():
                 for s_type in setups_list:
                     setups_rows.append({
                         "symbol": sym,
+                        "sector": get_sector(sym),
                         "date": d_t,
                         "setup_type": s_type,
                         "bias": playbook.get("bias", "Neutral"),
@@ -685,6 +688,7 @@ def main():
             else:
                 setups_rows.append({
                     "symbol": sym,
+                    "sector": get_sector(sym),
                     "date": d_t,
                     "setup_type": "NONE",
                     "bias": playbook.get("bias", "Neutral"),
@@ -697,6 +701,7 @@ def main():
             # C. Inventory Shifts
             inventory_rows.append({
                 "symbol": sym,
+                "sector": get_sector(sym),
                 "date": d_t,
                 "put_wall_shift": day_data.get("put_wall_shift", "Stable"),
                 "call_wall_shift": day_data.get("call_wall_shift", "Stable"),

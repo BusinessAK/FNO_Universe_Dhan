@@ -8,7 +8,7 @@ import os
 from src.services.database_service import DatabaseService
 from src.ui.cards import render_html, format_score, get_ifs_hsl, fmt_gex
 
-def render_inventory_matrix(all_symbols: list, session_history: dict, latest_date: str, trading_dates: list):
+def render_inventory_matrix(all_symbols: list, session_history: dict, latest_date: str, trading_dates: list, selected_sectors: list = None):
     """
     Compiles and renders the flagship Custom HTML Grid Matrix in Section A.
     """
@@ -202,6 +202,12 @@ def render_inventory_matrix(all_symbols: list, session_history: dict, latest_dat
                 latest_sym_metrics = sym_history.get(latest_date, {})
                 if not latest_sym_metrics:
                     continue
+
+                # Apply sector filtering
+                sym_sector = latest_sym_metrics.get("sector", "Other")
+                if selected_sectors and "ALL" not in selected_sectors:
+                    if sym_sector not in selected_sectors:
+                        continue
                     
                 # Convert type mapping
                 ifs_score = latest_sym_metrics.get("ifs_score", 0.0)
@@ -236,6 +242,13 @@ def render_inventory_matrix(all_symbols: list, session_history: dict, latest_dat
             latest_sym_metrics = sym_history.get(latest_date, {})
             if not latest_sym_metrics:
                 continue
+
+            # Apply sector filtering in fallback
+            from src.config.sector_mapping import get_sector
+            sym_sector = get_sector(sym)
+            if selected_sectors and "ALL" not in selected_sectors:
+                if sym_sector not in selected_sectors:
+                    continue
                 
             # Get persistence and current IFS
             ifs_score = latest_sym_metrics.get("ifs_score", 0.0)
