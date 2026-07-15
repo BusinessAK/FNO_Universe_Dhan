@@ -56,6 +56,28 @@ def build_tape():
     return tape, stats
 
 
+def seed_prev_close(store, im, symbols):
+    """Seed prev_close from the latest EOD spot_close so chg% is correct from
+    the first live tick (rather than waiting for a Previous Close packet)."""
+    try:
+        import duckdb
+        db = ROOT / "data" / "compiled" / "vanguard.duckdb"
+        con = duckdb.connect(str(db), read_only=True)
+        latest = con.execute("SELECT MAX(date) FROM daily_market_structure").fetchone()[0]
+        closes = {r[0]: r[1] for r in con.execute(
+            "SELECT symbol, spot_close FROM daily_market_structure WHERE date=?", [latest]).fetchall()}
+        con.close()
+        n = 0
+        for s in symbols:
+            row = im.spot(s)
+            if row and closes.get(s):
+                store.seed_prev_close(int(row["security_id"]), float(closes[s]))
+                n += 1
+        print(f"[seed] prev_close seeded for {n} symbols from EOD {latest}")
+    except Exception as e:
+        print(f"[seed] prev_close seeding skipped: {e}")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--dry-run", action="store_true", help="build manifest + auth check, no socket")
@@ -90,9 +112,22 @@ def main():
 
     # ── live loop ─────────────────────────────────────────────────────────
     from src.live.feed_handler import FeedHandler
+    from src.live.snapshot import build_sid_symbol_map, write_snapshot
+    from src.live.bridge import Bridge
+    from src.data.instrument_master import InstrumentMaster
+
+    im = InstrumentMaster()
+    all_syms = (compiled_universe() or []) + C.INDEX_SYMBOLS
+    sid_symbol = build_sid_symbol_map(im, all_syms)
+
     store = StateStore()
+    seed_prev_close(store, im, all_syms)
     journal = TickJournal()
     fh = FeedHandler(client, store, journal)
+
+    bridge = Bridge()
+    bridge.start()
+    print(f"[live] open the terminal at http://{C.BRIDGE_HOST}:{C.BRIDGE_PORT}/")
 
     while True:
         wait = cal.seconds_until_daemon_start()
@@ -106,6 +141,7 @@ def main():
         t.start()
         while cal.is_daemon_window():
             journal.flush()
+            write_snapshot(store, sid_symbol)
             age = time.time() - fh.last_tick_ts if fh.last_tick_ts else 0
             if cal.is_market_open() and fh.last_tick_ts and age > C.STALE_TICK_ALERT:
                 print(f"[watchdog] no tick for {age:.0f}s in market hours")
@@ -113,6 +149,7 @@ def main():
         print("[live] daemon window closed; stopping feed, flushing journal")
         fh.stop()
         journal.close()
+        write_snapshot(store, sid_symbol)
 
 
 if __name__ == "__main__":
