@@ -43,17 +43,24 @@ def compiled_universe() -> list[str] | None:
 
 
 def build_tape():
-    """Assemble the M1 tape manifest (spot + front futures). Returns (tape, stats)."""
+    """Assemble the M1 tape manifest (spot + front futures).
+
+    Returns (tape, stats, spot_symbols) — spot_symbols is the deduped symbol set
+    the tape covers, so the snapshot map is built from exactly what we stream.
+    """
     sm = SubscriptionManager()
     universe = compiled_universe()
     fno = sm.fno_underlyings(whitelist=universe)
-    spot = sm.spot_manifest(fno + C.INDEX_SYMBOLS)
+    # The compiled universe already contains the indices (they have futures), so
+    # `fno + INDEX_SYMBOLS` would subscribe each index twice. Dedupe.
+    spot_symbols = sorted(set(fno) | set(C.INDEX_SYMBOLS))
+    spot = sm.spot_manifest(spot_symbols)
     fut = sm.futures_manifest(fno)
     tape = spot + fut
     stats = {"fno": len(fno), "spot": len(spot), "fut": len(fut),
              "total": len(tape), "conns": len(sm.pack_connections(tape)),
              "msgs": len(sm.chunks(tape))}
-    return tape, stats
+    return tape, stats, spot_symbols
 
 
 def seed_prev_close(store, im, symbols):
@@ -71,7 +78,8 @@ def seed_prev_close(store, im, symbols):
         for s in symbols:
             row = im.spot(s)
             if row and closes.get(s):
-                store.seed_prev_close(int(row["security_id"]), float(closes[s]))
+                store.seed_prev_close(int(row["feed_segment"]), int(row["security_id"]),
+                                      float(closes[s]))
                 n += 1
         print(f"[seed] prev_close seeded for {n} symbols from EOD {latest}")
     except Exception as e:
@@ -87,7 +95,7 @@ def main():
     print("  VANGUARD LIVE DAEMON — M1 tape")
     print("=" * 70)
 
-    tape, stats = build_tape()
+    tape, stats, spot_symbols = build_tape()
     print(f"[manifest] F&O {stats['fno']} · spot {stats['spot']} · futures {stats['fut']} "
           f"→ {stats['total']} instruments / {stats['conns']} conn / {stats['msgs']} msgs")
 
@@ -112,16 +120,15 @@ def main():
 
     # ── live loop ─────────────────────────────────────────────────────────
     from src.live.feed_handler import FeedHandler
-    from src.live.snapshot import build_sid_symbol_map, write_snapshot
+    from src.live.snapshot import build_key_symbol_map, write_snapshot
     from src.live.bridge import Bridge
     from src.data.instrument_master import InstrumentMaster
 
     im = InstrumentMaster()
-    all_syms = (compiled_universe() or []) + C.INDEX_SYMBOLS
-    sid_symbol = build_sid_symbol_map(im, all_syms)
+    key_symbol = build_key_symbol_map(im, spot_symbols)
 
     store = StateStore()
-    seed_prev_close(store, im, all_syms)
+    seed_prev_close(store, im, spot_symbols)
     journal = TickJournal()
     fh = FeedHandler(client, store, journal)
 
@@ -158,7 +165,7 @@ def main():
         # Resilient tick: one bad iteration must never kill the daemon.
         try:
             journal.flush()
-            write_snapshot(store, sid_symbol)
+            write_snapshot(store, key_symbol)
             age = time.time() - fh.last_tick_ts if fh.last_tick_ts else 0
             if cal.is_market_open() and fh.last_tick_ts and age > C.STALE_TICK_ALERT:
                 log(f"[watchdog] no tick for {age:.0f}s; feed reconnecting")

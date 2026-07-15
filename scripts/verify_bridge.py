@@ -24,17 +24,19 @@ from src.live import config as C
 from src.live.state_store import StateStore
 from src.live.tick_journal import TickJournal
 from src.live.feed_handler import FeedHandler
-from src.live.snapshot import build_sid_symbol_map, write_snapshot
+from src.live.snapshot import build_key_symbol_map, write_snapshot
 from src.live.bridge import Bridge
 
-symbols = ["NIFTY", "RELIANCE", "TCS", "HDFCBANK", "INFY", "SBIN"]
+# ABB/ADANIENT share a security_id with NIFTY/BANKNIFTY — keep both pairs here so
+# a live run proves the (segment, security_id) keying holds against the real feed.
+symbols = ["NIFTY", "ABB", "BANKNIFTY", "ADANIENT", "RELIANCE", "TCS", "HDFCBANK", "INFY", "SBIN"]
 im = InstrumentMaster()
 instruments = []
 for s in symbols:
     sp = im.spot(s)
     if sp:
         instruments.append((int(sp["feed_segment"]), str(int(sp["security_id"])), C.MODE_QUOTE))
-sid_symbol = build_sid_symbol_map(im, symbols)
+key_symbol = build_key_symbol_map(im, symbols)
 
 client = DhanClient()
 store = StateStore()
@@ -47,7 +49,7 @@ con.close()
 for s in symbols:
     sp = im.spot(s)
     if sp and _closes.get(s):
-        store.seed_prev_close(int(sp["security_id"]), float(_closes[s]))
+        store.seed_prev_close(int(sp["feed_segment"]), int(sp["security_id"]), float(_closes[s]))
 journal = TickJournal("BRIDGEVERIFY")
 fh = FeedHandler(client, store, journal)
 
@@ -55,7 +57,7 @@ print(f"[verify] streaming {len(instruments)} spot names for {DURATION}s", flush
 threading.Thread(target=fh.run, args=(instruments,), daemon=True).start()
 time.sleep(DURATION)
 
-snap = write_snapshot(store, sid_symbol)
+snap = write_snapshot(store, key_symbol)
 print(f"[verify] snapshot: {snap['n']} live quotes, market_open={snap['market_open']}", flush=True)
 
 bridge = Bridge()

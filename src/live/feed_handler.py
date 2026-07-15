@@ -15,19 +15,24 @@ from src.live.state_store import StateStore
 from src.live.tick_journal import TickJournal
 
 
+def _key(raw: dict) -> tuple[int, int] | None:
+    """(exchange_segment, security_id) — the instrument identity. security_id
+    alone is ambiguous across segments (sid 13 = NIFTY *and* ABB), so a packet
+    without a segment is unkeyable and must be dropped rather than guessed at."""
+    seg, sid = _int(raw.get("exchange_segment")), _int(raw.get("security_id"))
+    return None if seg is None or sid is None else (seg, sid)
+
+
 def normalize(raw: dict) -> dict | None:
     """SDK tick dict → our normalized tick. Returns None for non-price packets
     (those are handled separately, e.g. Previous Close seeds prev_close)."""
     if not isinstance(raw, dict):
         return None
     t = raw.get("type", "")
-    sid = raw.get("security_id")
-    if sid is None:
+    key = _key(raw)
+    if key is None:
         return None
-    try:
-        sid = int(sid)
-    except (TypeError, ValueError):
-        return None
+    seg, sid = key
 
     if t in ("Ticker Data", "Quote Data", "Full Data", "Market Depth"):
         ltp = raw.get("LTP")
@@ -37,7 +42,7 @@ def normalize(raw: dict) -> dict | None:
             ltp = float(ltp)
         except (TypeError, ValueError):
             return None
-        tick = {"sid": sid, "ts": time.time(), "ltp": ltp}
+        tick = {"seg": seg, "sid": sid, "ts": time.time(), "ltp": ltp}
         if raw.get("volume") is not None:
             tick["vol"] = _int(raw["volume"])
         if raw.get("OI") is not None:
@@ -50,7 +55,7 @@ def normalize(raw: dict) -> dict | None:
         oi = _int(raw.get("OI"))
         if oi is None:
             return None
-        return {"sid": sid, "ts": time.time(), "ltp": None, "oi": oi}
+        return {"seg": seg, "sid": sid, "ts": time.time(), "ltp": None, "oi": oi}
 
     return None
 
@@ -87,10 +92,10 @@ class FeedHandler:
         if not isinstance(raw, dict):
             return
         if raw.get("type") == "Previous Close":
-            sid = _int(raw.get("security_id"))
+            key = _key(raw)
             pc = _float(raw.get("prev_close") or raw.get("Previous Close"))
-            if sid is not None and pc:
-                self.store.seed_prev_close(sid, pc)
+            if key is not None and pc:
+                self.store.seed_prev_close(*key, pc)
             return
         tick = normalize(raw)
         if tick is None:
@@ -101,7 +106,7 @@ class FeedHandler:
             self.journal.append(tick)
         closed = self.store.ingest(tick)
         if closed and self.on_bar_close:
-            self.on_bar_close(tick["sid"], closed)
+            self.on_bar_close((tick["seg"], tick["sid"]), closed)
 
     def run(self, instruments: list):
         """Blocking connection loop — run in a daemon thread. Reconnects on drop."""
