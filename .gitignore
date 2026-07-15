@@ -29,3 +29,6 @@ env/
 
 # Live realtime artifacts (regenerable)
 data/live/
+
+# Built HUD (regenerable: scripts/build_hud.py = hud/template.html + vanguard.duckdb)
+hud/vanguard_hud.html
