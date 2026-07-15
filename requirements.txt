@@ -13,3 +13,7 @@ streamlit-autorefresh
 certifi
 pnsea
 duckdb
+feedparser
+google-genai
+dhanhq
+websockets

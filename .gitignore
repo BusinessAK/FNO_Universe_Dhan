@@ -9,6 +9,10 @@ data/raw/
 data/processed/
 data/compiled/
 
+# Compiled databases and throwaway analysis scripts
+*.duckdb
+scratch/
+
 # Credentials and environment secrets
 .env
 secret.json
@@ -22,3 +26,6 @@ Thumbs.db
 venv/
 .venv/
 env/
+
+# Live realtime artifacts (regenerable)
+data/live/
