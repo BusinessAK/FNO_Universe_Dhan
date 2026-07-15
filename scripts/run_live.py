@@ -127,29 +127,45 @@ def main():
 
     bridge = Bridge()
     bridge.start()
-    print(f"[live] open the terminal at http://{C.BRIDGE_HOST}:{C.BRIDGE_PORT}/")
+
+    import traceback
+    logfile = C.LIVE_DIR / f"daemon_{cal.now_ist().strftime('%Y%m%d')}.log"
+
+    def log(msg):
+        line = f"{cal.now_ist().strftime('%H:%M:%S')} {msg}"
+        print(line, flush=True)
+        try:
+            with open(logfile, "a") as f:
+                f.write(line + "\n")
+        except Exception:
+            pass
+
+    log(f"[live] open the terminal at http://{C.BRIDGE_HOST}:{C.BRIDGE_PORT}/")
+    feed_started = False
 
     while True:
-        wait = cal.seconds_until_daemon_start()
-        if wait > 0:
-            print(f"[sched] off-hours; sleeping {wait/60:.0f} min until daemon window")
-            time.sleep(min(wait, 1800))
+        if not cal.is_daemon_window():
+            wait = cal.seconds_until_daemon_start()
+            log(f"[sched] off-hours; sleeping {wait/60:.0f} min")
+            time.sleep(min(max(wait, 30), 1800))
             continue
 
-        print(f"[live] entering session; streaming {stats['total']} instruments")
-        t = threading.Thread(target=fh.run, args=(tape,), daemon=True)
-        t.start()
-        while cal.is_daemon_window():
+        if not feed_started:
+            log(f"[live] entering session; streaming {stats['total']} instruments")
+            threading.Thread(target=fh.run, args=(tape,), daemon=True).start()
+            feed_started = True
+
+        # Resilient tick: one bad iteration must never kill the daemon.
+        try:
             journal.flush()
             write_snapshot(store, sid_symbol)
             age = time.time() - fh.last_tick_ts if fh.last_tick_ts else 0
             if cal.is_market_open() and fh.last_tick_ts and age > C.STALE_TICK_ALERT:
-                print(f"[watchdog] no tick for {age:.0f}s in market hours")
-            time.sleep(C.SNAPSHOT_CADENCE)
-        print("[live] daemon window closed; stopping feed, flushing journal")
-        fh.stop()
-        journal.close()
-        write_snapshot(store, sid_symbol)
+                log(f"[watchdog] no tick for {age:.0f}s; feed reconnecting")
+        except Exception as e:
+            log(f"[loop] error (continuing): {e}")
+            traceback.print_exc()
+        time.sleep(C.SNAPSHOT_CADENCE)
 
 
 if __name__ == "__main__":

@@ -1,7 +1,8 @@
 """
-Tick journal — append-only parquet per session. This is the research substrate
-and (critically) the ONLY source for intraday-microstructure backtests, so it
-must be lossless. Batched writes keep it off the hot path.
+Tick journal — append-only parquet *dataset* (one part file per flush) per
+session. Writing a new part each flush is O(1) and corruption-proof, versus
+re-reading + rewriting a single growing file (which is O(n^2) and can wedge the
+daemon). Read the whole day with pd.read_parquet(dir) or duckdb.
 """
 from __future__ import annotations
 
@@ -15,23 +16,28 @@ from src.live import config as C
 class TickJournal:
     def __init__(self, date_str: str | None = None):
         self.date = date_str or datetime.now().strftime("%Y%m%d")
-        self.path = C.LIVE_DIR / f"ticks_{self.date}.parquet"
-        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.dir = C.LIVE_DIR / f"ticks_{self.date}"
+        self.dir.mkdir(parents=True, exist_ok=True)
         self._buf: list[dict] = []
+        self._part = 0
 
     def append(self, tick: dict):
         self._buf.append(tick)
 
     def flush(self):
-        """Append the buffer to the day's parquet. Safe to call on a timer."""
+        """Write the buffer to a fresh part file — never re-reads prior data."""
         if not self._buf:
             return
-        df = pd.DataFrame(self._buf)
-        self._buf = []
-        if self.path.exists():
-            prior = pd.read_parquet(self.path)
-            df = pd.concat([prior, df], ignore_index=True)
-        df.to_parquet(self.path, index=False)
+        rows, self._buf = self._buf, []
+        self._part += 1
+        try:
+            pd.DataFrame(rows).to_parquet(self.dir / f"part_{self._part:05d}.parquet", index=False)
+        except Exception as e:                 # never let journaling kill the daemon
+            print(f"[tick_journal] flush error (dropping {len(rows)} ticks): {e}")
 
     def close(self):
         self.flush()
+
+    @property
+    def path(self):                            # back-compat: the dataset dir
+        return self.dir
