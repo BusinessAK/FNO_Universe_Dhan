@@ -381,8 +381,8 @@ figure figcaption{font-size:10px;color:var(--muted);letter-spacing:.06em;margin-
     <a id="dss-tv" class="chip" target="_blank" rel="noopener"
        title="One-click chart view (TradingView, NSE). Renders the exact stock — for a quick look."
        style="position:absolute;top:12px;right:76px;text-decoration:none">📈 CHART ⤴</a>
-    <a id="dss-chart" class="chip" target="_blank" rel="noopener" href="https://tv.dhan.co/"
-       title="Opens Dhan terminal (your saved multi-chart layout) for trading · symbol copied — paste (⌘V) + Enter in Symbol Search"
+    <a id="dss-chart" class="chip" href="https://tv.dhan.co/"
+       title="Opens Dhan terminal (ONE reused tab, saved layout) · symbol copied — paste (⌘V) + Enter in Symbol Search"
        style="position:absolute;top:12px;right:166px;text-decoration:none">DHAN ⤴</a>
     <h3 id="dss-sym">—</h3>
     <div class="sub" id="dss-sub">—</div>
@@ -1199,20 +1199,34 @@ function openDossier(sym){
   $("#dss-close").focus();
 }
 $("#dss-close").addEventListener("click",()=>$("#dossier").hidden=true);
-/* Also copy the Dhan search symbol on click — if the terminal's ?symbol=
-   param doesn't auto-resolve (label-only), the flow is: start typing or
-   Cmd+V in Dhan's symbol search, Enter. */
-$("#dss-chart").addEventListener("click",()=>{
+/* Dhan cannot deep-link a symbol (re-verified 2026-07: tv.dhan.co has no
+   resolving ?symbol= — community-tested formats error out), so the terminal
+   ALWAYS opens on its saved layout showing the last-viewed chart. Best
+   possible flow, and why each piece exists:
+   - ONE named tab ("dhan_terminal"), navigated + refocused on every click —
+     target="_blank" spawned a new tab per click, and refocusing a stale old
+     tab is exactly the "opens the first/last chart" confusion.
+   - clipboard write is AWAITED (writeText returns a promise; the old
+     try/catch missed rejections and showed "✓ copied" over an unchanged
+     clipboard), with a hidden-textarea fallback before giving up. */
+$("#dss-chart").addEventListener("click",e=>{
+  e.preventDefault();
   const sym=$("#dss-sym").textContent;
   const dhanSym=DHAN_MAP[sym]||sym;
-  // Dhan's ?symbol= param is label-only (won't load data) and blanks the saved
-  // layout — so we open clean and copy the symbol. Toast makes the paste flow visible.
-  try{
-    navigator.clipboard.writeText(dhanSym);
-    showToast(`✓ <b>${esc(dhanSym)}</b> copied — in Dhan, press <b>⌘V</b> then <b>Enter</b> in Symbol Search`);
-  }catch(e){
-    showToast(`In Dhan's Symbol Search, type <b>${esc(dhanSym)}</b> + Enter`);
-  }
+  const done=ok=>showToast(ok
+    ?`✓ <b>${esc(dhanSym)}</b> copied — in Dhan press <b>⌘V</b> then <b>Enter</b> in Symbol Search`
+    :`In Dhan's Symbol Search, type <b>${esc(dhanSym)}</b> + Enter`);
+  const legacyCopy=()=>{const ta=document.createElement("textarea");ta.value=dhanSym;
+    ta.style.cssText="position:fixed;opacity:0";document.body.appendChild(ta);ta.select();
+    let ok=false;try{ok=document.execCommand("copy")}catch(_){/* denied */}
+    ta.remove();return ok};
+  if(navigator.clipboard?.writeText)
+    navigator.clipboard.writeText(dhanSym).then(()=>done(true),()=>done(legacyCopy()));
+  else done(legacyCopy());
+  /* open/refocus the single Dhan tab synchronously inside the click gesture
+     (popup blockers require it); reuse keeps stale symbol tabs from piling up */
+  const w=window.open("https://tv.dhan.co/","dhan_terminal");
+  try{w&&w.focus()}catch(_){/* cross-origin focus refusal is fine */}
 });
 $("#dossier").addEventListener("click",e=>{if(e.target.id==="dossier")$("#dossier").hidden=true});
 document.addEventListener("keydown",e=>{
