@@ -426,16 +426,18 @@ const SESSIONS = META.sessions;
 /* Shared lookback for all trend charts (waveform, McClellan, A/D line).
    Mirrors TREND_WINDOW_SESSIONS in src/core/config.py — keep in sync. */
 const TREND_WINDOW = 60;
-/* Dhan terminal link. tv.dhan.co's ?symbol= param is LABEL-ONLY — it never
-   resolves an instrument (tested: NSE:TICKER, TICKER, display names, TICKER-EQ,
-   NSE_EQ|securityId) and passing one actively breaks the user's saved layout
-   by blanking every pane. So: open the terminal CLEAN (saved layout loads
-   intact) and copy the Dhan search symbol (DHAN_MAP, from
-   scripts/build_dhan_map.py) to the clipboard — paste + Enter in Symbol
-   Search lands the instrument. Revisit if Dhan ever ships a resolving param. */
+/* Dhan terminal link. tv.dhan.co DOES resolve ?symbol= (re-verified 2026-07
+   by deobfuscating bundle3.0.7.js: an ff("symbol") URL-param getter feeds the
+   TradingView widget's initial symbol, saved layout intact via
+   load_last_chart — it's the same mechanism as Dhan's own chart-popout
+   button, which generates "?symbol="+activeChart().symbol()). The accepted
+   format is the Dhan trading symbol ("DIXON-EQ"), which is exactly what
+   DHAN_MAP (scripts/build_dhan_map.py) holds. Earlier "label-only" testing
+   failed on wrong formats (NSE:TICKER etc.), not a missing feature. The
+   symbol is still copied to the clipboard as a fallback: if a format ever
+   fails to resolve, paste + Enter in Symbol Search recovers. */
 const DHAN_MAP = VG.dhan_map || {};
-// DHAN terminal: label-only ?symbol= (proven — won't load data), so open clean + copy symbol.
-const CHART_URL = () => "https://tv.dhan.co/";
+const CHART_URL = s => "https://tv.dhan.co/?symbol=" + encodeURIComponent(DHAN_MAP[s] || s);
 // TradingView: real deep-link that renders the exact stock in one click (viewing, no orders).
 const TV_URL = s => "https://www.tradingview.com/chart/?symbol=NSE:" + encodeURIComponent(String(s).replace(/[&-]/g, "_"));
 const groupByDate = rows => { const m = {}; rows.forEach(r => { (m[r.date] ??= []).push(r); }); return m; };
@@ -1136,7 +1138,7 @@ function interpCol(side,txt){
 function openDossier(sym){
   const r=bySym[sym];if(!r)return;
   $("#dss-sym").textContent=r.symbol;
-  $("#dss-chart").href=CHART_URL();
+  $("#dss-chart").href=CHART_URL(r.symbol);
   $("#dss-tv").href=TV_URL(r.symbol);
   const flipChip=r.structure_flip&&r.structure_flip!=="NONE"
     ?(r.structure_flip==="BEARISH_TO_BULLISH"
@@ -1199,23 +1201,19 @@ function openDossier(sym){
   $("#dss-close").focus();
 }
 $("#dss-close").addEventListener("click",()=>$("#dossier").hidden=true);
-/* Dhan cannot deep-link a symbol (re-verified 2026-07: tv.dhan.co has no
-   resolving ?symbol= — community-tested formats error out), so the terminal
-   ALWAYS opens on its saved layout showing the last-viewed chart. Best
-   possible flow, and why each piece exists:
-   - ONE named tab ("dhan_terminal"), navigated + refocused on every click —
-     target="_blank" spawned a new tab per click, and refocusing a stale old
-     tab is exactly the "opens the first/last chart" confusion.
-   - clipboard write is AWAITED (writeText returns a promise; the old
-     try/catch missed rejections and showed "✓ copied" over an unchanged
-     clipboard), with a hidden-textarea fallback before giving up. */
+/* One-click Dhan deep link (see CHART_URL note): opens ?symbol=<DHAN_MAP sym>
+   in ONE named tab ("dhan_terminal", navigated + refocused every click — a
+   new tab per click left stale charts around, which read as "opens the wrong
+   chart"). The symbol is ALSO copied (clipboard promise awaited; rejections
+   used to show "✓ copied" over an unchanged clipboard) so if a symbol format
+   ever fails to resolve, paste + Enter in Symbol Search recovers. */
 $("#dss-chart").addEventListener("click",e=>{
   e.preventDefault();
   const sym=$("#dss-sym").textContent;
   const dhanSym=DHAN_MAP[sym]||sym;
   const done=ok=>showToast(ok
-    ?`✓ <b>${esc(dhanSym)}</b> copied — in Dhan press <b>⌘V</b> then <b>Enter</b> in Symbol Search`
-    :`In Dhan's Symbol Search, type <b>${esc(dhanSym)}</b> + Enter`);
+    ?`⤴ Opening <b>${esc(dhanSym)}</b> in Dhan — also copied (⌘V + Enter in Symbol Search if the chart didn't switch)`
+    :`⤴ Opening <b>${esc(dhanSym)}</b> in Dhan — if the chart didn't switch, type it in Symbol Search`);
   const legacyCopy=()=>{const ta=document.createElement("textarea");ta.value=dhanSym;
     ta.style.cssText="position:fixed;opacity:0";document.body.appendChild(ta);ta.select();
     let ok=false;try{ok=document.execCommand("copy")}catch(_){/* denied */}
@@ -1224,8 +1222,8 @@ $("#dss-chart").addEventListener("click",e=>{
     navigator.clipboard.writeText(dhanSym).then(()=>done(true),()=>done(legacyCopy()));
   else done(legacyCopy());
   /* open/refocus the single Dhan tab synchronously inside the click gesture
-     (popup blockers require it); reuse keeps stale symbol tabs from piling up */
-  const w=window.open("https://tv.dhan.co/","dhan_terminal");
+     (popup blockers require it) */
+  const w=window.open(CHART_URL(sym),"dhan_terminal");
   try{w&&w.focus()}catch(_){/* cross-origin focus refusal is fine */}
 });
 $("#dossier").addEventListener("click",e=>{if(e.target.id==="dossier")$("#dossier").hidden=true});
