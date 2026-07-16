@@ -179,6 +179,10 @@ figure figcaption{font-size:10px;color:var(--muted);letter-spacing:.06em;margin-
 
 /* ── signal feed ─────────────────────────────────────────────────────── */
 #sig-list{max-height:404px;overflow-y:auto;display:flex;flex-direction:column;gap:2px;scrollbar-width:thin;scrollbar-color:var(--faint) transparent}
+#wallbreak-list{max-height:220px;overflow-y:auto;display:flex;flex-direction:column;gap:2px;scrollbar-width:thin;scrollbar-color:var(--faint) transparent}
+#wallbreak-list .sig .tm{flex:none;color:var(--faint);font-size:10px;font-variant-numeric:tabular-nums;align-self:center}
+#triggers-list{max-height:220px;overflow-y:auto;display:flex;flex-direction:column;gap:2px;scrollbar-width:thin;scrollbar-color:var(--faint) transparent}
+#triggers-list .sig .tm{flex:none;color:var(--faint);font-size:10px;font-variant-numeric:tabular-nums;align-self:center}
 .sig{display:flex;gap:10px;padding:7px 8px;border-radius:4px;border-left:2px solid transparent;cursor:pointer}
 .sig:hover{background:rgba(83,221,242,.05)}
 .sig .ic{flex:none;width:16px;text-align:center}
@@ -219,6 +223,11 @@ figure figcaption{font-size:10px;color:var(--muted);letter-spacing:.06em;margin-
 #scan td:nth-child(2){text-align:left;color:var(--muted);font-size:10.5px}
 #scan tbody tr{cursor:pointer}
 #scan tbody tr:hover{background:rgba(83,221,242,.05)}
+.live-px{display:inline-block;margin-left:6px;font-size:10.5px;font-weight:600}
+/* Wall-break row highlight (live, client-side): cleared automatically once
+   price moves back inside the wall — independent of the one-shot toast. */
+#scan tbody tr.wall-break-bull{border-left:2px solid var(--bull-hi);background:rgba(49,168,120,.06)}
+#scan tbody tr.wall-break-bear{border-left:2px solid var(--bear-hi);background:rgba(232,84,111,.06)}
 .pos{color:var(--bull-hi)}.neg{color:var(--bear-hi)}.dim{color:var(--muted)}
 .meter{display:inline-block;width:54px;height:5px;border-radius:3px;background:rgba(124,140,160,.15);vertical-align:1px;margin-left:6px;overflow:hidden}
 .meter i{display:block;height:100%;background:var(--cyan-mark)}
@@ -283,6 +292,16 @@ figure figcaption{font-size:10px;color:var(--muted);letter-spacing:.06em;margin-
     <div id="hint"><kbd>/</kbd> SCAN &nbsp; <kbd>ESC</kbd> CLOSE</div>
   </header>
 
+  <section class="panel" style="--i:0" id="p-triggers" hidden>
+    <div class="ph"><h2>⚡ Live Triggers</h2><span class="sub" id="triggers-sub"></span></div>
+    <div id="triggers-list"></div>
+  </section>
+
+  <section class="panel" style="--i:0" id="p-wallbreaks" hidden>
+    <div class="ph"><h2>🚨 Live Wall Breaks</h2><span class="sub" id="wallbreak-sub"></span></div>
+    <div id="wallbreak-list"></div>
+  </section>
+
   <section class="row r1">
     <div class="panel" style="--i:1" id="p-regime">
       <div class="ph"><h2>Regime Core</h2><span class="sub" id="regime-date"></span></div>
@@ -320,6 +339,7 @@ figure figcaption{font-size:10px;color:var(--muted);letter-spacing:.06em;margin-
 
   <section class="panel" style="--i:4" id="p-flips">
     <div class="ph"><h2>Flip Radar</h2><span class="sub" id="flip-count">structural polarity flips · sorted by confidence</span>
+      <span class="sub dim" title="Pre-registered backtest (src/research/flip_backtester.py): STRONG flips return -0.12% fwd-3d / 48.2% hit rate; WEAK flips return +0.16% / 52.2% hit rate. The score ranks flips, it does not predict them — see data/research/flip_backtest_report.md.">⚠ confidence is not predictive — see backtest</span>
       <span class="spacer"></span><div style="display:flex;gap:6px;flex-wrap:wrap" id="flip-chips"></div></div>
     <div id="flip-cards"></div>
   </section>
@@ -374,6 +394,10 @@ figure figcaption{font-size:10px;color:var(--muted);letter-spacing:.06em;margin-
       </div>
       <div>
         <div class="sect" style="margin-top:0"><h4>Structure Readout</h4><div class="tiles" id="dss-tiles"></div></div>
+        <div class="sect" id="dss-live-structure-sect" hidden>
+          <h4>Live Structure <span id="dss-live-structure-watermark" class="bias" style="background:rgba(232,180,92,.15);color:#E8B45C;font-size:9px;letter-spacing:.08em;padding:1px 6px;margin-left:6px" hidden title="Not yet confirmed against the next EOD compile — see scripts/live_parity_check.py">INDICATIVE</span></h4>
+          <div id="dss-live-structure"></div>
+        </div>
         <div class="sect"><h4>Desk Line</h4><div id="dss-strat"></div></div>
         <div class="sect" id="dss-setups-sect"><h4>Active Setups</h4><div id="dss-setups"></div></div>
         <div class="sect" id="dss-sigs-sect"><h4>Structure Alerts</h4><div id="dss-sigs"></div></div>
@@ -897,18 +921,21 @@ function drawSetups(){
 /* ── flip radar ──────────────────────────────────────────────────────── */
 /* Whipsaw guard: a flip whose symbol also flipped within the prior 3 sessions
    is mostly IFS churn (67% of all flips historically) — those are tagged,
-   dimmed, and sorted after fresh flips. */
+   dimmed, and sorted after fresh flips. flip_repeat is computed at export time,
+   where the full DB is in reach; deriving it here would go blind at the oldest
+   exported sessions, whose prior 3 sessions fall outside the window. */
+/* Floor rather than round: strength is graded at conf>=60/>=35, so rounding a
+   59.8 up to "60" would print a number the badge next to it contradicts. */
+const fconf=c=>Math.floor(Math.max(0,Math.min(100,c||0)));
 let flipStrFilter="ALL",flipHideWhip=false;
 function drawFlips(){
   const sIdx=SESSIONS.indexOf(SDATE);
-  const prevDates=SESSIONS.slice(Math.max(0,sIdx-3),sIdx);
   const prevDate=sIdx>0?SESSIONS[sIdx-1]:null;
   const flipsAll=MS.filter(r=>r.structure_flip&&r.structure_flip!=="NONE")
     .map(r=>{
       const hist=msBySymbol[r.symbol]||[];
-      const whip=hist.some(h=>h.date!==SDATE&&prevDates.includes(h.date)&&h.structure_flip&&h.structure_flip!=="NONE");
       const prevRow=prevDate?hist.find(h=>h.date===prevDate):null;
-      return{...r,_whip:whip,_prevIfs:prevRow?prevRow.ifs_score:null};
+      return{...r,_whip:!!r.flip_repeat,_prevIfs:prevRow?prevRow.ifs_score:null};
     })
     /* fresh flips first, then whipsaws; confidence-descending within each */
     .sort((a,b)=>(a._whip-b._whip)||(b.flip_confidence||0)-(a.flip_confidence||0));
@@ -927,7 +954,7 @@ function drawFlips(){
   if(flipHideWhip)flips=flips.filter(r=>!r._whip);
   $("#flip-cards").innerHTML=flips.length?flips.map(r=>{
     const up=r.structure_flip==="BEARISH_TO_BULLISH";
-    const conf=Math.max(0,Math.min(100,r.flip_confidence||0));
+    const conf=fconf(r.flip_confidence);
     const pol=up
       ?`<span class="polch" style="color:${C.bullHi};border-color:rgba(62,213,152,.35)">BEAR→BULL</span>`
       :`<span class="polch" style="color:${C.bearHi};border-color:rgba(255,122,146,.35)">BULL→BEAR</span>`;
@@ -941,8 +968,8 @@ function drawFlips(){
         ?esc(r.structural_bias)+" · flow polarity reversed"
         :esc(r.prev_structural_bias||"—")+" → "+esc(r.structural_bias)}</div>
       ${ifsPath}
-      <div class="cbar"><i style="width:${conf.toFixed(0)}%;background:${up?C.bull:C.bear}"></i></div>
-      <div class="meta"><span>${esc(r.flip_strength||"")}</span><span>conf ${conf.toFixed(0)}</span><span class="${cls(r.spot_change_pct)}">${fmtP(r.spot_change_pct)}</span></div>
+      <div class="cbar"><i style="width:${conf}%;background:${up?C.bull:C.bear}"></i></div>
+      <div class="meta"><span>${esc(r.flip_strength||"")}</span><span>conf ${conf}</span><span class="${cls(r.spot_change_pct)}">${fmtP(r.spot_change_pct)}</span></div>
     </div>`}).join("")
     :'<span class="dim" style="font-size:11px">no flips match the active filters</span>';
   document.querySelectorAll(".fc").forEach(el=>{
@@ -955,7 +982,7 @@ function drawFlips(){
 const COLS=[
   ["symbol","SYM",r=>esc(r.symbol),!1],
   ["sector","SECTOR",r=>esc(r.sector||"—"),!1],
-  ["spot_close","SPOT",r=>fmtPr(r.spot_close),!0],
+  ["spot_close","SPOT",r=>fmtPr(r.spot_close)+`<span class="live-px" data-sym="${esc(r.symbol)}"></span>`,!0],
   ["spot_change_pct","Δ%",r=>`<span class="${cls(r.spot_change_pct)}">${fmtP(r.spot_change_pct)}</span>`,!0],
   ["pcr","PCR",r=>fmt2(r.pcr),!0],
   ["iv","IV",r=>r.iv==null?"—":(r.iv*100).toFixed(1)+"%",!0],
@@ -1113,8 +1140,8 @@ function openDossier(sym){
   $("#dss-tv").href=TV_URL(r.symbol);
   const flipChip=r.structure_flip&&r.structure_flip!=="NONE"
     ?(r.structure_flip==="BEARISH_TO_BULLISH"
-      ?` · <span style="color:${C.bullHi};border:1px solid rgba(62,213,152,.35);border-radius:3px;padding:0 5px;font-size:10px;font-weight:700;white-space:nowrap">🔄 BEAR→BULL ${(r.flip_confidence||0).toFixed(0)}</span>`
-      :` · <span style="color:${C.bearHi};border:1px solid rgba(255,122,146,.35);border-radius:3px;padding:0 5px;font-size:10px;font-weight:700;white-space:nowrap">🔻 BULL→BEAR ${(r.flip_confidence||0).toFixed(0)}</span>`)
+      ?` · <span style="color:${C.bullHi};border:1px solid rgba(62,213,152,.35);border-radius:3px;padding:0 5px;font-size:10px;font-weight:700;white-space:nowrap">🔄 BEAR→BULL ${fconf(r.flip_confidence)}</span>`
+      :` · <span style="color:${C.bearHi};border:1px solid rgba(255,122,146,.35);border-radius:3px;padding:0 5px;font-size:10px;font-weight:700;white-space:nowrap">🔻 BULL→BEAR ${fconf(r.flip_confidence)}</span>`)
     :"";
   $("#dss-sub").innerHTML=`${esc(r.sector||"—")} · ${fmtPr(r.spot_close)} <span class="${cls(r.spot_change_pct)}">${fmtP(r.spot_change_pct)}</span> · <span class="bias ${biasKind(r.structural_bias)}">${esc(r.structural_bias)}</span> · ${esc((r.gamma_regime||"").replace(/_/g," "))}${flipChip}`;
   ladder(r);
@@ -1144,7 +1171,7 @@ function openDossier(sym){
   if(s0){
     const[stTxt,stCol]=setupStatus(r.spot_close,s0.bias,s0.trigger_strike,s0.invalidation_strike);
     levelsHtml=`<div style="display:flex;gap:14px;align-items:center;margin-top:9px;font-size:11px;font-variant-numeric:tabular-nums;flex-wrap:wrap">
-      <span style="border:1px solid ${stCol};color:${stCol};border-radius:4px;padding:1.5px 8px;font-size:9.5px;letter-spacing:.08em;font-weight:700">${stTxt}</span>
+      <span id="dss-setup-status" data-trig="${s0.trigger_strike}" data-inv="${s0.invalidation_strike}" data-bias="${esc(s0.bias)}" style="border:1px solid ${stCol};color:${stCol};border-radius:4px;padding:1.5px 8px;font-size:9.5px;letter-spacing:.08em;font-weight:700">${stTxt}</span>
       <span class="dim">TRIGGER <b style="color:#E8B45C">${s0.trigger_strike>0?fmtPr(s0.trigger_strike):"—"}</b></span>
       <span class="dim">INVALIDATION <b style="color:${C.bearHi}">${s0.invalidation_strike>0?fmtPr(s0.invalidation_strike):"—"}</b></span></div>`;
   }
@@ -1167,6 +1194,7 @@ function openDossier(sym){
   $("#dss-sigs").innerHTML=sg.map(s=>{const m=SIGMETA[s.type]||["·"];
     return`<div style="font-size:11px;color:var(--muted);margin-bottom:5px">${m[0]} ${esc(s.msg)}</div>`}).join("");
   $("#dossier").hidden=false;
+  renderLiveStructure(LIVE.feed_ts>0 && (Date.now()/1000-LIVE.feed_ts)<LIVE_STALE_SECS);
   $("#dss").scrollTop=0;
   $("#dss-close").focus();
 }
@@ -1234,7 +1262,134 @@ renderSession();
 /* ── live overlay (M1.5): poll the bridge /snapshot when served over http ───
    Served from file:// (no bridge) it silently no-ops and the HUD stays EOD. */
 const LIVE_STALE_SECS = 15;   // 3 missed snapshot writes (SNAPSHOT_CADENCE=5s)
-const LIVE = {quotes:{}, open:false, n:0, feed_ts:0};
+const LIVE = {quotes:{}, open:false, n:0, feed_ts:0, events:[], structure:{}, structure_validated:false};
+/* Live Triggers panel: two server-side producers feed the same `events` list —
+   trigger_engine (setup WAITING->TRIGGERED/INVALIDATED, no "type" key) and, as
+   of M2, live_compute (REGIME_CROSS/WALL_RELOCATED/IV_EVENT, discriminated by
+   "type"). Both are already one-shot/debounced server-side and ordered
+   newest-first, so this just renders the authoritative list each poll. */
+function eventLine(e){
+  if(e.type==="REGIME_CROSS"){
+    const bull=e.to==="LONG_GAMMA", bear=e.to==="SHORT_GAMMA";
+    return {cls: bull?"up":bear?"dn":"", icon:"🔄",
+      text:`<b>${esc(e.symbol)}</b> regime ${esc(e.from.replace(/_/g," "))} → ${esc(e.to.replace(/_/g," "))}`};
+  }
+  if(e.type==="WALL_RELOCATED"){
+    return {cls: e.side==="call"?"up":"dn", icon: e.side==="call"?"🧱":"🛡",
+      text:`<b>${esc(e.symbol)}</b> ${e.side.toUpperCase()} WALL relocated ₹${(+e.from).toLocaleString('en-IN')} → ₹${(+e.to).toLocaleString('en-IN')}`};
+  }
+  if(e.type==="IV_EVENT"){
+    return {cls: e.direction==="up"?"up":"dn", icon:"🌪",
+      text:`<b>${esc(e.symbol)}</b> IV ${e.direction} ${(e.iv*100).toFixed(1)}% (${e.delta>=0?'+':''}${(e.delta*100).toFixed(1)}pt vs open)`};
+  }
+  // trigger_engine event (no "type" key): setup TRIGGERED/INVALIDATED
+  return {cls: e.to==="TRIGGERED"?"up":"dn", icon: e.to==="TRIGGERED"?"⚡":"❌",
+    text:`<b>${esc(e.symbol)}</b> ${esc(e.setup_type)} ${e.to} — level ₹${(+e.level).toLocaleString('en-IN')}, spot ₹${(+e.spot).toLocaleString('en-IN')}`};
+}
+function renderTriggers(){
+  const panel = $("#p-triggers");
+  if(!panel)return;
+  const events = LIVE.events || [];
+  if(!events.length){ panel.hidden = true; return; }
+  panel.hidden = false;
+  $("#triggers-sub").textContent = events.length + " event" + (events.length===1?"":"s") + " today";
+  $("#triggers-list").innerHTML = events.map(e=>{
+    const {cls,icon,text} = eventLine(e);
+    const hhmm = new Date(e.ts*1000).toLocaleTimeString("en-IN",{hour12:false,hour:"2-digit",minute:"2-digit",second:"2-digit"});
+    return `<div class="sig ${cls}" data-sym="${esc(e.symbol)}">
+      <span class="ic">${icon}</span>
+      <span class="tx">${text}</span>
+      <span class="tm">${hhmm}</span>
+    </div>`;
+  }).join("");
+  document.querySelectorAll("#triggers-list .sig").forEach(el=>
+    el.addEventListener("click",()=>openDossier(el.dataset.sym)));
+}
+/* Dossier live structure strip (M2): call_wall/put_wall/gamma_regime/iv_avg
+   for covered (top-N-by-OI + indices) symbols only — absent from LIVE.structure
+   means "not covered," section stays hidden and the EOD tiles are unaffected. */
+function renderLiveStructure(fresh){
+  const sect = $("#dss-live-structure-sect");
+  if(!sect || $("#dossier").hidden)return;
+  const sym = $("#dss-sym").textContent;
+  const s = LIVE.structure[sym];
+  if(!s || !LIVE.open || !fresh){ sect.hidden = true; return; }
+  sect.hidden = false;
+  $("#dss-live-structure-watermark").hidden = !!LIVE.structure_validated;
+  const regimeCol = s.gamma_regime==="LONG_GAMMA"?C.bull:s.gamma_regime==="SHORT_GAMMA"?C.bear:"#E8B45C";
+  $("#dss-live-structure").innerHTML = `<div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;font-size:11px;font-variant-numeric:tabular-nums">
+    <span class="dim">CALL WALL <b style="color:#E8B45C">${s.call_wall>0?fmtPr(s.call_wall):"—"}</b></span>
+    <span class="dim">PUT WALL <b style="color:${C.bearHi}">${s.put_wall>0?fmtPr(s.put_wall):"—"}</b></span>
+    <span style="border:1px solid ${regimeCol};color:${regimeCol};border-radius:4px;padding:1.5px 8px;font-size:9.5px;letter-spacing:.08em;font-weight:700">${esc((s.gamma_regime||"").replace(/_/g," "))}</span>
+    <span class="dim">LIVE IV <b>${(s.iv_avg*100).toFixed(1)}%</b></span>
+  </div>`;
+}
+/* Live LTP on every scanner row. Patches the existing .live-px placeholder
+   spans (added per-row by the SPOT column in COLS) directly rather than
+   re-invoking renderScan(), so a poll never disturbs sort/filter/scroll. */
+function applyLiveToScan(fresh){
+  document.querySelectorAll("#scan .live-px").forEach(el=>{
+    const q=LIVE.quotes[el.dataset.sym];
+    el.innerHTML=(q && LIVE.open && fresh)
+      ? `<span style="color:${q.chg>=0?C.bull:C.bear}">● ₹${(+q.ltp).toLocaleString('en-IN')} (${q.chg>=0?'+':''}${q.chg}%)</span>`
+      : "";
+  });
+}
+/* Client-side wall-break alert: live LTP vs TODAY's already-EOD-compiled
+   call_wall/put_wall (no live wall recompute — that needs live options
+   streaming, not built). Same 1% breakout/breakdown buffer as
+   classifier.py's is_breakout/is_breakdown, so "broken" means the same
+   thing live as it does at EOD. One-shot toast per symbol/side per page
+   load (wallBreakAlerted); the row highlight itself is live and clears if
+   price moves back inside the wall. Only meaningful against the latest/
+   live session — same gate the code already uses for #histbadge. */
+const wallBreakAlerted = new Set();
+const WALL_BREAK_LOG_MAX = 300;      // defensive cap — a single session realistically never approaches this
+let wallBreakLog = [];                // ordered event log (newest first), independent of the dedup Set above
+function renderWallBreaks(){
+  const panel = $("#p-wallbreaks");
+  if(!panel)return;
+  if(!wallBreakLog.length){ panel.hidden = true; return; }
+  panel.hidden = false;
+  $("#wallbreak-sub").textContent = wallBreakLog.length + " event" + (wallBreakLog.length===1?"":"s") + " this session";
+  $("#wallbreak-list").innerHTML = wallBreakLog.map(e=>{
+    const dir = e.side==="call" ? "bull" : "bear";
+    const cls = e.side==="call" ? "up" : "dn";
+    const hhmm = new Date(e.t).toLocaleTimeString("en-IN",{hour12:false,hour:"2-digit",minute:"2-digit",second:"2-digit"});
+    return `<div class="sig ${cls}" data-sym="${esc(e.sym)}">
+      <span class="ic">${e.side==="call"?"🧱":"🛡"}</span>
+      <span class="tx"><b>${esc(e.sym)}</b> broke ${e.side.toUpperCase()} WALL ₹${e.wall.toLocaleString("en-IN")} — live ₹${e.ltp.toLocaleString("en-IN")}</span>
+      <span class="tm">${hhmm}</span>
+    </div>`;
+  }).join("");
+  document.querySelectorAll("#wallbreak-list .sig").forEach(el=>
+    el.addEventListener("click",()=>openDossier(el.dataset.sym)));
+}
+function checkWallBreaks(fresh){
+  if(SDATE!==SESSIONS[SESSIONS.length-1] || !(LIVE.open && fresh))return;
+  document.querySelectorAll("#scan tbody tr").forEach(row=>{
+    const sym=row.dataset.sym, q=LIVE.quotes[sym], r=bySym[sym];
+    if(!q || !r){ row.classList.remove("wall-break-bull","wall-break-bear"); return; }
+    const ltp=+q.ltp, cw=r.call_wall, pw=r.put_wall;
+    const brokeCall = cw>0 && ltp > cw*1.01;
+    const brokePut  = pw>0 && ltp < pw*0.99;
+    row.classList.toggle("wall-break-bull", brokeCall);
+    row.classList.toggle("wall-break-bear", brokePut);
+    if(brokeCall && !wallBreakAlerted.has(sym+":call")){
+      wallBreakAlerted.add(sym+":call");
+      wallBreakLog.unshift({sym, side:"call", wall:cw, ltp, t:Date.now()});
+      if(wallBreakLog.length>WALL_BREAK_LOG_MAX)wallBreakLog.length=WALL_BREAK_LOG_MAX;
+      showToast(`🚨 <b>${esc(sym)}</b> broke CALL WALL ₹${cw.toLocaleString('en-IN')} — live ₹${ltp.toLocaleString('en-IN')}`);
+    }
+    if(brokePut && !wallBreakAlerted.has(sym+":put")){
+      wallBreakAlerted.add(sym+":put");
+      wallBreakLog.unshift({sym, side:"put", wall:pw, ltp, t:Date.now()});
+      if(wallBreakLog.length>WALL_BREAK_LOG_MAX)wallBreakLog.length=WALL_BREAK_LOG_MAX;
+      showToast(`🚨 <b>${esc(sym)}</b> broke PUT WALL ₹${pw.toLocaleString('en-IN')} — live ₹${ltp.toLocaleString('en-IN')}`);
+    }
+  });
+  renderWallBreaks();
+}
 function applyLive(){
   /* Freshness is measured from the last TICK (feed_ts), never from poll time:
      the daemon loop keeps writing snapshots even if the feed thread stalls, so
@@ -1248,7 +1403,21 @@ function applyLive(){
     if(el) el.innerHTML = (q && LIVE.open && fresh)
       ? `<span style="color:${q.chg>=0?C.bull:C.bear};font-weight:600">● LIVE ₹${(+q.ltp).toLocaleString('en-IN')} (${q.chg>=0?'+':''}${q.chg}%)</span>`
       : "";
+    /* Setup status badge: prefer live spot over the EOD close once fresh live
+       data exists for this symbol, using the same setupStatus() the badge was
+       first rendered with in openDossier() — reuses that convention rather
+       than a parallel one. */
+    const stEl=$("#dss-setup-status");
+    if(stEl){
+      const spot=(q && LIVE.open && fresh)?+q.ltp:bySym[sym]?.spot_close;
+      const[stTxt,stCol]=setupStatus(spot,stEl.dataset.bias,+stEl.dataset.trig,+stEl.dataset.inv);
+      stEl.textContent=stTxt; stEl.style.borderColor=stCol; stEl.style.color=stCol;
+    }
   }
+  applyLiveToScan(fresh);
+  checkWallBreaks(fresh);
+  renderTriggers();
+  renderLiveStructure(fresh);
 }
 async function pollLive(){
   try{
@@ -1256,6 +1425,7 @@ async function pollLive(){
     if(r.ok){
       const s = await r.json();
       LIVE.quotes=s.quotes||{}; LIVE.open=!!s.market_open; LIVE.n=s.n||0; LIVE.feed_ts=+s.feed_ts||0;
+      LIVE.events=s.events||[]; LIVE.structure=s.structure||{}; LIVE.structure_validated=!!s.structure_validated;
     }
   }catch(e){ /* bridge absent — fall through; staleness drops the badge */ }
   applyLive();   // always re-evaluate: a dead bridge must not freeze a LIVE badge on screen

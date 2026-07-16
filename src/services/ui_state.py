@@ -17,6 +17,9 @@ class UIStateService:
         if "selected_symbol" not in st.session_state and self.all_symbols:
             st.session_state.selected_symbol = self.all_symbols[0]
             
+        if "symbol_selector" not in st.session_state and self.all_symbols:
+            st.session_state.symbol_selector = self.all_symbols[0]
+            
         if "view_mode" not in st.session_state:
             st.session_state.view_mode = "⚡ VANGUARD SCREENER TERMINAL"
 
@@ -37,6 +40,7 @@ class UIStateService:
     def selected_symbol(self, val: str):
         if st.session_state.get("selected_symbol") != val:
             st.session_state.selected_symbol = val
+            st.session_state.symbol_selector = val
 
     @property
     def view_mode(self) -> str:

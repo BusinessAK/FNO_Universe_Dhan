@@ -3,12 +3,14 @@ Vanguard Institutional Terminal - Chronological Wall Migration & OI Accumulation
 """
 import plotly.graph_objects as go
 from src.config.settings import C, PB
+from src.core.config import TREND_WINDOW_SESSIONS
 
 def render_wall_migration_chart(sym_sessions: dict) -> go.Figure:
     """
     Plots the chronological wall migration step line chart showing Spot, Call Wall, Put Wall, and Gamma Flip.
     """
-    chrono_dates = sorted(list(sym_sessions.keys()))
+    # Restrict to the shared trend window (approx 3 months) for legibility
+    chrono_dates = sorted(list(sym_sessions.keys()))[-TREND_WINDOW_SESSIONS:]
     spots = [sym_sessions[d]["spot_close"] for d in chrono_dates]
     calls = [sym_sessions[d]["call_wall"] for d in chrono_dates]
     puts = [sym_sessions[d]["put_wall"] for d in chrono_dates]
@@ -58,7 +60,8 @@ def render_cumulative_oi_chart(sym_sessions: dict) -> go.Figure:
     """
     Plots the stacked area chart of multi-day PE vs CE cumulative Open Interest.
     """
-    chrono_dates = sorted(list(sym_sessions.keys()))
+    # Restrict to the shared trend window (approx 3 months) for legibility
+    chrono_dates = sorted(list(sym_sessions.keys()))[-TREND_WINDOW_SESSIONS:]
     ce_oi_cum = [sym_sessions[d]["total_ce_oi"] for d in chrono_dates]
     pe_oi_cum = [sym_sessions[d]["total_pe_oi"] for d in chrono_dates]
     

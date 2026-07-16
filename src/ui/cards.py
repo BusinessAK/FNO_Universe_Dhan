@@ -55,17 +55,24 @@ def render_metric_row(cmp_val: float, spot_change_pct: float, cw_val: float, pw_
     spot_change_class = "positive" if spot_change_pct >= 0 else "negative"
     spot_change_arrow = "▲" if spot_change_pct >= 0 else "▼"
 
-    cw_gap = pct_gap(cmp_val, cw_val)
-    cw_gap_class = "positive" if cw_gap >= 0 else "negative"
-    cw_gap_arrow = "▲" if cw_gap >= 0 else "▼"
-
-    pw_gap = pct_gap(cmp_val, pw_val)
-    pw_gap_class = "positive" if pw_gap >= 0 else "negative"
-    pw_gap_arrow = "▲" if pw_gap >= 0 else "▼"
-
-    gf_gap = pct_gap(cmp_val, gf_val)
-    gf_gap_class = "positive" if gf_gap >= 0 else "negative"
-    gf_gap_arrow = "▲" if gf_gap >= 0 else "▼"
+    def _level_card(label: str, level: float) -> str:
+        """One wall/flip metric card; a missing level (0) renders as N/A, not ₹0."""
+        if level <= 0:
+            return f"""
+      <div class="custom-metric-card">
+        <div class="metric-label">{label}</div>
+        <div class="metric-value" style="color:#7888aa;">N/A</div>
+        <div style="height: 14px;"></div>
+      </div>"""
+        gap = pct_gap(cmp_val, level)
+        gap_class = "positive" if gap >= 0 else "negative"
+        gap_arrow = "▲" if gap >= 0 else "▼"
+        return f"""
+      <div class="custom-metric-card">
+        <div class="metric-label">{label}</div>
+        <div class="metric-value">₹{level:,.0f}</div>
+        <div class="metric-delta {gap_class}">{gap_arrow} {gap:+.2f}% gap</div>
+      </div>"""
 
     metrics_html = f"""
     <div class="custom-metrics-row">
@@ -74,21 +81,9 @@ def render_metric_row(cmp_val: float, spot_change_pct: float, cw_val: float, pw_
         <div class="metric-value">₹{cmp_val:,.2f}</div>
         <div class="metric-delta {spot_change_class}">{spot_change_arrow} {spot_change_pct:+.2f}%</div>
       </div>
-      <div class="custom-metric-card">
-        <div class="metric-label">CALL WALL</div>
-        <div class="metric-value">₹{cw_val:,.0f}</div>
-        <div class="metric-delta {cw_gap_class}">{cw_gap_arrow} {cw_gap:+.2f}% gap</div>
-      </div>
-      <div class="custom-metric-card">
-        <div class="metric-label">PUT WALL</div>
-        <div class="metric-value">₹{pw_val:,.0f}</div>
-        <div class="metric-delta {pw_gap_class}">{pw_gap_arrow} {pw_gap:+.2f}% gap</div>
-      </div>
-      <div class="custom-metric-card">
-        <div class="metric-label">GAMMA FLIP</div>
-        <div class="metric-value">₹{gf_val:,.0f}</div>
-        <div class="metric-delta {gf_gap_class}">{gf_gap_arrow} {gf_gap:+.2f}% gap</div>
-      </div>
+      {_level_card("CALL WALL", cw_val)}
+      {_level_card("PUT WALL", pw_val)}
+      {_level_card("GAMMA FLIP", gf_val)}
       <div class="custom-metric-card">
         <div class="metric-label">DEALER GEX</div>
         <div class="metric-value">{fmt_gex(gex_val)}</div>
@@ -127,7 +122,7 @@ def render_alerts(cmp_val: float, cw_val: float, pw_val: float, gf_val: float, p
             wall_val = cw_val
             dist = abs(cmp_val - wall_val)
             if cmp_val < wall_val:
-                st.markdown(f'<div class="alert-box warn">🛡️ CONCENTRATED WALL (₹{wall_val:,.0f}) is ₹{dist:.1f} above — spot has breached the major option wall. Dealer hedging may expand volatility.</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="alert-box warn">🛡️ CONCENTRATED WALL (₹{wall_val:,.0f}) is ₹{dist:.1f} above — acting as a major resistance ceiling.</div>', unsafe_allow_html=True)
             elif cmp_val > wall_val:
                 st.markdown(f'<div class="alert-box warn">🎯 CONCENTRATED WALL (₹{wall_val:,.0f}) is ₹{dist:.1f} below — acting as a major support floor.</div>', unsafe_allow_html=True)
             else:
@@ -424,7 +419,7 @@ def render_market_breadth_panel(breadth_metrics: dict, container=st):
     mean_rev_pct = breadth_metrics.get("mean_rev_pct", 0.0)
     tot_sym = breadth_metrics.get("total_symbols", 0)
     neutral_pct = max(0.0, round(100.0 - bull_pct - bear_pct, 1))
-    
+
     render_html(f"""
     <div class="glass-card" style="margin-bottom: 20px;">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
@@ -434,7 +429,7 @@ def render_market_breadth_panel(breadth_metrics: dict, container=st):
       <div style="font-size:11px; color:#cbd5e1; margin-bottom: 12px;">
         Top-down snapshot of F&O inventory cycles & positioning trends.
       </div>
-      
+
       <!-- Breadth progress bar -->
       <div style="display:flex; height:18px; border-radius:4px; overflow:hidden; background:#141435; margin-bottom:12px; border:1px solid #1c1c4f;">
         <div style="width:{bull_pct}%; background:#10b981; display:flex; align-items:center; justify-content:center; font-size:9px; font-weight:bold; color:#03030c;" title="Bullish Flow: {bull_pct}%">{bull_pct}%</div>
@@ -549,8 +544,15 @@ def render_playbook_card(playbook: dict, container=st):
     container.markdown('<p class="term-header">ACTIONABLE EOD QUANT PLAYBOOK</p>', unsafe_allow_html=True)
     
     bias = playbook.get("bias", "Neutral")
-    trig = playbook.get("trigger_strike", 0.0)
-    invalid = playbook.get("invalidation_strike", 0.0)
+    try:
+        trig = float(playbook.get("trigger_strike") or 0.0)
+    except (ValueError, TypeError):
+        trig = 0.0
+        
+    try:
+        invalid = float(playbook.get("invalidation_strike") or 0.0)
+    except (ValueError, TypeError):
+        invalid = 0.0
     behavior = playbook.get("expected_behavior", "Mean Reversion")
     dealer = playbook.get("dealer_behavior", "Long Gamma")
     
@@ -591,3 +593,159 @@ def render_playbook_card(playbook: dict, container=st):
     """, container=container)
 
 
+def render_cm_breadth_panel(cm_breadth: dict, container=st, anchor_date: str = ""):
+    """
+    Cash Market Price Breadth panel — full NSE EQ universe (~2,400 symbols).
+    DISTINCT from the F&O structural breadth panel above.
+    cm_breadth: one row dict from daily_cm_breadth parquet/DuckDB.
+    anchor_date: first date in the CM dataset (A/D line anchor), for display.
+    """
+    if not cm_breadth:
+        container.markdown(
+            '<div style="padding:10px;background:#141435;border-radius:6px;color:#a0aec0;font-size:11px;">'
+            'ℹ️ Cash market breadth data not available for this session.</div>',
+            unsafe_allow_html=True
+        )
+        return
+
+    total    = cm_breadth.get("cm_total_symbols", 0)
+    adv      = int(cm_breadth.get("cm_advances", 0))
+    dec      = int(cm_breadth.get("cm_declines", 0))
+    unch     = int(cm_breadth.get("cm_unchanged", 0))
+    adv_pct  = float(cm_breadth.get("cm_advance_pct", 0.0))
+    dec_pct  = round(dec / max(total, 1) * 100, 1)
+    unch_pct = round(unch / max(total, 1) * 100, 1)
+    ad_ratio = float(cm_breadth.get("cm_ad_ratio", 1.0))
+    vol_ad   = float(cm_breadth.get("cm_volume_ad_ratio", 1.0))
+    p20      = cm_breadth.get("cm_pct_above_20dma")
+    p50      = cm_breadth.get("cm_pct_above_50dma")
+    p200     = cm_breadth.get("cm_pct_above_200dma")
+    rsi_ob   = cm_breadth.get("cm_pct_overbought_70")
+    rsi_os   = cm_breadth.get("cm_pct_oversold_30")
+    nh_val    = cm_breadth.get("cm_new_highs")
+    nl_val    = cm_breadth.get("cm_new_lows")
+    nh_nl_val = cm_breadth.get("cm_nh_nl_ratio")
+    mcl       = cm_breadth.get("cm_mcclellan_osc", 0.0)
+    ad_line   = cm_breadth.get("cm_ad_line", 0.0)
+    t20_pct   = cm_breadth.get("cm_turnover_top20_pct")
+    ca_cnt    = int(cm_breadth.get("cm_ca_count", 0))
+
+    days_rem = cm_breadth.get("cm_days_remaining", 0)
+    if days_rem is None:
+        days_rem = 0
+
+    if days_rem > 0:
+        extreme_label = f"EXTREMES (building 52w baseline, {days_rem}d remaining)"
+    else:
+        extreme_label = "52-WEEK EXTREMES"
+
+    if nh_val is None or nh_val != nh_val or nl_val is None or nl_val != nl_val:
+        nh_str = "&#8212;"
+        nl_str = "&#8212;"
+        nh_nl_str = "&#8212;"
+        nh_color = "#cbd5e1"
+    else:
+        nh_str = str(int(nh_val))
+        nl_str = str(int(nl_val))
+        nh_nl_f = float(nh_nl_val)
+        nh_nl_str = f"{nh_nl_f:.2f}"
+        nh_color = "#10b981" if nh_nl_f >= 2.0 else "#f59e0b" if nh_nl_f >= 0.5 else "#ef4444"
+
+    ad_color  = "#10b981" if adv_pct >= 55 else "#f59e0b" if adv_pct >= 45 else "#ef4444"
+    vol_color = "#10b981" if vol_ad >= 1.2 else "#f59e0b" if vol_ad >= 0.8 else "#ef4444"
+    mcl_color = "#10b981" if (mcl or 0) >= 30 else "#f59e0b" if (mcl or 0) >= -30 else "#ef4444"
+    adl_color = "#10b981" if (ad_line or 0) >= 0 else "#ef4444"
+
+    def _bar(pct, color, label):
+        is_val = pct is not None and pct == pct  # check None and NaN
+        if not is_val:
+            return (
+                f'<div style="margin-bottom:8px;">'
+                f'<div style="display:flex;justify-content:space-between;font-size:10px;color:#7888aa;margin-bottom:3px;">'
+                f'<span>{label}</span><span style="color:#7888aa;font-weight:700;">&#8212;</span></div>'
+                f'<div style="background:#141435;border-radius:3px;height:10px;overflow:hidden;border:1px dashed #1c1c4f;">'
+                f'</div></div>'
+            )
+        v = round(float(pct), 1)
+        return (
+            f'<div style="margin-bottom:8px;">'
+            f'<div style="display:flex;justify-content:space-between;font-size:10px;color:#a0aec0;margin-bottom:3px;">'
+            f'<span>{label}</span><span style="color:{color};font-weight:700;">{v}%</span></div>'
+            f'<div style="background:#141435;border-radius:3px;height:10px;overflow:hidden;border:1px solid #1c1c4f;">'
+            f'<div style="width:{min(v, 100)}%;height:100%;background:{color};border-radius:3px;"></div>'
+            f'</div></div>'
+        )
+
+    def _stat(label, val, color="#cbd5e1"):
+        return (
+            f'<div style="display:flex;justify-content:space-between;font-size:11px;'
+            f'color:#a0aec0;font-family:\'JetBrains Mono\';margin-bottom:5px;">'
+            f'<span>{label}</span>'
+            f'<span style="color:{color};font-weight:700;">{val}</span></div>'
+        )
+
+    anchor_note = (
+        f"Anchored at 0 on {anchor_date} (start of dataset)" if anchor_date
+        else "Anchored at 0 on the first date of the dataset"
+    )
+    ca_note = f"&#9888; {ca_cnt} corporate action(s) adjusted today." if ca_cnt > 0 else ""
+    t20_str = f"{t20_pct:.1f}%" if (t20_pct is not None and t20_pct == t20_pct) else "&#8212;"
+    mcl_str = f"{round(mcl, 1)}" if (mcl is not None and mcl == mcl) else "&#8212;"
+    adl_str = f"{int(ad_line):+,}" if (ad_line is not None and ad_line == ad_line) else "&#8212;"
+
+    html = f"""
+    <div class="glass-card" style="margin-bottom:16px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+        <div class="narrative-title" style="font-size:12px;margin:0;">&#128202; CASH MARKET PRICE BREADTH</div>
+        <span style="font-family:'JetBrains Mono';font-size:9px;color:#4a5a8a;">NSE EQ &#8212; {total:,} SYMBOLS</span>
+      </div>
+      <div style="font-size:10px;color:#4a5a8a;margin-bottom:12px;font-style:italic;">
+        Price-based breadth across all NSE equity stocks. Distinct from F&amp;O structural breadth. {ca_note}
+      </div>
+      <div style="display:flex;height:20px;border-radius:4px;overflow:hidden;background:#141435;margin-bottom:12px;border:1px solid #1c1c4f;">
+        <div style="width:{adv_pct}%;background:#10b981;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:bold;color:#03030c;" title="Advances: {adv}">{adv_pct}%</div>
+        <div style="width:{unch_pct}%;background:#2a3a5a;" title="Unchanged: {unch}"></div>
+        <div style="width:{dec_pct}%;background:#ef4444;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:bold;color:#03030c;" title="Declines: {dec}">{dec_pct}%</div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+        <div style="background:#0d0d2b;border:1px solid #1c1c4f;border-radius:6px;padding:10px;">
+          <div style="font-size:9px;color:#7888aa;text-transform:uppercase;margin-bottom:6px;">ADVANCES / DECLINES</div>
+          {_stat("Advances", f"{adv:,}", "#10b981")}
+          {_stat("Declines", f"{dec:,}", "#ef4444")}
+          {_stat("A/D Ratio", f"{ad_ratio:.2f}", ad_color)}
+          {_stat("Vol A/D Ratio", f"{vol_ad:.2f}", vol_color)}
+        </div>
+        <div style="background:#0d0d2b;border:1px solid #1c1c4f;border-radius:6px;padding:10px;">
+          <div style="font-size:9px;color:#7888aa;text-transform:uppercase;margin-bottom:6px;">{extreme_label}</div>
+          {_stat("New Highs", nh_str, "#10b981")}
+          {_stat("New Lows", nl_str, "#ef4444")}
+          {_stat("NH/NL Ratio", nh_nl_str, nh_color)}
+          {_stat("McClellan Osc", mcl_str, mcl_color)}
+        </div>
+      </div>
+      <div style="background:#0d0d2b;border:1px solid #1c1c4f;border-radius:6px;padding:10px;margin-bottom:10px;">
+        <div style="font-size:9px;color:#7888aa;text-transform:uppercase;margin-bottom:8px;">DMA PARTICIPATION</div>
+        {_bar(p20,  "#38bdf8", "% Above 20-DMA  (short-term)")}
+        {_bar(p50,  "#a78bfa", "% Above 50-DMA  (medium-term)")}
+        {_bar(p200, "#10b981", "% Above 200-DMA (structural)")}
+      </div>
+      <div style="background:#0d0d2b;border:1px solid #1c1c4f;border-radius:6px;padding:10px;margin-bottom:10px;">
+        <div style="font-size:9px;color:#7888aa;text-transform:uppercase;margin-bottom:8px;">RSI BREADTH (14-PERIOD)</div>
+        {_bar(rsi_ob, "#fbbf24", "% Overbought (RSI &gt; 70)")}
+        {_bar(rsi_os, "#ef4444", "% Oversold (RSI &lt; 30)")}
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div style="background:#0d0d2b;border:1px solid #1c1c4f;border-radius:6px;padding:10px;">
+          <div style="font-size:9px;color:#7888aa;text-transform:uppercase;margin-bottom:6px;">CUMULATIVE A/D LINE</div>
+          <div style="font-size:20px;font-weight:700;color:{adl_color};font-family:'JetBrains Mono';">{adl_str}</div>
+          <div style="font-size:9px;color:#4a5a8a;margin-top:3px;">{anchor_note}</div>
+        </div>
+        <div style="background:#0d0d2b;border:1px solid #1c1c4f;border-radius:6px;padding:10px;">
+          <div style="font-size:9px;color:#7888aa;text-transform:uppercase;margin-bottom:6px;">TURNOVER CONCENTRATION</div>
+          <div style="font-size:20px;font-weight:700;color:#fbbf24;font-family:'JetBrains Mono';">{t20_str}</div>
+          <div style="font-size:9px;color:#4a5a8a;margin-top:3px;">Top-20 stocks share of total market turnover</div>
+        </div>
+      </div>
+    </div>
+    """
+    render_html(html, container=container)

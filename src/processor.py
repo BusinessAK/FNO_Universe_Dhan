@@ -21,6 +21,7 @@ class DataProcessor:
             'StrkPric': 'STRIKE_PR',
             'OptnTp': 'OPTION_TYP',
             'ClsPric': 'CLOSE',
+            'PrvsClsgPric': 'PREV_CLOSE',
             'OpnPric': 'OPEN',
             'HghPric': 'HIGH',
             'LwPric': 'LOW',
@@ -45,7 +46,7 @@ class DataProcessor:
         df['TIMESTAMP'] = pd.to_datetime(df['TIMESTAMP'], errors='coerce')
         
         # Clean numerical columns
-        numeric_cols = ['STRIKE_PR', 'CLOSE', 'OPEN_INT', 'CHG_IN_OI', 'SPOT_PRICE', 'LOT_SIZE', 'VOLUME']
+        numeric_cols = ['STRIKE_PR', 'CLOSE', 'PREV_CLOSE', 'OPEN_INT', 'CHG_IN_OI', 'SPOT_PRICE', 'LOT_SIZE', 'VOLUME']
         for col in numeric_cols:
             if col in df.columns:
                 df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)

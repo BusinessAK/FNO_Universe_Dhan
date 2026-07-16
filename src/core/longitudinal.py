@@ -79,6 +79,146 @@ class LongitudinalEngine:
         
         return round(max(0.0, min(100.0, persistence_score)), 1)
 
+    # ── Structural Bias Classification Helpers ────────────────────────────────
+    # Unambiguously bullish biases — always map to BULLISH regardless of IFS
+    _BULLISH_BIASES = frozenset([
+        "Support Building", "Resistance Weakening",
+        "Bullish Accumulation", "Bullish Breakout", "Bullish Bias",
+        "Strong Bullish Momentum", "Bullish Mean Reversion",
+    ])
+    # Unambiguously bearish biases — always map to BEARISH regardless of IFS
+    _BEARISH_BIASES = frozenset([
+        "Support Weakening", "Resistance Building",
+        "Bearish Breakdown", "Bearish Consolidation", "Bearish Bias",
+        "Strong Bearish Momentum",
+    ])
+    # Ambiguous biases — polarity determined entirely by IFS sign
+    # Expansion: directional but sign-dependent
+    # Compression, Flip Zone, Dealer Controlled: indeterminate without IFS
+    _IFS_DEPENDENT_BIASES = frozenset([
+        "Expansion", "Compression", "Flip Zone", "Dealer Controlled",
+    ])
+
+    def _bias_polarity(self, bias: str, ifs: float) -> str:
+        """Returns 'BULLISH', 'BEARISH', or 'NEUTRAL' for a given structural_bias + ifs_score."""
+        if bias in self._BULLISH_BIASES:
+            return "BULLISH"
+        if bias in self._BEARISH_BIASES:
+            return "BEARISH"
+        # Ambiguous biases (Expansion, Compression, Flip Zone, Dealer Controlled)
+        # and any unknown label — resolve by IFS sign with a small dead-band
+        if ifs > 10:
+            return "BULLISH"
+        if ifs < -10:
+            return "BEARISH"
+        return "NEUTRAL"
+
+    def detect_structure_flip(self, history_list: list) -> dict:
+        """
+        Detects day-over-day structural polarity transitions:
+          - BEARISH_TO_BULLISH : structure flipped from bearish to bullish
+          - BULLISH_TO_BEARISH : structure flipped from bullish to bearish
+          - NONE               : no confirmed flip
+
+        Returns a dict:
+            {
+                "flip_type":        str,   # "BEARISH_TO_BULLISH" | "BULLISH_TO_BEARISH" | "NONE"
+                "prev_bias":        str,   # previous day structural_bias label
+                "curr_bias":        str,   # current day structural_bias label
+                "prev_polarity":    str,   # "BULLISH" | "BEARISH" | "NEUTRAL"
+                "curr_polarity":    str,   # "BULLISH" | "BEARISH" | "NEUTRAL"
+                "flip_confidence":  float, # 0.0 – 100.0 confidence score
+                "flip_strength":    str,   # "STRONG" | "MODERATE" | "WEAK"
+            }
+
+        Confidence formula (0–100):
+          40pts  IFS sign reversal magnitude  (IFS crossed zero + absolute magnitude)
+          25pts  Persistence threshold         (prev bias held for ≥2 days)
+          20pts  GEX regime alignment          (gamma regime supports new direction)
+          15pts  Price acceptance              (spot moved in direction of new bias)
+        """
+        no_flip = {
+            "flip_type": "NONE",
+            "prev_bias": "",
+            "curr_bias": "",
+            "prev_polarity": "NEUTRAL",
+            "curr_polarity": "NEUTRAL",
+            "flip_confidence": 0.0,
+            "flip_strength": "WEAK",
+        }
+
+        if len(history_list) < 2:
+            return no_flip
+
+        prev = history_list[-2]
+        curr = history_list[-1]
+
+        prev_bias = str(prev.get("structural_bias", ""))
+        curr_bias = str(curr.get("structural_bias", ""))
+        prev_ifs  = float(prev.get("ifs_score", 0.0))
+        curr_ifs  = float(curr.get("ifs_score", 0.0))
+
+        prev_pol = self._bias_polarity(prev_bias, prev_ifs)
+        curr_pol = self._bias_polarity(curr_bias, curr_ifs)
+
+        # No flip if same polarity or either side is NEUTRAL
+        if prev_pol == curr_pol or "NEUTRAL" in (prev_pol, curr_pol):
+            return {**no_flip, "prev_bias": prev_bias, "curr_bias": curr_bias,
+                    "prev_polarity": prev_pol, "curr_polarity": curr_pol}
+
+        # Determine flip type
+        if prev_pol == "BEARISH" and curr_pol == "BULLISH":
+            flip_type = "BEARISH_TO_BULLISH"
+        else:
+            flip_type = "BULLISH_TO_BEARISH"
+
+        # ── Confidence Scoring ───────────────────────────────────────────────
+        # 1. IFS reversal magnitude (40pts)
+        ifs_sign_crossed = (prev_ifs * curr_ifs < 0)  # True if literally crossed zero
+        ifs_magnitude = min(40.0, abs(curr_ifs) / 100.0 * 40.0 + (10.0 if ifs_sign_crossed else 0.0))
+
+        # 2. Persistence threshold (25pts) — previous bias was sustained ≥ 2 sessions
+        prev_bull_persist = int(prev.get("bullish_persistence", 0))
+        prev_bear_persist = int(prev.get("bearish_persistence", 0))
+        prev_streak = prev_bear_persist if prev_pol == "BEARISH" else prev_bull_persist
+        persistence_pts = 25.0 if prev_streak >= 2 else (12.0 if prev_streak == 1 else 0.0)
+
+        # 3. GEX regime alignment (20pts)
+        curr_gamma_regime = str(curr.get("gamma_regime", ""))
+        regime_aligned = (
+            (flip_type == "BEARISH_TO_BULLISH" and curr_gamma_regime == "LONG_GAMMA") or
+            (flip_type == "BULLISH_TO_BEARISH" and curr_gamma_regime == "SHORT_GAMMA")
+        )
+        regime_pts = 20.0 if regime_aligned else 0.0
+
+        # 4. Price acceptance (15pts)
+        spot_chg = float(curr.get("spot_change_pct", 0.0))
+        price_aligned = (
+            (flip_type == "BEARISH_TO_BULLISH" and spot_chg > 0) or
+            (flip_type == "BULLISH_TO_BEARISH" and spot_chg < 0)
+        )
+        price_pts = min(15.0, abs(spot_chg) / 3.0 * 15.0) if price_aligned else 0.0
+
+        confidence = round(ifs_magnitude + persistence_pts + regime_pts + price_pts, 1)
+        confidence = max(0.0, min(100.0, confidence))
+
+        if confidence >= 60.0:
+            strength = "STRONG"
+        elif confidence >= 35.0:
+            strength = "MODERATE"
+        else:
+            strength = "WEAK"
+
+        return {
+            "flip_type": flip_type,
+            "prev_bias": prev_bias,
+            "curr_bias": curr_bias,
+            "prev_polarity": prev_pol,
+            "curr_polarity": curr_pol,
+            "flip_confidence": confidence,
+            "flip_strength": strength,
+        }
+
     def detect_wall_migrations(self, history_list: list) -> dict:
         """
         Analyzes multi-session walls shifts to determine EOD support/resistance migration states.
@@ -99,10 +239,11 @@ class LongitudinalEngine:
         prev_cw, latest_cw = prev.get("call_wall", 0.0), latest.get("call_wall", 0.0)
         prev_gf, latest_gf = prev.get("gamma_flip", 0.0), latest.get("gamma_flip", 0.0)
 
-        # 1. Put Wall Migration
+        # 1. Put Wall Migration (both walls must exist — a missing wall today is
+        # a data gap, not a support drop)
         if latest_pw > prev_pw > 0:
             put_shift = "Higher (Support Rising)"
-        elif latest_pw < prev_pw > 0:
+        elif 0 < latest_pw < prev_pw:
             put_shift = "Lower (Support Dropping)"
         else:
             put_shift = "Stable"
@@ -110,7 +251,7 @@ class LongitudinalEngine:
         # 2. Call Wall Migration
         if latest_cw > prev_cw > 0:
             call_shift = "Higher (Resistance Rising)"
-        elif latest_cw < prev_cw > 0:
+        elif 0 < latest_cw < prev_cw:
             call_shift = "Lower (Resistance Weakening)"
         else:
             call_shift = "Stable"
@@ -122,6 +263,6 @@ class LongitudinalEngine:
             "put_shift": put_shift,
             "call_shift": call_shift,
             "regime_change": regime_change,
-            "put_wall_pct_change": round((latest_pw - prev_pw) / prev_pw * 100, 2) if prev_pw > 0 else 0.0,
-            "call_wall_pct_change": round((latest_cw - prev_cw) / prev_cw * 100, 2) if prev_cw > 0 else 0.0
+            "put_wall_pct_change": round((latest_pw - prev_pw) / prev_pw * 100, 2) if prev_pw > 0 and latest_pw > 0 else 0.0,
+            "call_wall_pct_change": round((latest_cw - prev_cw) / prev_cw * 100, 2) if prev_cw > 0 and latest_cw > 0 else 0.0
         }

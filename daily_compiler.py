@@ -18,8 +18,11 @@ sys.path.insert(0, os.path.dirname(__file__))
 
 from src.intelligence import InstitutionalIntelligence
 from src.core.longitudinal import LongitudinalEngine
+from src.core.playbook import build_playbook
+from src.core.config import MIN_WALL_MIGRATION_PCT, GEX_INTENSITY_PIN_THRESHOLD, SETUP_PRIORITY
 from src.core.classifier import StructureClassifier
 from src.core.breadth import MarketBreadthEngine
+from src.core.cash_market_breadth import CashMarketBreadthEngine
 from src.config.sector_mapping import get_sector
 
 def extract_date(filename):
@@ -29,6 +32,15 @@ def extract_date(filename):
         date_str = match.group(0)
         return f"{date_str[:4]}-{date_str[4:6]}-{date_str[6:]}"
     return None
+
+def safe_float(val, default=0.0):
+    """Safely cast value to float, returning default if None, NaN, or non-numeric."""
+    if val is None or val != val:
+        return default
+    try:
+        return float(val)
+    except Exception:
+        return default
 
 def main():
     print("=" * 80)
@@ -53,6 +65,7 @@ def main():
     long_engine = LongitudinalEngine()
     struct_classifier = StructureClassifier()
     breadth_engine = MarketBreadthEngine()
+    cm_breadth_engine = CashMarketBreadthEngine()
     
     # Chronological history index for persistence and trend mappings
     session_history = {}
@@ -84,6 +97,13 @@ def main():
             print(f"[!] Warning: Failed to load session history: {e}. Re-building database from scratch.")
             session_history = {}
             
+    # Force re-compilation of the latest scanned date to pick up any logic/UI overrides
+    if not force_compile and compiled_dates and len(files) > 0:
+        latest_scanned_date = extract_date(files[-1])
+        if latest_scanned_date in compiled_dates:
+            compiled_dates.discard(latest_scanned_date)
+            print(f"[*] Forcing re-compilation of the latest session: {latest_scanned_date}")
+            
     # Loop adjacent pairs chronologically
     for i in range(1, len(files)):
         file_tm1_name = files[i-1]
@@ -112,39 +132,46 @@ def main():
         
         try:
             df_intel = intel.analyze_market_structure(file_t_path, file_tm1_path)
-            
-            for _, row in df_intel.iterrows():
+        except Exception as e:
+            print(f"[!] Failed compiling session for date {date_t}: {e}")
+            import traceback
+            traceback.print_exc()
+            continue
+
+        for _, row in df_intel.iterrows():
+            # Per-symbol guard: one bad symbol must not abort the rest of the session
+            try:
                 symbol = row['SYMBOL']
                 
                 # Core daily metrics
-                spot_t = float(row.get('SPOT_T', 0.0))
-                spot_tm1 = float(row.get('SPOT_TM1', 0.0))
-                spot_chg = float(row.get('SPOT_CHG_PCT', 0.0))
-                pcr_t = float(row.get('PCR_T', 0.0))
+                spot_t = safe_float(row.get('SPOT_T'))
+                spot_tm1 = safe_float(row.get('SPOT_TM1'))
+                spot_chg = safe_float(row.get('SPOT_CHG_PCT'))
+                pcr_t = safe_float(row.get('PCR_T'))
                 
-                oi_ce_t = float(row.get('OPEN_INT_CE_T', 0.0))
-                oi_pe_t = float(row.get('OPEN_INT_PE_T', 0.0))
-                chg_ce_t = float(row.get('CHG_IN_OI_CE_T', 0.0))
-                chg_pe_t = float(row.get('CHG_IN_OI_PE_T', 0.0))
+                oi_ce_t = safe_float(row.get('OPEN_INT_CE_T'))
+                oi_pe_t = safe_float(row.get('OPEN_INT_PE_T'))
+                chg_ce_t = safe_float(row.get('CHG_IN_OI_CE_T'))
+                chg_pe_t = safe_float(row.get('CHG_IN_OI_PE_T'))
                 
-                call_wall_t = float(row.get('CALL_WALL_T', 0.0))
-                put_wall_t = float(row.get('PUT_WALL_T', 0.0))
-                gamma_flip_t = float(row.get('GAMMA_FLIP_T', 0.0))
+                call_wall_t = safe_float(row.get('CALL_WALL_T'))
+                put_wall_t = safe_float(row.get('PUT_WALL_T'))
+                gamma_flip_t = safe_float(row.get('GAMMA_FLIP_T'))
                 
                 # Fetch previous session parameters from compiled history to support longitudinal setups
                 prev_session = session_history.get(symbol, {}).get(date_tm1, {})
-                call_wall_tm1 = prev_session.get("call_wall", 0.0)
-                put_wall_tm1 = prev_session.get("put_wall", 0.0)
-                gamma_flip_tm1 = prev_session.get("gamma_flip", 0.0)
+                call_wall_tm1 = safe_float(prev_session.get("call_wall"))
+                put_wall_tm1 = safe_float(prev_session.get("put_wall"))
+                gamma_flip_tm1 = safe_float(prev_session.get("gamma_flip"))
                 
-                gex_t = float(row.get('GEX_T', 0.0))
-                gex_intensity = float(row.get('GEX_INTENSITY', 0.0))
-                gex_shift = float(row.get('GEX_SHIFT', 0.0))
+                gex_t = safe_float(row.get('GEX_T'))
+                gex_intensity = safe_float(row.get('GEX_INTENSITY'))
+                gex_shift = safe_float(row.get('GEX_SHIFT'))
                 
-                iv_t = float(row.get('IV_T', 0.0))
-                iv_shift = float(row.get('IV_SHIFT', 0.0))
+                iv_t = safe_float(row.get('IV_T'))
+                iv_shift = safe_float(row.get('IV_SHIFT'))
                 
-                net_bull_inv_shift = float(row.get('NET_BULL_INV_SHIFT', 0.0))
+                net_bull_inv_shift = safe_float(row.get('NET_BULL_INV_SHIFT'))
 
                 # Expiry rollover metadata — populated by intelligence.py when a weekly
                 # index series was stripped from T-1 before delta computation.
@@ -154,10 +181,10 @@ def main():
 
                 
                 # IFS Score Computation
-                vol_ce_t = float(row.get('VOLUME_CE_T', 0.0))
-                vol_pe_t = float(row.get('VOLUME_PE_T', 0.0))
-                vol_ce_tm1 = float(row.get('VOLUME_CE_TM1', 0.0))
-                vol_pe_tm1 = float(row.get('VOLUME_PE_TM1', 0.0))
+                vol_ce_t = safe_float(row.get('VOLUME_CE_T'))
+                vol_pe_t = safe_float(row.get('VOLUME_PE_T'))
+                vol_ce_tm1 = safe_float(row.get('VOLUME_CE_TM1'))
+                vol_pe_tm1 = safe_float(row.get('VOLUME_PE_TM1'))
                 
                 vol_t = vol_ce_t + vol_pe_t
                 vol_tm1 = vol_ce_tm1 + vol_pe_tm1
@@ -168,7 +195,7 @@ def main():
                 vol_delta_scaled = vol_delta / 1e5
                 gex_shift_scaled = gex_shift / 2e5
                 price_acc = spot_chg
-                
+
                 ifs = (0.35 * pe_oi_scaled) - (0.35 * ce_oi_scaled) + (0.10 * vol_delta_scaled) + (0.10 * gex_shift_scaled) + (0.10 * price_acc)
                 ifs_final = round(max(-100.0, min(100.0, ifs * 15.0)), 1)
                 
@@ -182,25 +209,36 @@ def main():
                 elif net_bull_inv_shift < -50000:
                     persistence_tracker[symbol]["bearish_days"] += 1
                     persistence_tracker[symbol]["bullish_days"] = 0
-                
+                else:
+                    # Neutral flow day breaks the streak — persistence counts
+                    # strictly consecutive sessions. (A/B vs freeze-on-neutral
+                    # showed higher rank IC and cleaner bucket monotonicity.)
+                    persistence_tracker[symbol]["bullish_days"] = 0
+                    persistence_tracker[symbol]["bearish_days"] = 0
+
                 bull_persist = persistence_tracker[symbol]["bullish_days"]
                 bear_persist = persistence_tracker[symbol]["bearish_days"]
-                
-                gamma_regime = "TRANSITION_REGIME"
-                if gex_t > 200000:
-                    gamma_regime = "LONG_GAMMA"
-                elif gex_t < -10000:
-                    gamma_regime = "SHORT_GAMMA"
+
+                # Scale-free gamma regime: spot vs gamma flip, shared with
+                # market_structure_engine + the live structure engine so all
+                # three can never silently diverge (see InstitutionalIntelligence
+                # .gamma_regime in src/intelligence.py).
+                gamma_regime = InstitutionalIntelligence.gamma_regime(spot_t, gamma_flip_t, gex_t)
                 
                 # Fetch history compiled so far to run true longitudinal models
                 sym_history_list = []
                 if symbol in session_history:
-                    sorted_pd_dates = sorted(list(session_history[symbol].keys()))
+                    # Exclude date_t itself: on incremental runs the latest session is
+                    # force-recompiled while its previous compile is still in history —
+                    # including it would make migrations/flips compare today vs old-today.
+                    sorted_pd_dates = sorted(d for d in session_history[symbol].keys() if d < date_t)
                     for pd_date in sorted_pd_dates:
                         sym_history_list.append(session_history[symbol][pd_date])
 
                 # ── IV Rank Calculation ──
-                iv_history = [s.get("iv", 0.0) for s in sym_history_list]
+                # Skip zero placeholders (days where IV failed to compute) so they
+                # don't become iv_min and inflate every subsequent rank.
+                iv_history = [s.get("iv", 0.0) for s in sym_history_list if s.get("iv", 0.0) > 0]
                 if iv_history:
                     iv_min = min(iv_history)
                     iv_max = max(iv_history)
@@ -229,7 +267,7 @@ def main():
                     setups.append("FLOOR_BOUNCE")
                 
                 # 4. DEALER_DEFENSE (Tier 2: Dealer Pin Zones)
-                if gamma_regime == "LONG_GAMMA" and abs(gex_intensity) > 75 and gamma_flip_t > 0 and abs(spot_t - gamma_flip_t) / spot_t <= 0.015:
+                if gamma_regime == "LONG_GAMMA" and abs(gex_intensity) > GEX_INTENSITY_PIN_THRESHOLD and gamma_flip_t > 0 and abs(spot_t - gamma_flip_t) / spot_t <= 0.015:
                     setups.append("DEALER_DEFENSE")
                 
                 # 5. REGIME_SHIFT (Tier 3: Regime Flip Transition)
@@ -237,7 +275,11 @@ def main():
                     setups.append("REGIME_SHIFT")
                 
                 # 6. INVENTORY_MIGRATION (Tier 3: Wall Migration Breakout / Collapse)
-                if (put_wall_t != put_wall_tm1 and put_wall_t > 0 and put_wall_tm1 > 0) or (call_wall_t != call_wall_tm1 and call_wall_t > 0 and call_wall_tm1 > 0):
+                # Walls jump in whole strike intervals — require a minimum shift
+                # magnitude so routine strike-to-strike drift doesn't fire it.
+                pw_shift_pct = (abs(put_wall_t - put_wall_tm1) / put_wall_tm1 * 100.0) if (put_wall_t > 0 and put_wall_tm1 > 0) else 0.0
+                cw_shift_pct = (abs(call_wall_t - call_wall_tm1) / call_wall_tm1 * 100.0) if (call_wall_t > 0 and call_wall_tm1 > 0) else 0.0
+                if max(pw_shift_pct, cw_shift_pct) >= MIN_WALL_MIGRATION_PCT:
                     setups.append("INVENTORY_MIGRATION")
                 
                 # 7. PINCH_ZONE (Tier 2: All walls converged — Compression Breakout Setup)
@@ -253,11 +295,12 @@ def main():
                     setups.append("PINCH_ZONE")
 
                 # 8. IV_SPIKE Setup (Vol Spike - Premium Rich)
-                if iv_shift > 4.5 and iv_rank > 70:
+                # iv_shift is in decimal vol units (0.045 = 4.5 IV points)
+                if iv_shift > 0.045 and iv_rank > 70:
                     setups.append("IV_SPIKE")
 
                 # 9. IV_CRUSH Setup (Vol Crush - Post Event)
-                if iv_shift < -4.5 and iv_rank < 35:
+                if iv_shift < -0.045 and iv_rank < 35:
                     setups.append("IV_CRUSH")
 
                 # 10. IV_SKEW_ACCUMULATION Setup (Speculative Skew Chase)
@@ -295,8 +338,8 @@ def main():
                     "date": date_t,
                     "spot_close": spot_t,
                     "spot_change_pct": spot_chg,
-                    "futures_oi": float(row.get('FUT_OI_T', 0.0)),
-                    "futures_oi_chg": float(row.get('FUT_CHG_OI_T', 0.0)),
+                    "futures_oi": safe_float(row.get('FUT_OI_T')),
+                    "futures_oi_chg": safe_float(row.get('FUT_CHG_OI_T')),
                     "pcr": pcr_t,
                     "total_ce_oi": oi_ce_t,
                     "total_pe_oi": oi_pe_t,
@@ -334,6 +377,10 @@ def main():
                 smart_money_persistence = long_engine.compute_smart_money_persistence(symbol, sym_history_list_temp)
                 migrations = long_engine.detect_wall_migrations(sym_history_list_temp)
                 structural_bias = struct_classifier.classify_structure(day_data, setups)
+                # Assign before detect_structure_flip — it reads structural_bias off the
+                # current day (last element of sym_history_list_temp is day_data itself).
+                day_data["structural_bias"] = structural_bias
+                structure_flip_data = long_engine.detect_structure_flip(sym_history_list_temp)
                 
                 # Compute conviction
                 conviction_score = (
@@ -354,227 +401,27 @@ def main():
                 # Rapid crossover regime shift
                 regime_transition = migrations["regime_change"]
                 
-                # Compile playbook
-                playbook = {
-                    "bias": "Neutral",
-                    "trigger_strike": 0.0,
-                    "invalidation_strike": 0.0,
-                    "expected_behavior": "Mean Reversion",
-                    "dealer_behavior": "Long Gamma"
-                }
-                if "GAMMA_SQUEEZE" in setups:
-                    invalid_val = float(gamma_flip_t)
-                    if invalid_val >= float(call_wall_t * 0.99):
-                        invalid_val = float(call_wall_t * 0.98)
-                    playbook = {"bias": "Bullish Breakout", "trigger_strike": float(call_wall_t), "invalidation_strike": invalid_val, "expected_behavior": "Short Squeeze Breakout", "dealer_behavior": "Short Gamma Hedging Squeeze"}
-                elif "INVENTORY_MIGRATION" in setups:
-                    # Classify the specific type of wall migration dynamically!
-                    put_up = put_wall_t > put_wall_tm1 > 0
-                    put_down = 0 < put_wall_t < put_wall_tm1
-                    call_up = call_wall_t > call_wall_tm1 > 0
-                    call_down = 0 < call_wall_t < call_wall_tm1
-                    
-                    if put_up and call_up:
-                        playbook = {
-                            "bias": "Strong Bullish Momentum",
-                            "trigger_strike": float(call_wall_t),
-                            "invalidation_strike": float(put_wall_t),
-                            "expected_behavior": "Bullish Trend Extension",
-                            "dealer_behavior": "Dual Wall Upward Migration"
-                        }
-                    elif put_down and call_down:
-                        playbook = {
-                            "bias": "Strong Bearish Momentum",
-                            "trigger_strike": float(put_wall_t),
-                            "invalidation_strike": float(call_wall_t),
-                            "expected_behavior": "Bearish Trend Extension",
-                            "dealer_behavior": "Dual Wall Downward Migration"
-                        }
-                    elif put_up:
-                        invalid_val = float(put_wall_tm1)
-                        if invalid_val >= float(put_wall_t * 0.99):
-                            invalid_val = float(put_wall_t * 0.98)
-                        playbook = {
-                            "bias": "Bullish Accumulation",
-                            "trigger_strike": float(put_wall_t),
-                            "invalidation_strike": invalid_val,
-                            "expected_behavior": "Support Floor Rise",
-                            "dealer_behavior": "Support Floor Upward Migration"
-                        }
-                    elif put_down:
-                        invalid_val = float(put_wall_tm1)
-                        if invalid_val <= float(put_wall_t * 1.01):
-                            invalid_val = float(put_wall_t * 1.02)
-                        
-                        # If spot price is rising and remains above the new Put Wall, this is support normalization, not a breakdown!
-                        if spot_t > put_wall_t and spot_chg > 0:
-                            playbook = {
-                                "bias": "Support Normalization",
-                                "trigger_strike": float(put_wall_t),
-                                "invalidation_strike": float(put_wall_t * 0.985),
-                                "expected_behavior": "Bullish Rebalancing",
-                                "dealer_behavior": "Support Floor Normalization"
-                            }
-                        else:
-                            playbook = {
-                                "bias": "Bearish Breakdown",
-                                "trigger_strike": float(put_wall_t),
-                                "invalidation_strike": invalid_val,
-                                "expected_behavior": "Support Floor Collapse",
-                                "dealer_behavior": "Support Floor Downward Migration"
-                            }
-                    elif call_up:
-                        invalid_val = float(call_wall_tm1)
-                        if invalid_val >= float(call_wall_t * 0.99):
-                            invalid_val = float(call_wall_t * 0.98)
-                        playbook = {
-                            "bias": "Bullish Breakout",
-                            "trigger_strike": float(call_wall_t),
-                            "invalidation_strike": invalid_val,
-                            "expected_behavior": "Resistance Ceiling Rise",
-                            "dealer_behavior": "Call Wall Upward Migration"
-                        }
-                    elif call_down:
-                        invalid_val = float(call_wall_tm1)
-                        if invalid_val <= float(call_wall_t * 1.01):
-                            invalid_val = float(call_wall_t * 1.02)
-                        playbook = {
-                            "bias": "Bearish Consolidation",
-                            "trigger_strike": float(call_wall_t),
-                            "invalidation_strike": invalid_val,
-                            "expected_behavior": "Ceiling Drop (Bearish)",
-                            "dealer_behavior": "Call Wall Downward Migration"
-                        }
-                    else:
-                        playbook = {
-                            "bias": "Range Shift",
-                            "trigger_strike": float(call_wall_t),
-                            "invalidation_strike": float(put_wall_t),
-                            "expected_behavior": "Wall Rebalancing",
-                            "dealer_behavior": "Inventory Repositioning"
-                        }
-                elif "REGIME_SHIFT" in setups:
-                    playbook = {"bias": "Regime Transition", "trigger_strike": float(gamma_flip_t), "invalidation_strike": float(gamma_flip_t * 0.99), "expected_behavior": "Volatility Stabilization", "dealer_behavior": "Hedging Crossover Transition"}
-                elif "VOLATILITY_COIL" in setups:
-                    playbook = {"bias": "Volatility Expansion", "trigger_strike": float(gamma_flip_t), "invalidation_strike": float(spot_t * 0.985), "expected_behavior": "Coil Breakout Watch", "dealer_behavior": "Inventory Compression Coil"}
-                elif "DEALER_DEFENSE" in setups:
-                    playbook = {"bias": "Mean Reversion", "trigger_strike": float(gamma_flip_t), "invalidation_strike": float(gamma_flip_t * 0.98), "expected_behavior": "Institutional Pin Target", "dealer_behavior": "Straddle Pin Defense"}
-                elif "FLOOR_BOUNCE" in setups:
-                    playbook = {"bias": "Bullish Mean Reversion", "trigger_strike": float(put_wall_t), "invalidation_strike": float(put_wall_t * 0.985), "expected_behavior": "Key Support Bounce", "dealer_behavior": "Put Wall Support Hedging"}
-                elif "PINCH_ZONE" in setups:
-                    # All walls converged — breakout direction determined by spot price relative to the pinch wall (gamma_flip_t)
-                    is_bullish = (spot_t >= gamma_flip_t) if spot_t > 0 and gamma_flip_t > 0 else (ifs_final >= 0)
-                    if is_bullish:
-                        pz_bias = "Compression — Bullish Breakout Watch"
-                        pz_behavior = "Bullish Breakout Watch"
-                        invalid_val = float(spot_t * 0.985)
-                    else:
-                        pz_bias = "Compression — Bearish Breakdown Watch"
-                        pz_behavior = "Bearish Breakdown Watch"
-                        invalid_val = float(spot_t * 1.015)
-                    playbook = {
-                        "bias": pz_bias,
-                        "trigger_strike": float(gamma_flip_t),
-                        "invalidation_strike": invalid_val,
-                        "expected_behavior": pz_behavior,
-                        "dealer_behavior": "Long Gamma Pin Defense"
-                    }
-                elif "IV_SPIKE" in setups:
-                    playbook = {
-                        "bias": "Volatility Mean Reversion",
-                        "trigger_strike": float(spot_t),
-                        "invalidation_strike": float(spot_t * 1.05) if ifs_final < 0 else float(spot_t * 0.95),
-                        "expected_behavior": "IV Contraction Reversion",
-                        "dealer_behavior": "Premium Rich Straddle Selling"
-                    }
-                elif "IV_CRUSH" in setups:
-                    playbook = {
-                        "bias": "Volatility Stable Range",
-                        "trigger_strike": float(spot_t),
-                        "invalidation_strike": float(spot_t * 1.03),
-                        "expected_behavior": "IV Collapse Flatline",
-                        "dealer_behavior": "Post Event Unwinding"
-                    }
-                elif "IV_SKEW_ACCUMULATION" in setups:
-                    is_bullish_skew = spot_t > 0 and call_wall_t > 0 and 0 < (call_wall_t - spot_t) / spot_t <= 0.03 and skew_slope > 1.15
-                    if is_bullish_skew:
-                        playbook = {
-                            "bias": "Bullish Breakout",
-                            "trigger_strike": float(call_wall_t),
-                            "invalidation_strike": float(spot_t * 0.97),
-                            "expected_behavior": "Upside Skew Chase Breakout",
-                            "dealer_behavior": "Speculative Call Buying Squeeze"
-                        }
-                    else:
-                        playbook = {
-                            "bias": "Bearish Breakdown",
-                            "trigger_strike": float(put_wall_t),
-                            "invalidation_strike": float(spot_t * 1.03),
-                            "expected_behavior": "Downside Skew Chase Breakdown",
-                            "dealer_behavior": "Speculative Put Buying Squeeze"
-                        }
-                elif ifs_final > 15:
-                    playbook = {"bias": "Bullish Bias", "trigger_strike": float(call_wall_t), "invalidation_strike": float(put_wall_t), "expected_behavior": "Support Floor Building", "dealer_behavior": "Put Writing Support"}
-                elif ifs_final < -15:
-                    playbook = {"bias": "Bearish Bias", "trigger_strike": float(put_wall_t), "invalidation_strike": float(call_wall_t), "expected_behavior": "Ceiling Reinforcement", "dealer_behavior": "Call Writing Reinforcement"}
-
-                # ── Setup-Aware High-Fidelity Suggested Strategy Override ──
-                s_strat = row.get('SUGGESTED_STRATEGY', 'Wait for Setup')
-                p_bias = playbook.get("bias", "Neutral")
-                
-                if "GAMMA_SQUEEZE" in setups:
-                    s_strat = "ATM Option Buying (Call)"
-                elif "IV_SPIKE" in setups:
-                    s_strat = "Bear Call Spread (Credit)" if ifs_final < 0 else "Bull Put Spread (Credit)"
-                elif "IV_CRUSH" in setups:
-                    s_strat = "Iron Condor / Short Straddle"
-                elif "VOLATILITY_COIL" in setups:
-                    s_strat = "Long Straddle (Breakout Watch)"
-                elif "FLOOR_BOUNCE" in setups:
-                    s_strat = "Bull Put Spread (Credit)"
-                elif "DEALER_DEFENSE" in setups:
-                    s_strat = "Iron Condor / Short Straddle"
-                elif "PINCH_ZONE" in setups:
-                    is_pz_bullish = (spot_t >= gamma_flip_t) if spot_t > 0 and gamma_flip_t > 0 else (ifs_final >= 0)
-                    if is_pz_bullish:
-                        s_strat = "Bull Call Spread (Debit)"
-                    else:
-                        s_strat = "Bear Put Spread (Debit)"
-                elif "INVENTORY_MIGRATION" in setups:
-                    if p_bias == "Strong Bullish Momentum" or p_bias == "Bullish Breakout":
-                        s_strat = "Bull Call Spread (Debit)"
-                    elif p_bias == "Bullish Accumulation" or p_bias == "Support Normalization":
-                        s_strat = "Bull Put Spread (Credit)"
-                    elif p_bias == "Bearish Consolidation":
-                        s_strat = "Bear Call Spread (Credit)"
-                    elif p_bias == "Bearish Breakdown" or p_bias == "Strong Bearish Momentum":
-                        s_strat = "Bear Put Spread (Debit)"
-                    else:
-                        s_strat = "Wait for Setup"
-                elif "IV_SKEW_ACCUMULATION" in setups:
-                    # Bias direction takes precedence; gamma_regime is a secondary tie-breaker
-                    # for neutral/transition cases where direction is unclear.
-                    if "Bullish" in p_bias:
-                        # Spot above gamma flip + call skew building → buy the breakout
-                        s_strat = "Bull Call Spread (Debit)"
-                    elif "Bearish" in p_bias:
-                        # Spot below gamma flip + put skew building → buy the breakdown
-                        s_strat = "Bear Put Spread (Debit)"
-                    else:
-                        # Neutral / Regime Transition — defer to gamma_regime
-                        s_strat = "Bull Call Spread (Debit)" if gamma_regime == "LONG_GAMMA" else "Bear Put Spread (Debit)"
-                elif "REGIME_SHIFT" in setups:
-                    if p_bias == "Regime Transition" and ifs_final >= 0:
-                        s_strat = "Bull Put Spread (Credit)"
-                    elif p_bias == "Regime Transition" and ifs_final < 0:
-                        s_strat = "Bear Call Spread (Credit)"
-                elif ifs_final > 15:
-                    s_strat = "Bull Put Spread (Credit)"
-                elif ifs_final < -15:
-                    s_strat = "Bear Call Spread (Credit)"
-                else:
-                    s_strat = "Wait for Setup"
-                
+                # Compile playbook + setup-aware strategy override (src/core/playbook.py)
+                # Primary setup by shared precedence; the playbook is built for
+                # THAT setup only, so setup_type and playbook always agree.
+                primary_setup = next((p for p in SETUP_PRIORITY if p in setups),
+                                     setups[0] if setups else None)
+                day_data["primary_setup"] = primary_setup or "NONE"
+                playbook, s_strat = build_playbook(
+                    setups=[primary_setup] if primary_setup else [],
+                    spot_t=spot_t,
+                    call_wall_t=call_wall_t,
+                    put_wall_t=put_wall_t,
+                    gamma_flip_t=gamma_flip_t,
+                    call_wall_tm1=call_wall_tm1,
+                    put_wall_tm1=put_wall_tm1,
+                    ifs_final=ifs_final,
+                    gamma_regime=gamma_regime,
+                    spot_chg=spot_chg,
+                    skew_slope=skew_slope,
+                    base_strategy=row.get('SUGGESTED_STRATEGY', 'Wait for Setup'),
+                    pe_interp=row.get('PE_INTERP', ''),
+                )
                 day_data["suggested_strategy"] = s_strat
 
                 # Save updated longitudinal stats
@@ -589,15 +436,20 @@ def main():
                 day_data["structural_bias"] = structural_bias
                 day_data["regime_transition"] = regime_transition
                 day_data["playbook"] = playbook
+                # ── Structure Flip Metadata ─────────────────────────────────────────────────
+                day_data["structure_flip"]        = structure_flip_data["flip_type"]
+                day_data["prev_structural_bias"]  = structure_flip_data["prev_bias"]
+                day_data["flip_confidence"]        = structure_flip_data["flip_confidence"]
+                day_data["flip_strength"]          = structure_flip_data["flip_strength"]
                 
                 if symbol not in session_history:
                     session_history[symbol] = {}
                 session_history[symbol][date_t] = day_data
-                
-        except Exception as e:
-            print(f"[!] Failed compiling session for date {date_t}: {e}")
-            import traceback
-            traceback.print_exc()
+
+            except Exception as e:
+                print(f"[!] {row.get('SYMBOL', '?')} failed on {date_t}: {e} — symbol skipped")
+                import traceback
+                traceback.print_exc()
 
     # ─────────────────────────────────────────────────────────────────────────────
     # COMPILING BREADTH AND CHANGE ALERTS LEDGER
@@ -621,6 +473,10 @@ def main():
         changes = breadth_engine.detect_daily_changes(d_t, prev_d, session_history)
         market_changes_history[d_t] = changes
 
+    # macro_regime_prob is held at 0.0 (ML macro gate decommissioned)
+    for d_t, mb in market_breadth_history.items():
+        mb["macro_regime_prob"] = 0.0
+
     # ─────────────────────────────────────────────────────────────────────────────
     # DATA FLATTENING FOR COLUMNAR PARQUET EXPORTS
     # ─────────────────────────────────────────────────────────────────────────────
@@ -632,6 +488,7 @@ def main():
     
     for sym, history in session_history.items():
         for d_t, day_data in history.items():
+            
             # A. Structure records
             structure_rows.append({
                 "symbol": sym,
@@ -655,6 +512,11 @@ def main():
                 "priority_score": day_data["priority_score"],
                 "structural_bias": day_data["structural_bias"],
                 "regime_transition": bool(day_data["regime_transition"]),
+                # ── Structure Flip Columns ──
+                "structure_flip":       day_data.get("structure_flip", "NONE"),
+                "prev_structural_bias": day_data.get("prev_structural_bias", ""),
+                "flip_confidence":      float(day_data.get("flip_confidence", 0.0)),
+                "flip_strength":        day_data.get("flip_strength", "WEAK"),
                 "call_wall": day_data["call_wall"],
                 "put_wall": day_data["put_wall"],
                 "gamma_flip": day_data["gamma_flip"],
@@ -666,31 +528,30 @@ def main():
                 "iv_shift": day_data["iv_shift"],
                 "ce_interp": day_data.get("ce_interp", "Neutral"),
                 "pe_interp": day_data.get("pe_interp", "Neutral"),
-                "suggested_strategy": day_data.get("suggested_strategy", "Wait for Setup")
+                "suggested_strategy": day_data.get("suggested_strategy", "Wait for Setup"),
             })
             
             # B. Playbook & Setups
+            # One row per (symbol, date). When multiple setup types fire simultaneously,
+            # collapse to the highest-priority type (setup_type) and store all triggered
+            # types pipe-delimited in setup_types for research queries.
             setups_list = day_data.get("setups", [])
             playbook = day_data.get("playbook", {})
+            # No-setup days are not persisted — every consumer filters setup_type != 'NONE'
             if setups_list:
-                for s_type in setups_list:
-                    setups_rows.append({
-                        "symbol": sym,
-                        "sector": get_sector(sym),
-                        "date": d_t,
-                        "setup_type": s_type,
-                        "bias": playbook.get("bias", "Neutral"),
-                        "trigger_strike": playbook.get("trigger_strike", 0.0),
-                        "invalidation_strike": playbook.get("invalidation_strike", 0.0),
-                        "expected_behavior": playbook.get("expected_behavior", "Mean Reversion"),
-                        "dealer_behavior": playbook.get("dealer_behavior", "Long Gamma")
-                    })
-            else:
+                # Prefer the primary recorded at compute time (playbook was built
+                # for it); fall back to recomputing for history entries compiled
+                # before primary_setup existed.
+                primary_type = day_data.get("primary_setup")
+                if not primary_type or primary_type == "NONE":
+                    primary_type = next((p for p in SETUP_PRIORITY if p in setups_list),
+                                        setups_list[0])
                 setups_rows.append({
                     "symbol": sym,
                     "sector": get_sector(sym),
                     "date": d_t,
-                    "setup_type": "NONE",
+                    "setup_type": primary_type,
+                    "setup_types": "|".join(setups_list),
                     "bias": playbook.get("bias", "Neutral"),
                     "trigger_strike": playbook.get("trigger_strike", 0.0),
                     "invalidation_strike": playbook.get("invalidation_strike", 0.0),
@@ -723,7 +584,8 @@ def main():
             "expansion_pct": b["expansion_pct"],
             "transition_pct": b["transition_pct"],
             "mean_rev_pct": b["mean_rev_pct"],
-            "total_symbols": b["total_symbols"]
+            "total_symbols": b["total_symbols"],
+            "macro_regime_prob": b.get("macro_regime_prob", 0.0)
         })
         
     # E. Changes Rows
@@ -745,6 +607,21 @@ def main():
     df_inventory = pd.DataFrame(inventory_rows)
     df_breadth = pd.DataFrame(breadth_rows)
     df_changes = pd.DataFrame(changes_rows) if changes_rows else pd.DataFrame(columns=["date", "symbol", "icon", "type", "msg", "rank"])
+
+    # ─────────────────────────────────────────────────────────────────────────────
+    # CASH MARKET BREADTH (full NSE EQ universe ~2,400 symbols)
+    # Additive: does not modify existing daily_market_breadth F&O table.
+    # ─────────────────────────────────────────────────────────────────────────────
+    cm_parquet_path = os.path.join("data", "compiled", "cash_market_prices.parquet")
+    cm_breadth_output = os.path.join(output_dir, "daily_cm_breadth.parquet")
+    df_cm_breadth = pd.DataFrame()  # fallback if CM parquet not present
+    if os.path.exists(cm_parquet_path):
+        try:
+            df_cm_breadth = cm_breadth_engine.build_cm_breadth(cm_parquet_path, cm_breadth_output)
+        except Exception as e:
+            print(f"[!] CM breadth computation failed (non-fatal): {e}")
+    else:
+        print("[!] cash_market_prices.parquet not found — skipping CM breadth. Run cash_market_builder.py first.")
 
     # ─────────────────────────────────────────────────────────────────────────────
     # EXPORTING TO COLUMNAR PARQUET & DUCKDB INDEX
@@ -771,6 +648,8 @@ def main():
     conn.execute("CREATE TABLE daily_inventory AS SELECT * FROM df_inventory")
     conn.execute("CREATE TABLE daily_market_breadth AS SELECT * FROM df_breadth")
     conn.execute("CREATE TABLE daily_changes AS SELECT * FROM df_changes")
+    if not df_cm_breadth.empty:
+        conn.execute("CREATE TABLE daily_cm_breadth AS SELECT * FROM df_cm_breadth")
     conn.close()
 
     # Backwards compatibility JSON dump

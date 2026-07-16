@@ -30,6 +30,12 @@ MS_COLS = [
     "call_wall", "put_wall", "gamma_flip", "ce_interp", "pe_interp", "suggested_strategy",
     "structure_flip", "prev_structural_bias", "flip_confidence", "flip_strength",
 ]
+
+# Sessions of lookback the flip radar's whipsaw guard needs behind each exported
+# session. Derived here rather than in the HUD: the guard has to see sessions the
+# export window itself does not contain, or the oldest exported sessions would
+# report every flip as fresh.
+FLIP_REPEAT_LOOKBACK = 3
 SETUP_COLS = ["date", "symbol", "sector", "setup_type", "setup_types", "bias",
               "trigger_strike", "invalidation_strike", "expected_behavior", "dealer_behavior"]
 CHANGE_COLS = ["date", "symbol", "icon", "type", "msg", "rank"]
@@ -58,6 +64,42 @@ def clean(v):
 def table(con, sql, cols, params=()):
     rows = con.execute(sql, params).fetchall()
     return {"cols": cols, "rows": [[clean(c) for c in r] for r in rows]}
+
+
+def add_flip_repeat(con, tbl, sessions):
+    """Tag each flip whose symbol also flipped in the FLIP_REPEAT_LOOKBACK sessions
+    before it — mostly IFS churn rather than a fresh structural turn.
+
+    Reads back past the export window so the oldest exported sessions are judged
+    against real history instead of an empty lookback.
+    """
+    # Keys are compared against already-cleaned row values, so normalise both sides.
+    window = sorted(clean(r[0]) for r in con.execute(
+        "SELECT DISTINCT date FROM daily_market_structure WHERE date <= ? "
+        "ORDER BY date DESC LIMIT ?",
+        (sessions[-1], len(sessions) + FLIP_REPEAT_LOOKBACK)).fetchall())
+    order = {d: i for i, d in enumerate(window)}
+
+    flipped = set()
+    for sym, d in con.execute(
+        "SELECT symbol, date FROM daily_market_structure "
+        "WHERE structure_flip IS NOT NULL AND structure_flip != 'NONE' AND date <= ?",
+        (sessions[-1],)
+    ).fetchall():
+        i = order.get(clean(d))
+        if i is not None:
+            flipped.add((sym, i))
+
+    di, yi, fi = tbl["cols"].index("date"), tbl["cols"].index("symbol"), tbl["cols"].index("structure_flip")
+    tbl["cols"].append("flip_repeat")
+    for r in tbl["rows"]:
+        i = order.get(r[di])
+        repeat = (
+            r[fi] not in (None, "NONE")
+            and i is not None
+            and any((r[yi], i - k) in flipped for k in range(1, FLIP_REPEAT_LOOKBACK + 1))
+        )
+        r.append(repeat)
 
 
 def remap_sector(tbl):
@@ -137,6 +179,7 @@ def main():
         dhan_map = {s: full_map[s] for s in exported_syms if s in full_map}
     data["dhan_map"] = dhan_map
 
+    add_flip_repeat(con, data["market_structure"], sessions)
     remap_sector(data["market_structure"])
     remap_sector(data["setups"])
 

@@ -51,6 +51,18 @@ case "$MODE" in
     streamlit run dashboard.py --server.port 8501
     ;;
 
+  # ── Brief Mode: Generate Tomorrow's Watchlist for a given date ─────────────
+  brief)
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "  VANGUARD BRIEFING — Tomorrow's Watchlist"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    if [ -n "$2" ]; then
+      python3 briefing.py "$2"
+    else
+      python3 briefing.py
+    fi
+    ;;
+
   # ── Dash Mode: Launch dashboard only ───────────────────────────────────────
   dash)
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -60,11 +72,13 @@ case "$MODE" in
     ;;
 
   *)
-    echo "Usage: ./start.sh [eod|live|dash]"
+    echo "Usage: ./start.sh [eod|live|brief|dash]"
     echo ""
-    echo "  eod   → Download latest BhavCopy, process signals, launch dashboard"
-    echo "  live  → Start NSE live polling bridge + launch dashboard"
-    echo "  dash  → Launch dashboard only (data already exists)"
+    echo "  eod         → Download latest BhavCopy, process signals, launch dashboard"
+    echo "  live        → Start NSE live polling bridge + launch dashboard"
+    echo "  brief       → Generate Tomorrow's Watchlist briefing (latest date)"
+    echo "  brief DATE  → Generate briefing for a specific date (e.g. 2026-06-25)"
+    echo "  dash        → Launch dashboard only (data already exists)"
     exit 1
     ;;
 esac

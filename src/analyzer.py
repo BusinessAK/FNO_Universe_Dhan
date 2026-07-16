@@ -22,7 +22,6 @@ class GammaAnalyzer:
         
         def get_gex(row):
             symbol = row['SYMBOL']
-            lot = self.lot_sizes.get(symbol, 1) # Fallback to 1 if lot size unknown
             spot = spot_prices.get(symbol, 0)
             
             # GEX Formula: Gamma * OI (in shares) * Spot (scaled)

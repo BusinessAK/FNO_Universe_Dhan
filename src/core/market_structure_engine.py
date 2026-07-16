@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 from src.models.states import MarketState
+from src.intelligence import InstitutionalIntelligence
 
 class MarketStructureEngine:
     """
@@ -49,54 +50,52 @@ class MarketStructureEngine:
                 
                 ce_gex = g_slice[g_slice['OPTION_TYP'] == 'CE'].groupby('STRIKE_PR')['GEX'].sum()
                 pe_gex = g_slice[g_slice['OPTION_TYP'] == 'PE'].groupby('STRIKE_PR')['GEX'].sum().abs()
-                
-                # Initialize walls to 0.0 before dynamic calculation so we don't bleed all-expiry values
-                call_wall = 0.0
-                put_wall = 0.0
+
+                # Compute into locals and commit only at the end of the try, so a
+                # mid-computation exception leaves the pre-compiled fallbacks intact.
+                dyn_call_wall = 0.0
+                dyn_put_wall = 0.0
 
                 # Call Wall = Strike of maximum positive Call GEX
                 # Filter > 0 to avoid garbage idxmax() on zero-GEX series (BUG-3 fix)
                 ce_gex_pos = ce_gex[ce_gex > 0]
                 if not ce_gex_pos.empty:
-                    call_wall = float(ce_gex_pos.idxmax())
-                
+                    dyn_call_wall = float(ce_gex_pos.idxmax())
+
                 # Put Wall = Strike of maximum absolute Put GEX
                 pe_gex_pos = pe_gex[pe_gex > 0]
                 if not pe_gex_pos.empty:
-                    put_wall = float(pe_gex_pos.idxmax())
-                
+                    dyn_put_wall = float(pe_gex_pos.idxmax())
+
                 # ── Gamma Flip: ALWAYS use compiled ALL-EXPIRY value from latest_metrics ──
                 # Gamma Flip is a full-chain structural pivot (where aggregate dealer net gamma
                 # crosses zero). Filtering to a single expiry distorts this — near-expiry gamma
                 # is exponentially amplified, anchoring the flip to a different strike.
                 # The compiled value (from intelligence.py, full chain) is the canonical one.
                 # gamma_flip is intentionally NOT overridden here.
-                
+
                 # Combined Net GEX Exposure
-                gex_total = float(g_slice['GEX'].sum())
-                
+                dyn_gex_total = float(g_slice['GEX'].sum())
+
                 # PCR Index
                 ce_oi = g_slice[g_slice['OPTION_TYP'] == 'CE']['OPEN_INT'].sum()
                 pe_oi = g_slice[g_slice['OPTION_TYP'] == 'PE']['OPEN_INT'].sum()
-                pcr_index = float(pe_oi / ce_oi) if ce_oi > 0 else pcr_index
-                
-                # Regime Mapping based on true mathematical Flip zone boundary
-                if gamma_flip > 0:
-                    if abs(spot_close - gamma_flip) / spot_close <= 0.008:
-                        gamma_regime = "TRANSITION_REGIME"
-                    elif spot_close > gamma_flip:
-                        gamma_regime = "LONG_GAMMA"
-                    else:
-                        gamma_regime = "SHORT_GAMMA"
-                else:
-                    gamma_regime = "TRANSITION_REGIME"
-                    if gex_total > 200000:
-                        gamma_regime = "LONG_GAMMA"
-                    elif gex_total < -10000:
-                        gamma_regime = "SHORT_GAMMA"
-                    
+                dyn_pcr = float(pe_oi / ce_oi) if ce_oi > 0 else pcr_index
+
+                # Regime mapping based on the true mathematical flip boundary —
+                # shared with daily_compiler.py + the live structure engine
+                # (InstitutionalIntelligence.gamma_regime).
+                dyn_regime = InstitutionalIntelligence.gamma_regime(spot_close, gamma_flip, dyn_gex_total)
+
+                # Commit dynamic values atomically
+                call_wall = dyn_call_wall
+                put_wall = dyn_put_wall
+                gex_total = dyn_gex_total
+                pcr_index = dyn_pcr
+                gamma_regime = dyn_regime
+
             except Exception:
-                # Silently fall back to pre-compiled values if any dynamic math parsing fails
+                # Fall back to pre-compiled values if any dynamic math parsing fails
                 pass
 
         return MarketState(

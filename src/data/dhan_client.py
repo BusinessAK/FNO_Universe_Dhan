@@ -12,14 +12,21 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def _load_env():
-    """Minimal .env loader (avoids a hard python-dotenv dependency)."""
+    """Minimal .env loader (avoids a hard python-dotenv dependency).
+
+    .env is authoritative and always overrides any pre-existing process env
+    var of the same name — not setdefault(). A stale DHAN_ACCESS_TOKEN left
+    exported in an interactive shell (from an old test, a forgotten `export`,
+    a shell-profile entry) would otherwise silently win over a fresh, valid
+    .env value with no visible symptom beyond an opaque auth failure.
+    """
     env = ROOT / ".env"
     if env.exists():
         for line in env.read_text().splitlines():
             line = line.strip()
             if line and not line.startswith("#") and "=" in line:
                 k, v = line.split("=", 1)
-                os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
+                os.environ[k.strip()] = v.strip().strip('"').strip("'")
 
 
 def _ensure_ssl_certs():

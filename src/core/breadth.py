@@ -2,6 +2,14 @@
 Vanguard Institutional Terminal - Market-Wide Breadth & Change Detection Engine
 """
 
+def _safe_float(metrics: dict, key: str, default: float = 0.0) -> float:
+    """Float coercion tolerant of None / NaN / non-numeric metric values."""
+    try:
+        return float(metrics.get(key) or default)
+    except (ValueError, TypeError):
+        return default
+
+
 class MarketBreadthEngine:
     """
     Analyzes top-down institutional breadth and structural shifts across the entire F&O universe.
@@ -42,9 +50,9 @@ class MarketBreadthEngine:
                 compression_count += 1
             elif "Expansion" in bias:
                 expansion_count += 1
-            elif "Transition" in bias or "Flip Zone" in bias or "Resistance Weakening" in bias:
+            elif "Transition" in bias or "Flip Zone" in bias or "Resistance Weakening" in bias or "Support Weakening" in bias:
                 transition_count += 1
-            elif "Mean Reversion" in bias or "Controlled" in bias or "Support Building" in bias:
+            elif "Mean Reversion" in bias or "Controlled" in bias or "Support Building" in bias or "Resistance Building" in bias:
                 mean_rev_count += 1
 
         if total_symbols == 0:
@@ -83,14 +91,18 @@ class MarketBreadthEngine:
             if not prev_m or not lat_m:
                 continue
 
-            p_pw, l_pw = prev_m.get("put_wall", 0.0), lat_m.get("put_wall", 0.0)
-            p_cw, l_cw = prev_m.get("call_wall", 0.0), lat_m.get("call_wall", 0.0)
-            p_gf, l_gf = prev_m.get("gamma_flip", 0.0), lat_m.get("gamma_flip", 0.0)
+            p_pw = _safe_float(prev_m, "put_wall")
+            l_pw = _safe_float(lat_m, "put_wall")
+            p_cw = _safe_float(prev_m, "call_wall")
+            l_cw = _safe_float(lat_m, "call_wall")
+            p_gf = _safe_float(prev_m, "gamma_flip")
+            l_gf = _safe_float(lat_m, "gamma_flip")
+
             p_reg, l_reg = prev_m.get("gamma_regime"), lat_m.get("gamma_regime")
-            pty_score = lat_m.get("priority_score", 0.0)
-            
-            p_gex_int = prev_m.get("gex_intensity", 0.0)
-            l_gex_int = lat_m.get("gex_intensity", 0.0)
+
+            pty_score = _safe_float(lat_m, "priority_score")
+            p_gex_int = _safe_float(prev_m, "gex_intensity")
+            l_gex_int = _safe_float(lat_m, "gex_intensity")
 
             # --- 1. DUAL WALL SHIFTS VS INDIVIDUAL WALL SHIFTS ---
             dual_shifted = False
@@ -110,7 +122,7 @@ class MarketBreadthEngine:
                     "msg": f"<b>{sym}</b>: <b>Dual Option Walls migrated higher</b> (Support: ₹{p_pw:,.0f} → ₹{l_pw:,.0f} | Resistance: ₹{p_cw:,.0f} → ₹{l_cw:,.0f})"
                 })
                 dual_shifted = True
-            elif l_pw < p_pw > 0 and l_cw < p_cw > 0:
+            elif 0 < l_pw < p_pw and 0 < l_cw < p_cw:
                 # Dual Wall Fall (Strong Bearish Migration)
                 mag_pw = abs(l_pw - p_pw) / p_pw
                 mag_cw = abs(l_cw - p_cw) / p_cw
@@ -138,7 +150,7 @@ class MarketBreadthEngine:
                         "priority_score": pty_score,
                         "msg": f"<b>{sym}</b>: Support shifted higher (₹{p_pw:,.0f} → ₹{l_pw:,.0f})"
                     })
-                elif l_pw < p_pw > 0:
+                elif 0 < l_pw < p_pw:
                     magnitude = abs(l_pw - p_pw) / p_pw
                     events.append({
                         "symbol": sym,
@@ -160,7 +172,7 @@ class MarketBreadthEngine:
                         "priority_score": pty_score,
                         "msg": f"<b>{sym}</b>: Resistance expanded higher (₹{p_cw:,.0f} → ₹{l_cw:,.0f})"
                     })
-                elif l_cw < p_cw > 0:
+                elif 0 < l_cw < p_cw:
                     magnitude = abs(l_cw - p_cw) / p_cw
                     events.append({
                         "symbol": sym,
@@ -194,7 +206,7 @@ class MarketBreadthEngine:
                         "type": "option_wall_expansion",
                         "magnitude": magnitude,
                         "priority_score": pty_score,
-                        "msg": f"<b>{sym}</b>: Option walls <b>expanded by {ratio*100:.1f}%</b> (Range: ₹{l_pw:,.0f} → ₹{l_cw:,.0f}) — volatility expansion"
+                        "msg": f"<b>{sym}</b>: Option walls <b>expanded by {(ratio-1)*100:.1f}%</b> (New range: ₹{l_pw:,.0f} – ₹{l_cw:,.0f}) — volatility expansion"
                     })
 
             # --- 3. GEX INTENSITY EXPLOSION (Institutional Block Additions) ---
@@ -208,7 +220,7 @@ class MarketBreadthEngine:
                         "type": "gex_intensity_explosion",
                         "magnitude": magnitude,
                         "priority_score": pty_score,
-                        "msg": f"<b>{sym}</b>: <b>GEX Concentration Spike of {int(ratio*100):d}%</b> (Intensity: {l_gex_int:.3f}), signaling heavy institutional block additions"
+                        "msg": f"<b>{sym}</b>: <b>GEX Concentration Spike of +{int((ratio - 1.0) * 100):d}%</b> (Intensity: {l_gex_int:.3f}), signaling heavy institutional block additions"
                     })
 
             # --- 4. GAMMA FLIP CROSSOVER ---

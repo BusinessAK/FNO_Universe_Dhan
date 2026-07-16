@@ -5,8 +5,9 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 import os
+from src.core.config import INDEX_SYMBOLS
 from src.services.database_service import DatabaseService
-from src.ui.cards import render_html, format_score, get_ifs_hsl, fmt_gex
+from src.ui.cards import render_html, get_ifs_hsl, fmt_gex
 
 def render_inventory_matrix(all_symbols: list, session_history: dict, latest_date: str, trading_dates: list, selected_sectors: list = None):
     """
@@ -116,11 +117,6 @@ def render_inventory_matrix(all_symbols: list, session_history: dict, latest_dat
         font-weight: 700 !important;
         color: #5d6d8f !important;
         font-size: 9.5px !important;
-        transition: background-color 0.2s, color 0.2s !important;
-    }
-    .matrix-table th:hover {
-        background-color: #141435 !important;
-        color: #a78bfa !important;
     }
     .matrix-table td:first-child {
         position: -webkit-sticky !important;
@@ -152,7 +148,7 @@ def render_inventory_matrix(all_symbols: list, session_history: dict, latest_dat
     ]
 
     # Search and filtration for the matrix
-    m_col1, m_col2, m_col3, m_col4 = st.columns([3, 3, 2, 2])
+    m_col1, m_col2, m_col3, m_col4, m_col5 = st.columns([3, 2, 2, 2, 2])
     with m_col1:
         search_query = st.text_input("🔍 Filter Symbols", "", placeholder="Enter symbol name...").upper().strip()
     with m_col2:
@@ -170,25 +166,30 @@ def render_inventory_matrix(all_symbols: list, session_history: dict, latest_dat
         )
     with m_col4:
         max_symbols = st.slider("Limit (Rows)", 10, 50, 15, 5)
+    with m_col5:
+        lookback_days = st.slider("Lookback (Days)", 5, 40, 15, 5)
+        
+    active_trading_dates = trading_dates[-lookback_days:]
+    start_date = active_trading_dates[0] if active_trading_dates else None
         
     db_service = DatabaseService()
     matrix_rows = []
     use_db = True
     
-    # Define index ticker sets for filtering
-    index_tickers = {"NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY", "NIFTYNXT50"}
+    # Index ticker set for instrument-type filtering
+    index_tickers = frozenset(INDEX_SYMBOLS)
     
     try:
-        df = db_service.get_matrix_data(search_query)
+        df = db_service.get_matrix_data(search_query, start_date=start_date)
         if not df.empty:
             # Group by symbol & date lookup
             lookup = {}
-            for _, r in df.iterrows():
-                sym = r["symbol"]
-                dt = r["date"]
+            for row in df.to_dict(orient="records"):
+                sym = row["symbol"]
+                dt = row["date"]
                 if sym not in lookup:
                     lookup[sym] = {}
-                lookup[sym][dt] = r.to_dict()
+                lookup[sym][dt] = row
                 
             db_symbols = df["symbol"].unique()
             for sym in db_symbols:
@@ -288,7 +289,7 @@ def render_inventory_matrix(all_symbols: list, session_history: dict, latest_dat
         st.warning("No symbols match your filters.")
     else:
         # Generate the Custom HTML Grid Matrix
-        dates_headers_html = "".join([f"<th>{datetime.strptime(d, '%Y-%m-%d').strftime('%d %b')}</th>" for d in trading_dates])
+        dates_headers_html = "".join([f"<th>{datetime.strptime(d, '%Y-%m-%d').strftime('%d %b')}</th>" for d in active_trading_dates])
         
         table_rows_html = ""
         for row in sliced_rows:
@@ -330,7 +331,7 @@ def render_inventory_matrix(all_symbols: list, session_history: dict, latest_dat
                 
             # Compile individual date cells for this symbol
             date_cells_html = ""
-            for d in trading_dates:
+            for d in active_trading_dates:
                 d_metrics = row["metrics"].get(d, {})
                 if not d_metrics:
                     date_cells_html += "<td>-</td>"
@@ -365,8 +366,16 @@ def render_inventory_matrix(all_symbols: list, session_history: dict, latest_dat
                     buildup_color = "#7888aa"  # Slate Grey
                 
                 # Volume calculations for bottom micro-bar
-                delta_vol = float(d_metrics.get("delta_volume", 0.0))
-                tot_vol = float(d_metrics.get("total_volume", 0.0))
+                try:
+                    delta_vol = float(d_metrics.get("delta_volume") or 0.0)
+                except (ValueError, TypeError):
+                    delta_vol = 0.0
+                    
+                try:
+                    tot_vol = float(d_metrics.get("total_volume") or 0.0)
+                except (ValueError, TypeError):
+                    tot_vol = 0.0
+                    
                 vol_ratio = min(100.0, max(0.0, abs(delta_vol) / (tot_vol + 1.0) * 100.0))
                 bar_color = "#10b981" if delta_vol >= 0 else "#ef4444"
                 
@@ -408,6 +417,11 @@ def render_inventory_matrix(all_symbols: list, session_history: dict, latest_dat
                 )
                 
             # Render Row
+            try:
+                spot_cl_latest = float(row['metrics'].get(latest_date, {}).get('spot_close') or 0.0)
+            except (ValueError, TypeError):
+                spot_cl_latest = 0.0
+                
             table_rows_html += f"""
             <tr>
               <td class="{sym_cell_class}" style="padding: 10px 12px;">
@@ -415,7 +429,7 @@ def render_inventory_matrix(all_symbols: list, session_history: dict, latest_dat
                   <span style="font-size: 13px; font-weight: 800; color: #ffffff; letter-spacing: 0.5px;">{sym}</span>
                   {pulse_dot_html}
                 </div>
-                <div style="font-size: 9px; color:#4a5a8a; margin-bottom: 3px; font-family: 'JetBrains Mono', monospace;">Latest: ₹{row['metrics'][latest_date]['spot_close']:,.2f}</div>
+                <div style="font-size: 9px; color:#4a5a8a; margin-bottom: 3px; font-family: 'JetBrains Mono', monospace;">Latest: ₹{spot_cl_latest:,.2f}</div>
                 <div style="font-size: 9px; color:#a78bfa; font-weight:700; background: rgba(167, 139, 250, 0.08); border: 1px solid rgba(167, 139, 250, 0.18); border-radius: 3px; padding: 1.5px 5px; display: inline-block; font-family: 'JetBrains Mono', monospace;">Pty: {row['PRIORITY_SCORE']:.1f}</div>
               </td>
               <td><span style="font-family:'JetBrains Mono'; font-weight:bold; font-size:12px; color:{'#10b981' if ifs_lat >= 0 else '#ef4444'}">{ifs_lat:+.1f}</span></td>
@@ -440,100 +454,6 @@ def render_inventory_matrix(all_symbols: list, session_history: dict, latest_dat
             </tbody>
           </table>
         </div>
-        """)
-        
-        render_html(r"""
-        <script>
-        (function() {
-            function getCellValueForSort(cell, colIndex) {
-                if (colIndex === 0) {
-                    const tickerSpan = cell.querySelector("span[style*='font-weight: 800']");
-                    return tickerSpan ? tickerSpan.innerText.trim() : cell.innerText.trim();
-                } else if (colIndex === 1) {
-                    return parseFloat(cell.innerText.trim()) || 0;
-                } else if (colIndex === 2) {
-                    const badge = cell.querySelector(".persistence-badge");
-                    if (badge) {
-                        const txt = badge.innerText.trim();
-                        if (txt.includes("Transition")) return 1000;
-                        const match = txt.match(/\d+/);
-                        let val = match ? parseInt(match[0]) : 0;
-                        if (txt.includes("Bear")) val = -val;
-                        return val;
-                    }
-                    return 0;
-                } else {
-                    const valDiv = cell.querySelector("div > div:nth-child(2)");
-                    if (valDiv) {
-                        const num = parseFloat(valDiv.innerText);
-                        return isNaN(num) ? 0 : num;
-                    }
-                    return 0;
-                }
-            }
-
-            function sortMatrixTable(colIndex) {
-                const table = document.querySelector(".matrix-table");
-                if (!table) return;
-                const tbody = table.querySelector("tbody");
-                const rows = Array.from(tbody.querySelectorAll("tr"));
-                
-                let isAsc = table.dataset.sortedCol === String(colIndex) && table.dataset.sortedAsc === "true";
-                let nextAsc = !isAsc;
-                table.dataset.sortedCol = colIndex;
-                table.dataset.sortedAsc = nextAsc ? "true" : "false";
-                
-                rows.sort((a, b) => {
-                    const aCell = a.cells[colIndex];
-                    const bCell = b.cells[colIndex];
-                    if (!aCell || !bCell) return 0;
-                    
-                    const aVal = getCellValueForSort(aCell, colIndex);
-                    const bVal = getCellValueForSort(bCell, colIndex);
-                    
-                    if (typeof aVal === "number" && typeof bVal === "number") {
-                        return nextAsc ? aVal - bVal : bVal - aVal;
-                    } else {
-                        return nextAsc ? String(aVal).localeCompare(String(bVal)) : String(bVal).localeCompare(String(aVal));
-                    }
-                });
-                
-                rows.forEach(row => tbody.appendChild(row));
-                
-                const headers = table.querySelectorAll("th");
-                headers.forEach((h, idx) => {
-                    let text = h.innerText.replace(" ▲", "").replace(" ▼", "");
-                    if (idx === colIndex) {
-                        h.innerText = text + (nextAsc ? " ▲" : " ▼");
-                    } else {
-                        h.innerText = text;
-                    }
-                });
-            }
-
-            function initSort() {
-                const table = document.querySelector(".matrix-table");
-                if (!table) {
-                    setTimeout(initSort, 100);
-                    return;
-                }
-                
-                if (table.dataset.sortInitialized === "true") return;
-                table.dataset.sortInitialized = "true";
-                
-                const headers = table.querySelectorAll("th");
-                headers.forEach((header, index) => {
-                    header.style.cursor = "pointer";
-                    header.title = "Click to sort by this column";
-                    header.addEventListener("click", () => {
-                        sortMatrixTable(index);
-                    });
-                });
-            }
-            
-            setTimeout(initSort, 100);
-        })();
-        </script>
         """)
         
         render_html("""

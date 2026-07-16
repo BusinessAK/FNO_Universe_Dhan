@@ -41,8 +41,9 @@ class SignalGenerator:
             inv_points = min(30, (abs(row['NET_INV_SHIFT']) / 5e6) * 30)
             
             # 3. IV Shift Score (Max 15)
-            # 5% IV shift day over day is massive panic/greed.
-            iv_points = min(15, (abs(row['IV_SHIFT']) / 5.0) * 15)
+            # IV_SHIFT is in decimal vol units: 0.05 = 5 IV points, a massive
+            # day-over-day panic/greed move.
+            iv_points = min(15, (abs(row['IV_SHIFT']) / 0.05) * 15)
             
             # 4. Spot Price Shift (Max 15)
             # 4% move confirms a massive breakout.
@@ -63,7 +64,7 @@ class SignalGenerator:
         df_final['Δ GEX (Lakhs)'] = (df_final['GEX_SHIFT'] / 1e5).round(2)
         df_final['Δ CALL OI'] = (df_final['CHG_IN_OI_CE_T'] / 100000).round(1).astype(str) + "L"
         df_final['Δ PUT OI'] = (df_final['CHG_IN_OI_PE_T'] / 100000).round(1).astype(str) + "L"
-        df_final['Δ IV %'] = df_final['IV_SHIFT'].round(2).astype(str) + "%"
+        df_final['Δ IV %'] = (df_final['IV_SHIFT'] * 100).round(2).astype(str) + "%"
         df_final['CALL_WALL'] = df_final['CALL_WALL_T']
         df_final['PUT_WALL'] = df_final['PUT_WALL_T']
         df_final['GAMMA_FLIP'] = df_final['GAMMA_FLIP_T']

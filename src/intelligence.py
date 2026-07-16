@@ -5,10 +5,210 @@ from src.processor import DataProcessor
 from src.greeks_engine import GreeksEngine
 from src.analyzer import GammaAnalyzer
 
+# Flow classification thresholds
+FLOW_QUIET_OI_FRAC = 0.02   # gross OI churn this small means the chain barely traded
+FLOW_NET_VS_GROSS = 0.20    # net must be this share of gross to claim a direction
+FLOW_VOTE_MAJORITY = 0.60   # winning premium direction must carry this share of the OI
+
+
 class InstitutionalIntelligence:
     def __init__(self):
         self.processor = DataProcessor()
         self.engine = GreeksEngine()
+
+    @staticmethod
+    def classify_oi_flow(df_opt: pd.DataFrame) -> pd.DataFrame:
+        """
+        Classify per-symbol CE/PE flow from the option's OWN premium change.
+
+        Whether new OI is buying or writing is only decidable from the price of the
+        contract being traded, so this applies the standard OI matrix to the option
+        itself rather than inferring it from the underlying's move:
+
+            OI up   + premium up   -> Long Build-up  (buying)
+            OI up   + premium down -> Short Build-up (writing)
+            OI down + premium down -> Long Unwinding
+            OI down + premium up   -> Short Covering
+
+        Reading it off the spot instead only holds while IV is flat: on a down day
+        with collapsing IV, put premiums fall while spot falls, which is writing
+        being mislabelled as buying.
+
+        Direction is an OI-weighted vote on the SIGN of each strike's premium change.
+        Voting on signs rather than averaging the changes keeps one illiquid strike
+        with a stale previous close from outvoting the liquid body of the chain.
+        """
+        need = {'SYMBOL', 'OPTION_TYP', 'CLOSE', 'PREV_CLOSE', 'OPEN_INT', 'CHG_IN_OI', 'VOLUME'}
+        missing = need - set(df_opt.columns)
+        if missing:
+            raise KeyError(f"classify_oi_flow requires columns {sorted(missing)}")
+
+        def classify_side(g: pd.DataFrame, side: str) -> str:
+            chain_oi = g['OPEN_INT'].sum()
+            if chain_oi <= 0:
+                return "Neutral"
+
+            # An untraded strike's close is stale, so it neither counts as flow nor votes.
+            traded = g[g['VOLUME'] > 0]
+            net_oi_chg = g['CHG_IN_OI'].sum()
+            gross_oi_chg = traded['CHG_IN_OI'].abs().sum()
+
+            if gross_oi_chg < FLOW_QUIET_OI_FRAC * chain_oi:
+                return "Neutral"
+            # Heavy flow that nets to nothing is two-way churn, not conviction. Judging
+            # on net alone would report a direction that the gross flow does not support.
+            if abs(net_oi_chg) < FLOW_NET_VS_GROSS * gross_oi_chg:
+                return "Two-Sided Churn"
+
+            building = net_oi_chg > 0
+            # Only the strikes moving in the net direction inform what that net is.
+            legs = traded[(traded['CHG_IN_OI'] > 0) if building else (traded['CHG_IN_OI'] < 0)]
+            if legs.empty:
+                return "Neutral"
+
+            weight = legs['CHG_IN_OI'].abs()
+            prem_chg = legs['CLOSE'] - legs['PREV_CLOSE']
+            up = weight[prem_chg > 0].sum()
+            down = weight[prem_chg < 0].sum()
+            decided = up + down
+            if decided <= 0:
+                return "Neutral"
+
+            up_frac = up / decided
+            if up_frac >= FLOW_VOTE_MAJORITY:
+                prem_up = True
+            elif (1 - up_frac) >= FLOW_VOTE_MAJORITY:
+                prem_up = False
+            else:
+                return "Mixed Build-up" if building else "Mixed Unwind"
+
+            if building:
+                return f"{side} Buying (Long Build-up)" if prem_up else f"{side} Writing (Short Build-up)"
+            return "Short Covering" if prem_up else "Long Unwinding"
+
+        rows = {}
+        for (symbol, opt_typ), g in df_opt.groupby(['SYMBOL', 'OPTION_TYP']):
+            if opt_typ not in ('CE', 'PE'):
+                continue
+            col = 'CE_INTERP' if opt_typ == 'CE' else 'PE_INTERP'
+            rows.setdefault(symbol, {})[col] = classify_side(g, 'Call' if opt_typ == 'CE' else 'Put')
+
+        out = pd.DataFrame.from_dict(rows, orient='index')
+        out.index.name = 'SYMBOL'
+        for col in ('CE_INTERP', 'PE_INTERP'):
+            if col not in out.columns:
+                out[col] = "Neutral"
+        return out[['CE_INTERP', 'PE_INTERP']].fillna("Neutral")
+
+    @staticmethod
+    def verified_oi_flow(df_opt: pd.DataFrame) -> pd.DataFrame:
+        """
+        Premium-verified per-symbol net OI flow, in the same units (shares of OI
+        change) as the raw CHG_IN_OI it replaces, but signed from the option's own
+        premium move instead of assumed from OI direction alone.
+
+        An option's premium direction alone carries the informational content
+        regardless of whether OI is building or unwinding: a put getting more
+        expensive is bearish news whether that came from fresh buying or from
+        writers stepping away, and a put getting cheaper is bullish news whether
+        that came from fresh writing or from buyers giving up (mirrored for
+        calls). So every state collapses to one rule, verified against all four
+        OI-direction x premium-direction combinations before being written here:
+
+            CE contribution = +sign(premium_chg) * |CHG_IN_OI|
+            PE contribution = -sign(premium_chg) * |CHG_IN_OI|
+
+        Untraded strikes (VOLUME == 0) have a stale close and are excluded, same
+        as classify_oi_flow. A flat premium contributes zero. Genuine two-way
+        churn cancels out through the per-strike sign rather than needing a
+        separate churn/neutral special case — unlike classify_oi_flow, this is a
+        continuous magnitude, not a categorical label, so partial conviction
+        should shrink the number rather than being collapsed to "Neutral".
+        """
+        need = {'SYMBOL', 'OPTION_TYP', 'CLOSE', 'PREV_CLOSE', 'CHG_IN_OI', 'VOLUME'}
+        missing = need - set(df_opt.columns)
+        if missing:
+            raise KeyError(f"verified_oi_flow requires columns {sorted(missing)}")
+
+        traded = df_opt[df_opt['VOLUME'] > 0].copy()
+        prem_sign = np.sign(traded['CLOSE'] - traded['PREV_CLOSE'])
+        side_sign = np.where(traded['OPTION_TYP'] == 'CE', 1.0,
+                              np.where(traded['OPTION_TYP'] == 'PE', -1.0, 0.0))
+        traded['VERIFIED_FLOW'] = side_sign * prem_sign * traded['CHG_IN_OI'].abs()
+
+        out = traded.groupby(['SYMBOL', 'OPTION_TYP'])['VERIFIED_FLOW'].sum().unstack(fill_value=0.0)
+        out = out.reindex(columns=['CE', 'PE'], fill_value=0.0)
+        out.columns = ['VERIFIED_CE_FLOW', 'VERIFIED_PE_FLOW']
+        # Every symbol present in the input gets a row, even one with zero
+        # traded strikes (e.g. a symbol that hasn't traded at all today) — same
+        # guarantee classify_oi_flow makes, so callers never need a defensive
+        # fillna just to look a known symbol up.
+        return out.reindex(df_opt['SYMBOL'].unique(), fill_value=0.0)
+
+    @staticmethod
+    def compute_walls_and_flip(greeks_df: pd.DataFrame, spot_prices: dict) -> dict:
+        """
+        Per-symbol call_wall/put_wall/gamma_flip from GEX, not raw OI (which
+        includes dead deep-OTM strikes). Wall = the strike carrying the most
+        dealer gamma risk on that side. Gamma flip = the strike where BOTH
+        sides' dealer gamma risk peaks simultaneously — the strike dealers are
+        forced to actively hedge both ways around.
+
+        Shared by the EOD compiler (analyze_market_structure below) and the
+        live structure engine (src/live/live_compute.py) so the two paths
+        computing this from either bhav closes or live ticks can never
+        silently diverge on the math itself.
+
+        greeks_df: SYMBOL, STRIKE_PR, OPTION_TYP, GAMMA, OPEN_INT columns —
+        the shape GreeksEngine.process_dataframe emits.
+        Returns {symbol: {"call_wall": float, "put_wall": float, "gamma_flip": float}}.
+        """
+        if greeks_df.empty:
+            return {}
+        df = greeks_df.copy()
+        df['SPOT'] = df['SYMBOL'].map(spot_prices)
+        df['MULTIPLIER'] = df['OPTION_TYP'].apply(lambda x: 1 if x == 'CE' else -1)
+        df['GEX'] = df['GAMMA'] * df['OPEN_INT'] * df['SPOT'].fillna(0.0) * 0.01 * df['MULTIPLIER']
+
+        out = {}
+        for symbol, group in df.groupby('SYMBOL'):
+            ce_gex = group[group['OPTION_TYP'] == 'CE'].groupby('STRIKE_PR')['GEX'].sum()
+            pe_gex = group[group['OPTION_TYP'] == 'PE'].groupby('STRIKE_PR')['GEX'].sum().abs()
+
+            ce_gex_pos = ce_gex[ce_gex > 0]
+            pe_gex_pos = pe_gex[pe_gex > 0]
+            call_wall = float(ce_gex_pos.idxmax()) if not ce_gex_pos.empty else 0.0
+            put_wall = float(pe_gex_pos.idxmax()) if not pe_gex_pos.empty else 0.0
+
+            overlap = pd.concat([ce_gex, pe_gex], axis=1).min(axis=1)
+            overlap_pos = overlap[overlap > 0]
+            gamma_flip = float(overlap_pos.idxmax()) if not overlap_pos.empty else 0.0
+
+            out[symbol] = {"call_wall": call_wall, "put_wall": put_wall, "gamma_flip": gamma_flip}
+        return out
+
+    @staticmethod
+    def gamma_regime(spot: float, gamma_flip: float, gex_total: float) -> str:
+        """
+        Scale-free gamma regime: spot vs gamma flip (absolute GEX thresholds
+        aren't comparable across symbols of very different notional size).
+        0.8% band around the flip reads as TRANSITION_REGIME rather than
+        flapping LONG/SHORT on noise right at the pivot.
+
+        Shared by daily_compiler.py (EOD), src/core/market_structure_engine.py
+        (time-travel recompute), and the live structure engine — one formula,
+        three callers, so they can never silently diverge.
+        """
+        if gamma_flip > 0 and spot > 0:
+            if abs(spot - gamma_flip) / spot <= 0.008:
+                return "TRANSITION_REGIME"
+            return "LONG_GAMMA" if spot > gamma_flip else "SHORT_GAMMA"
+        # Fallback when no flip strike exists: legacy GEX thresholds
+        if gex_total > 200000:
+            return "LONG_GAMMA"
+        if gex_total < -10000:
+            return "SHORT_GAMMA"
+        return "TRANSITION_REGIME"
 
     def analyze_market_structure(self, file_t, file_t_minus_1):
         print(f"[*] Deep Dive Analysis: {os.path.basename(file_t)} vs {os.path.basename(file_t_minus_1)}")
@@ -46,16 +246,31 @@ class InstitutionalIntelligence:
 
         # 4. Detailed Interpretation (Call/Put breakdown)
         def get_detailed_metrics(df_greeks, spots):
+            # OI-weighted IV: an unweighted mean lets dust — deep-OTM strikes that
+            # often carry a hardcoded 0.20 fallback IV — pull the aggregate as hard
+            # as the liquid, OI-heavy strikes that actually drive the chain.
+            # Measured: NIFTY's unweighted mean IV was 2x its OI-weighted true IV.
+            df_greeks = df_greeks.copy()
+            df_greeks['IV_X_OI'] = df_greeks['IV'] * df_greeks['OPEN_INT']
+
             summary = df_greeks.groupby(['SYMBOL', 'OPTION_TYP']).agg({
                 'OPEN_INT': 'sum',
                 'CHG_IN_OI': 'sum',
                 'VOLUME': 'sum',
-                'IV': 'mean',
+                'IV_X_OI': 'sum',
                 'GAMMA': 'sum',
                 'CLOSE': 'mean' # Avg option price
             }).unstack()
             # Flatten columns: ('OPEN_INT', 'CE'), ('OPEN_INT', 'PE')
             summary.columns = [f"{c[0]}_{c[1]}" for c in summary.columns]
+
+            for side in ('CE', 'PE'):
+                oi_col, ivoi_col = f'OPEN_INT_{side}', f'IV_X_OI_{side}'
+                if oi_col in summary.columns and ivoi_col in summary.columns:
+                    summary[f'IV_{side}'] = (
+                        summary[ivoi_col] / summary[oi_col].replace(0, np.nan)
+                    ).fillna(0.0)
+                    summary = summary.drop(columns=[ivoi_col])
             return summary
 
         metrics_t = get_detailed_metrics(greeks_t, spots_t)
@@ -133,27 +348,22 @@ class InstitutionalIntelligence:
         # 2. Net Bullish Inventory Addition (Put OI added - Call OI added)
         final['NET_BULL_INV_SHIFT'] = final['CHG_IN_OI_PE_T'] - final['CHG_IN_OI_CE_T']
 
+        # Diagnostic only, not wired into NET_BULL_INV_SHIFT/IFS: a premium-verified
+        # read of the same flow (verified_oi_flow). A full-history forward-return
+        # backtest (src/research/ifs_verified_flow_backtest.py) showed it failing
+        # the same monotonicity gate flip_backtester.py uses, so production keeps
+        # the raw-OI-sign formula above despite its weaker economic justification —
+        # see data/research/ifs_verified_flow_validation.md for the full result.
+        verified_flow = self.verified_oi_flow(df_t)
+        final = final.join(verified_flow)
+        final['VERIFIED_CE_FLOW'] = final['VERIFIED_CE_FLOW'].fillna(0.0)
+        final['VERIFIED_PE_FLOW'] = final['VERIFIED_PE_FLOW'].fillna(0.0)
+
         # 6. Interpretation Logic
-        def interpret(row):
-            price_chg = row['SPOT_CHG_PCT']
-            
-            # CE Interpretation
-            ce_oi_chg = row['CHG_IN_OI_CE_T']
-            if price_chg > 0.5 and ce_oi_chg > 0: ce_interp = "Call Buying (Long Build-up)"
-            elif price_chg < -0.5 and ce_oi_chg > 0: ce_interp = "Call Writing (Short Build-up)"
-            elif price_chg > 0.5 and ce_oi_chg < 0: ce_interp = "Short Covering"
-            else: ce_interp = "Neutral / Unwinding"
-
-            # PE Interpretation
-            pe_oi_chg = row['CHG_IN_OI_PE_T']
-            if price_chg < -0.5 and pe_oi_chg > 0: pe_interp = "Put Buying (Long Build-up)"
-            elif price_chg > 0.5 and pe_oi_chg > 0: pe_interp = "Put Writing (Short Build-up)"
-            elif price_chg < -0.5 and pe_oi_chg < 0: pe_interp = "Short Covering"
-            else: pe_interp = "Neutral / Unwinding"
-
-            return ce_interp, pe_interp
-
-        final[['CE_INTERP', 'PE_INTERP']] = final.apply(lambda r: pd.Series(interpret(r)), axis=1)
+        flow = self.classify_oi_flow(df_t)
+        final = final.join(flow)
+        final['CE_INTERP'] = final['CE_INTERP'].fillna("Neutral")
+        final['PE_INTERP'] = final['PE_INTERP'].fillna("Neutral")
 
         # 7. Gamma Structure Change
         analyzer = GammaAnalyzer(lot_sizes=lots)
@@ -179,12 +389,14 @@ class InstitutionalIntelligence:
             if row['GEX_SHIFT'] < -1e8 and abs(row['SPOT_CHG_PCT']) > 1.0:
                 return "Option Buying (Momentum / Squeeze)"
             
-            # Bull Put Spread: Price Up + Put Writing
-            if row['SPOT_CHG_PCT'] > 0.5 and "Put Writing" in row['PE_INTERP']:
+            # Bull Put Spread: Put Writing. The spot direction is not re-checked here —
+            # PE_INTERP is now decided from the put's own premium, which already
+            # carries the direction the old SPOT_CHG_PCT gate was standing in for.
+            if "Put Writing" in row['PE_INTERP']:
                 return "Bull Put Spread (Credit)"
-                
-            # Bear Call Spread: Price Down + Call Writing
-            if row['SPOT_CHG_PCT'] < -0.5 and "Call Writing" in row['CE_INTERP']:
+
+            # Bear Call Spread: Call Writing
+            if "Call Writing" in row['CE_INTERP']:
                 return "Bear Call Spread (Credit)"
 
             return "Wait for Setup"
@@ -204,27 +416,14 @@ class InstitutionalIntelligence:
         greeks_t.to_csv("data/processed/greeks.csv", index=False)
         
         # --- OVERRIDE WALLS WITH GEX WALLS ---
-        # Instead of pure OI (which includes dead deep OTM strikes), 
-        # we calculate the walls based on where the highest Dealer Gamma Risk is concentrated.
-        for symbol, group in greeks_t.groupby('SYMBOL'):
-            ce_gex = group[group['OPTION_TYP'] == 'CE'].groupby('STRIKE_PR')['GEX'].sum()
-            pe_gex = group[group['OPTION_TYP'] == 'PE'].groupby('STRIKE_PR')['GEX'].sum().abs()
-            
-            # Max Positive GEX for Calls, Max Absolute GEX for Puts
-            # Filter to only strikes with meaningful GEX to avoid garbage idxmax() on zero-series
-            ce_gex_pos = ce_gex[ce_gex > 0]
-            pe_gex_pos = pe_gex[pe_gex > 0]
-            call_wall = ce_gex_pos.idxmax() if not ce_gex_pos.empty else 0
-            put_wall = pe_gex_pos.idxmax() if not pe_gex_pos.empty else 0
-            
-            # Gamma Flip: The strike with the highest overlapping Dealer Gamma Risk
-            overlap = pd.concat([ce_gex, pe_gex], axis=1).min(axis=1)
-            overlap_pos = overlap[overlap > 0]
-            gamma_flip = overlap_pos.idxmax() if not overlap_pos.empty else 0
-            
-            final.loc[final['SYMBOL'] == symbol, 'CALL_WALL_T'] = call_wall
-            final.loc[final['SYMBOL'] == symbol, 'PUT_WALL_T'] = put_wall
-            final.loc[final['SYMBOL'] == symbol, 'GAMMA_FLIP_T'] = gamma_flip
+        # Instead of pure OI (which includes dead deep OTM strikes), we calculate
+        # the walls based on where the highest Dealer Gamma Risk is concentrated.
+        # Shared with the live structure engine — see compute_walls_and_flip above.
+        walls_and_flip = self.compute_walls_and_flip(greeks_t, spots_t)
+        for symbol, wf in walls_and_flip.items():
+            final.loc[final['SYMBOL'] == symbol, 'CALL_WALL_T'] = wf['call_wall']
+            final.loc[final['SYMBOL'] == symbol, 'PUT_WALL_T'] = wf['put_wall']
+            final.loc[final['SYMBOL'] == symbol, 'GAMMA_FLIP_T'] = wf['gamma_flip']
 
         # ── Attach expiry rollover metadata ─────────────────────────────────────
         # Downstream (daily_compiler.py) reads these to persist the flag in

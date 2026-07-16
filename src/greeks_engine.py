@@ -135,37 +135,57 @@ class GreeksEngine:
         except (ValueError, RuntimeError):
             return 0.2  # Default fallback volatility 20%
 
-    def process_dataframe(self, df: pd.DataFrame, spot_prices: dict) -> pd.DataFrame:
+    def process_dataframe(self, df: pd.DataFrame, spot_prices: dict, wall_candidates: int = 5) -> pd.DataFrame:
         """
         Vectorized or efficient calculation for a dataframe with aggressive performance optimization.
+
+        wall_candidates: per (symbol, option type), this many of the largest-OI
+        strikes are always computed regardless of distance from spot (see the
+        15%-filter comment below for why).
         """
         results = []
-        
+
         # Filter for options only (UDiFF codes: STO, IDO)
         options_df = df[df['INSTRUMENT'].isin(['STO', 'IDO'])].copy()
-        
+
         # Calculate Time to Expiry (T) in years
         options_df['T'] = (options_df['EXPIRY_DT'] - options_df['TIMESTAMP']).dt.days / 365.0
-        
+
         # We only care about liquid-ish options or those with OI
         options_df = options_df[options_df['OPEN_INT'] > 0]
+
+        # The 15%-distance skip below exists purely to avoid slow, low-information
+        # Black-Scholes solves on deep-OTM dust — but callers (intelligence.py's
+        # wall/gamma-flip detection) only ever see strikes that make it out of this
+        # function. Skipping on distance alone can silently exclude a strike that
+        # carries real, large OI just because it happens to sit >15% out (common on
+        # low-priced names where one strike step is already a double-digit % move).
+        # Guarantee the top-N OI strikes per side are always computed, so a genuine
+        # wall is never invisible to what's built from this output.
+        top_oi_idx = (
+            options_df.groupby(['SYMBOL', 'OPTION_TYP'])['OPEN_INT']
+            .nlargest(wall_candidates)
+            .index.get_level_values(-1)
+        )
+        must_keep = set(top_oi_idx)
 
         for idx, row in options_df.iterrows():
             S = spot_prices.get(row['SYMBOL'])
             if not S or S <= 0:
                 continue
-            
+
             K = row['STRIKE_PR']
             T = row['T']
             price = row['CLOSE']
             opt_type = row['OPTION_TYP']
-            
-            # OPTIMIZATION: Filter out strikes that are more than 15% away from spot.
+
+            # OPTIMIZATION: Filter out strikes that are more than 15% away from spot,
+            # unless the strike is large enough OI to be a wall candidate (must_keep).
             # These far OTM/ITM strikes have essentially 0 Gamma, but their IV calculation
             # takes a huge amount of time because Brent fails to find roots.
-            if abs(K - S) / S > 0.15:
+            if abs(K - S) / S > 0.15 and idx not in must_keep:
                 continue
-                
+
             # OPTIMIZATION: Skip very cheap options as they are dead dust
             if price < 0.05:
                 iv = 0.20
