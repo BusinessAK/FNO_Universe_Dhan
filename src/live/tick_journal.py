@@ -12,6 +12,12 @@ import pandas as pd
 
 from src.live import config as C
 
+# Explicit, stable schema (TRD_fullmap_live_v1 §8 / V5): inferring columns from
+# whichever tick dicts land in a flush batch produced parquet parts with
+# inconsistent schemas — an all-price batch silently dropped the oi column for
+# the whole part, making OI-bearing replays impossible.
+JOURNAL_COLS = ["seg", "sid", "ts", "ltp", "vol", "atp", "oi"]
+
 
 class TickJournal:
     def __init__(self, date_str: str | None = None):
@@ -31,7 +37,8 @@ class TickJournal:
         rows, self._buf = self._buf, []
         self._part += 1
         try:
-            pd.DataFrame(rows).to_parquet(self.dir / f"part_{self._part:05d}.parquet", index=False)
+            df = pd.DataFrame(rows, columns=JOURNAL_COLS)
+            df.to_parquet(self.dir / f"part_{self._part:05d}.parquet", index=False)
         except Exception as e:                 # never let journaling kill the daemon
             print(f"[tick_journal] flush error (dropping {len(rows)} ticks): {e}")
 

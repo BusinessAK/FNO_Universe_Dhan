@@ -63,10 +63,18 @@ class StateStore:
         self._state(seg, sid).prev_close = prev_close
 
     def ingest(self, tick: dict) -> str | None:
-        """Update state from a tick. Returns the epoch-minute if a bar just closed."""
+        """Update state from a tick. Returns the epoch-minute if a bar just closed.
+
+        OI-only ticks (ltp=None, from standalone "OI Data" packets — the OI
+        update path under MODE_FULL) update oi + ts but never touch price,
+        OHLC, or bars. Dropping them entirely was the pre-full-map bug that
+        would have silently starved every OI-derived metric."""
         st = self._state(tick["seg"], tick["sid"])
         ltp = tick.get("ltp")
         if ltp is None or (isinstance(ltp, float) and math.isnan(ltp)):
+            if tick.get("oi") is not None:
+                st.oi = tick["oi"]
+                st.ts = tick.get("ts", st.ts)
             return None
         st.ltp, st.ts = ltp, tick.get("ts", st.ts)
         if tick.get("oi") is not None:

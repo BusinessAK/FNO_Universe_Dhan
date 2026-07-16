@@ -135,16 +135,125 @@ class GreeksEngine:
         except (ValueError, RuntimeError):
             return 0.2  # Default fallback volatility 20%
 
-    def process_dataframe(self, df: pd.DataFrame, spot_prices: dict, wall_candidates: int = 5) -> pd.DataFrame:
+    def implied_vol_vectorized(self, price, S, K, T, is_call,
+                               max_iter: int = 12, iv_tol: float = 1e-6):
         """
-        Vectorized or efficient calculation for a dataframe with aggressive performance optimization.
+        Newton-Raphson IV solve over numpy arrays, seeded with the
+        Brenner-Subrahmanyam approximation. Returns (iv, converged) — rows that
+        fail to converge get iv=NaN and converged=False, and the caller decides
+        the fallback (process_dataframe falls back to the scalar brentq path so
+        pathological rows keep byte-identical historical behavior).
+
+        Domain clamped to [0.001, 5.0] to mirror calculate_iv's brentq bracket.
+        """
+        price = np.asarray(price, dtype=float)
+        S = np.asarray(S, dtype=float)
+        K = np.asarray(K, dtype=float)
+        T = np.asarray(T, dtype=float)
+        is_call = np.asarray(is_call, dtype=bool)
+
+        iv = np.full(price.shape, np.nan)
+        converged = np.zeros(price.shape, dtype=bool)
+        valid = (price > 0) & (S > 0) & (K > 0) & (T > 0)
+        if not valid.any():
+            # mirror calculate_iv: invalid inputs -> 0.0, "converged" by definition
+            iv[~valid] = 0.0
+            converged[~valid] = True
+            return iv, converged
+
+        p, s, k, t, c = price[valid], S[valid], K[valid], T[valid], is_call[valid]
+        sqt = np.sqrt(t)
+        # Brenner-Subrahmanyam seed (ATM approx), clamped to the solve domain
+        sig = np.clip(np.sqrt(2.0 * np.pi / t) * p / s, 0.05, 3.0)
+        done = np.zeros(sig.shape, dtype=bool)
+
+        with np.errstate(divide="ignore", invalid="ignore", over="ignore"):
+            for _ in range(max_iter):
+                d1 = (np.log(s / k) + (self.r + 0.5 * sig ** 2) * t) / (sig * sqt)
+                d2 = d1 - sig * sqt
+                model = np.where(
+                    c,
+                    s * norm.cdf(d1) - k * np.exp(-self.r * t) * norm.cdf(d2),
+                    k * np.exp(-self.r * t) * norm.cdf(-d2) - s * norm.cdf(-d1),
+                )
+                diff = model - p
+                vega = s * norm.pdf(d1) * sqt
+                # Convergence is judged in IV units (|diff|/vega ~ IV error),
+                # not price units — an absolute price tol under-converges cheap
+                # contracts and over-demands precision on expensive ones.
+                done |= np.abs(diff) < np.maximum(vega * iv_tol, 1e-10)
+                if done.all():
+                    break
+                step = np.clip(diff / np.maximum(vega, 1e-10), -0.5, 0.5)
+                sig = np.where(done, sig, np.clip(sig - step, 0.001, 5.0))
+
+        out_iv = np.where(done, sig, np.nan)
+        iv[valid] = out_iv
+        converged[valid] = done
+        iv[~valid] = 0.0
+        converged[~valid] = True
+        return iv, converged
+
+    def greeks_vectorized(self, S, K, T, sigma, is_call) -> dict:
+        """
+        all_greeks() over numpy arrays — same formulas, same per-day / per-1%
+        scalings. Rows failing all_greeks' validity guard (T<=0, sigma<=0,
+        S<=0, K<=0) get all-zero greeks, exactly like the scalar path.
+        """
+        S = np.asarray(S, dtype=float)
+        K = np.asarray(K, dtype=float)
+        T = np.asarray(T, dtype=float)
+        sigma = np.asarray(sigma, dtype=float)
+        is_call = np.asarray(is_call, dtype=bool)
+
+        ok = (T > 0) & (sigma > 0) & (S > 0) & (K > 0)
+        z = np.zeros(S.shape)
+        res = {g: z.copy() for g in
+               ('DELTA', 'GAMMA', 'VEGA', 'THETA', 'RHO', 'VANNA', 'CHARM', 'VOMMA')}
+        if not ok.any():
+            return res
+
+        s, k, t, sig, c = S[ok], K[ok], T[ok], sigma[ok], is_call[ok]
+        sqt = np.sqrt(t)
+        d1 = (np.log(s / k) + (self.r + 0.5 * sig ** 2) * t) / (sig * sqt)
+        d2 = d1 - sig * sqt
+        pdf1, cdf1, cdf2 = norm.pdf(d1), norm.cdf(d1), norm.cdf(d2)
+        disc = np.exp(-self.r * t)
+
+        res['DELTA'][ok] = np.where(c, cdf1, cdf1 - 1.0)
+        res['GAMMA'][ok] = pdf1 / (s * sig * sqt)
+        vega = s * pdf1 * sqt / 100.0
+        res['VEGA'][ok] = vega
+        theta = np.where(
+            c,
+            -(s * pdf1 * sig) / (2.0 * sqt) - self.r * k * disc * cdf2,
+            -(s * pdf1 * sig) / (2.0 * sqt) + self.r * k * disc * norm.cdf(-d2),
+        )
+        res['THETA'][ok] = theta / 365.0
+        rho = np.where(c, k * t * disc * cdf2, -k * t * disc * norm.cdf(-d2))
+        res['RHO'][ok] = rho / 100.0
+        res['VANNA'][ok] = -pdf1 * d2 / sig
+        res['CHARM'][ok] = -pdf1 * (self.r / (sig * sqt) - d2 / (2.0 * t)) / 365.0
+        res['VOMMA'][ok] = vega * d1 * d2 / sig
+        return res
+
+    def process_dataframe(self, df: pd.DataFrame, spot_prices: dict, wall_candidates: int = 5,
+                          iv_method: str = "vectorized") -> pd.DataFrame:
+        """
+        IV + Greeks for a normalized option chain frame.
+
+        iv_method:
+          "vectorized" (default) — Newton-Raphson over the whole frame
+              (~1000x faster; F0-parity-gated vs brentq at |dIV| <= 1e-4);
+              rows that fail to converge fall back to the scalar path below,
+              so pathological rows keep historical brentq-or-0.2 behavior.
+          "scalar" — the original per-row brentq loop, kept as the parity
+              referee and as the fallback implementation.
 
         wall_candidates: per (symbol, option type), this many of the largest-OI
         strikes are always computed regardless of distance from spot (see the
         15%-filter comment below for why).
         """
-        results = []
-
         # Filter for options only (UDiFF codes: STO, IDO)
         options_df = df[df['INSTRUMENT'].isin(['STO', 'IDO'])].copy()
 
@@ -169,47 +278,85 @@ class GreeksEngine:
         )
         must_keep = set(top_oi_idx)
 
-        for idx, row in options_df.iterrows():
-            S = spot_prices.get(row['SYMBOL'])
-            if not S or S <= 0:
-                continue
+        # Shared row selection (both methods must see identical rows):
+        # drop symbols without a positive spot; apply the 15%-distance filter
+        # below, except for must_keep wall candidates.
+        options_df['SPOT_LK'] = options_df['SYMBOL'].map(spot_prices)
+        options_df = options_df[options_df['SPOT_LK'].fillna(0) > 0]
 
-            K = row['STRIKE_PR']
-            T = row['T']
-            price = row['CLOSE']
-            opt_type = row['OPTION_TYP']
+        # OPTIMIZATION: Filter out strikes that are more than 15% away from spot,
+        # unless the strike is large enough OI to be a wall candidate (must_keep).
+        # These far OTM/ITM strikes have essentially 0 Gamma, but their IV calculation
+        # takes a huge amount of time because the root solve struggles.
+        near = (options_df['STRIKE_PR'] - options_df['SPOT_LK']).abs() / options_df['SPOT_LK'] <= 0.15
+        keep = near | options_df.index.isin(must_keep)
+        options_df = options_df[keep]
 
-            # OPTIMIZATION: Filter out strikes that are more than 15% away from spot,
-            # unless the strike is large enough OI to be a wall candidate (must_keep).
-            # These far OTM/ITM strikes have essentially 0 Gamma, but their IV calculation
-            # takes a huge amount of time because Brent fails to find roots.
-            if abs(K - S) / S > 0.15 and idx not in must_keep:
-                continue
+        if options_df.empty:
+            return pd.DataFrame()
 
-            # OPTIMIZATION: Skip very cheap options as they are dead dust
-            if price < 0.05:
-                iv = 0.20
+        if iv_method == "vectorized":
+            iv = self._iv_block_vectorized(options_df)
+        else:
+            iv = self._iv_block_scalar(options_df)
+
+        is_call = (options_df['OPTION_TYP'] == 'CE').to_numpy()
+        greeks = self.greeks_vectorized(
+            options_df['SPOT_LK'].to_numpy(), options_df['STRIKE_PR'].to_numpy(),
+            options_df['T'].to_numpy(), iv, is_call)
+
+        out = pd.DataFrame({
+            'SYMBOL': options_df['SYMBOL'].to_numpy(),
+            'STRIKE_PR': options_df['STRIKE_PR'].to_numpy(),
+            'OPTION_TYP': options_df['OPTION_TYP'].to_numpy(),
+            'EXPIRY_DT': options_df['EXPIRY_DT'].to_numpy(),
+            'IV': iv,
+            'DELTA': greeks['DELTA'],
+            'GAMMA': greeks['GAMMA'],
+            'VEGA': greeks['VEGA'],
+            'THETA': greeks['THETA'],
+            'VANNA': greeks['VANNA'],
+            'CHARM': greeks['CHARM'],
+            'OPEN_INT': options_df['OPEN_INT'].to_numpy(),
+            'CHG_IN_OI': options_df['CHG_IN_OI'].to_numpy(),
+            'VOLUME': (options_df['VOLUME'] if 'VOLUME' in options_df else
+                       pd.Series(0, index=options_df.index)).to_numpy(),
+            'CLOSE': options_df['CLOSE'].to_numpy(),
+        })
+        return out.reset_index(drop=True)
+
+    # ── IV blocks (row selection already done by process_dataframe) ─────────
+
+    def _iv_block_scalar(self, odf: pd.DataFrame) -> np.ndarray:
+        """Original behavior: dust (<0.05) pinned at 20% IV, else brentq
+        (with its internal brentq-failure -> 0.2 fallback)."""
+        ivs = np.empty(len(odf))
+        for i, row in enumerate(odf.itertuples()):
+            if row.CLOSE < 0.05:
+                ivs[i] = 0.20
             else:
-                iv = self.calculate_iv(price, S, K, T, opt_type)
-                
-            greeks = self.all_greeks(S, K, T, iv, opt_type)
-            
-            results.append({
-                'SYMBOL': row['SYMBOL'],
-                'STRIKE_PR': K,
-                'OPTION_TYP': opt_type,
-                'EXPIRY_DT': row['EXPIRY_DT'],
-                'IV': iv,
-                'DELTA': greeks['DELTA'],
-                'GAMMA': greeks['GAMMA'],
-                'VEGA': greeks['VEGA'],
-                'THETA': greeks['THETA'],
-                'VANNA': greeks['VANNA'],
-                'CHARM': greeks['CHARM'],
-                'OPEN_INT': row['OPEN_INT'],
-                'CHG_IN_OI': row['CHG_IN_OI'],
-                'VOLUME': row.get('VOLUME', 0),
-                'CLOSE': row['CLOSE']
-            })
-            
-        return pd.DataFrame(results)
+                ivs[i] = self.calculate_iv(row.CLOSE, row.SPOT_LK, row.STRIKE_PR,
+                                           row.T, row.OPTION_TYP)
+        return ivs
+
+    def _iv_block_vectorized(self, odf: pd.DataFrame) -> np.ndarray:
+        """Newton over the whole block; dust pinned at 20% exactly like the
+        scalar path; non-converged rows fall back to scalar brentq so the
+        pathological tail keeps byte-identical historical behavior."""
+        price = odf['CLOSE'].to_numpy(dtype=float)
+        S = odf['SPOT_LK'].to_numpy(dtype=float)
+        K = odf['STRIKE_PR'].to_numpy(dtype=float)
+        T = odf['T'].to_numpy(dtype=float)
+        is_call = (odf['OPTION_TYP'] == 'CE').to_numpy()
+
+        dust = price < 0.05
+        iv, converged = self.implied_vol_vectorized(price, S, K, T, is_call)
+        iv[dust] = 0.20
+
+        fallback = ~converged & ~dust
+        if fallback.any():
+            sub = odf[fallback]
+            iv[fallback] = [self.calculate_iv(r.CLOSE, r.SPOT_LK, r.STRIKE_PR,
+                                              r.T, r.OPTION_TYP)
+                            for r in sub.itertuples()]
+        return iv

@@ -60,7 +60,7 @@ Runs as the last step of the nightly chain (PRD §7).
 1. Parse bhav option rows (`FinInstrmTp ∈ {STO, IDO}`). Schema-validate column names; on mismatch emit a schema diff report and **reuse the previous manifest** with `stale_manifest=true` (N10).
 2. Rank strikes by `OpnIntrst` descending; take the prefix reaching `OI_COVERAGE = 0.995` of total OI (~12k on current data).
 3. Add zero-OI buffer: for every one of the 215 names, ±`ATM_BUFFER = 5` strikes around prior close, front expiry (both sides), if not already selected.
-4. Add every strike of any name with an armed setup (full front-expiry chain for those names — they are tonight's hot list).
+4. Add a **wider ATM window** (±12 strikes, `ARMED_WINDOW`) for every name with an armed setup. *(Amended during build: 186/215 names arm daily on this platform, so "armed" is not a hot list and the originally-specified full-chain rule blows the size bounds — measured 31.7k. Trigger/invalidation levels are near ATM by construction, so the window carries the same information.)*
 5. Rollover rule (N6): if front expiry ≤ T+1, select from *next* expiry as well for that name (both series live on expiry eve; dead series dropped at expiry date).
 6. Map `(symbol, expiry, strike, type)` → `(segment, security_id)` via instrument master. **Unmapped rows are logged, never silently dropped**; > 1% unmapped aborts to previous manifest (mapping drift = corporate-action signal).
 7. Emit `data/live/ws_manifest_<date>.parquet` with columns `seg, sid, symbol, expiry, strike, otype, oi_baseline, close_baseline, reason ∈ {oi_set, atm_buffer, armed, rollover}` + a JSON coverage report (counts, % OI covered, conns needed).

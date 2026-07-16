@@ -29,6 +29,15 @@ STRIKE_WINDOW_INDEX = 20       # wider for dense weekly index chains
 RECENTER_DRIFT = 0.5           # re-center window when spot drifts > this * window width
 TOP_N_LIVE_OPTIONS = 60        # cap live-options names to top-N by OI + indices + armed setups
 
+# ── Full-map manifest (TRD_fullmap_live_v1 §2) ───────────────────────────────
+OI_COVERAGE = 0.995            # strikes covering this share of prior-day total OI
+OI_COVERAGE_FALLBACK = 0.99    # one retry at this coverage if the manifest overflows
+ATM_BUFFER = 5                 # ±zero-OI strikes around prior close per name
+ARMED_WINDOW = 12              # ±strikes for armed-setup names (NOT full chain —
+                               # 186/215 names arm daily, "armed" is not a hot list)
+MANIFEST_MIN = 8000            # below this the map is suspiciously small (N11)
+MANIFEST_MAX = 15000           # above this we won't fit 3 conns comfortably
+
 INDEX_SYMBOLS = ["NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY", "NIFTYNXT50"]
 
 # ── Market hours (IST) ───────────────────────────────────────────────────────

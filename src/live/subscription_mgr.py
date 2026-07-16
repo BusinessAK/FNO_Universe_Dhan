@@ -36,7 +36,11 @@ class SubscriptionManager:
                 out.append((int(row["feed_segment"]), str(row["security_id"]), mode))
         return out
 
-    def futures_manifest(self, underlyings: list[str], mode: int = C.MODE_QUOTE) -> list[tuple]:
+    # F&O default is FULL, not QUOTE: Dhan's Quote packet carries NO OI field
+    # (SDK-verified, TRD_fullmap_live_v1 §0 V6) — a Quote-mode F&O subscription
+    # silently starves every OI-derived metric. Observed live 2026-07-16:
+    # ~1.15M ticks, zero OI all day.
+    def futures_manifest(self, underlyings: list[str], mode: int = C.MODE_FULL) -> list[tuple]:
         out = []
         for u in underlyings:
             fut = self.im.futures(u)
@@ -46,7 +50,7 @@ class SubscriptionManager:
                 out.append((C.SEG_NSE_FNO, str(int(r.security_id)), mode))
         return out
 
-    def options_manifest(self, name_spots: dict[str, float], mode: int = C.MODE_QUOTE) -> list[tuple]:
+    def options_manifest(self, name_spots: dict[str, float], mode: int = C.MODE_FULL) -> list[tuple]:
         """Near-ATM CE/PE for each name in name_spots={symbol: live_spot} (M2)."""
         out = []
         for sym, spot in name_spots.items():
