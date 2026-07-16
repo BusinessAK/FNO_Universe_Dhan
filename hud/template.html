@@ -243,6 +243,10 @@ figure figcaption{font-size:10px;color:var(--muted);letter-spacing:.06em;margin-
   color:var(--muted);font-family:var(--mono);font-size:11px;padding:3px 10px;cursor:pointer}
 #dss-close:hover{color:var(--ink);border-color:var(--edge-hot)}
 #dss h3{font-size:22px;letter-spacing:.08em}
+#dss-date{display:inline-block;margin-left:10px;vertical-align:middle;font-size:10px;letter-spacing:.1em;
+  padding:2px 8px;border-radius:3px;font-weight:400;background:rgba(124,140,160,.12);color:var(--muted);
+  border:1px solid rgba(124,140,160,.25)}
+#dss-date.hist{background:rgba(179,136,56,.15);color:var(--amber-hi);border-color:rgba(179,136,56,.4)}
 #dss .sub{color:var(--muted);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;margin-bottom:14px}
 #dss-grid{display:grid;grid-template-columns:230px 1fr;gap:22px}
 @media(max-width:720px){#dss-grid{grid-template-columns:1fr}}
@@ -384,7 +388,7 @@ figure figcaption{font-size:10px;color:var(--muted);letter-spacing:.06em;margin-
     <a id="dss-chart" class="chip" href="https://tv.dhan.co/"
        title="Opens Dhan terminal (ONE reused tab, saved layout) · symbol copied — paste (⌘V) + Enter in Symbol Search"
        style="position:absolute;top:12px;right:166px;text-decoration:none">DHAN ⤴</a>
-    <h3 id="dss-sym">—</h3>
+    <h3><span id="dss-sym">—</span><span id="dss-date"></span></h3>
     <div class="sub" id="dss-sub">—</div>
     <div class="sub" id="dss-live" style="margin-top:2px"></div>
     <div id="dss-grid">
@@ -1138,6 +1142,16 @@ function interpCol(side,txt){
 function openDossier(sym){
   const r=bySym[sym];if(!r)return;
   $("#dss-sym").textContent=r.symbol;
+  /* Every tile below is bound to SDATE, not necessarily "today" — a
+     historical selection or a stale tab left open across a compile both
+     read identically to a fresh session otherwise (this is how a 15 Jul
+     dossier once got mistaken for 16 Jul: nothing on the card said "15 Jul").
+     Always show the session date; flag it amber when it isn't the latest. */
+  const isLatest=SDATE===SESSIONS[SESSIONS.length-1];
+  const dssDate=$("#dss-date");
+  dssDate.textContent=(isLatest?"EOD ":"◷ ")+fdate(SDATE);
+  dssDate.className=isLatest?"":"hist";
+  dssDate.title=isLatest?"latest compiled session":"historical session — not today's data";
   $("#dss-chart").href=CHART_URL(r.symbol);
   $("#dss-tv").href=TV_URL(r.symbol);
   const flipChip=r.structure_flip&&r.structure_flip!=="NONE"
