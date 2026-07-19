@@ -360,7 +360,8 @@ figure figcaption{font-size:10px;color:var(--muted);letter-spacing:.06em;margin-
 
   <section class="row r2">
     <div class="panel" style="--i:4" id="p-sectors">
-      <div class="ph"><h2>Sector Flow Grid</h2><span class="sub">avg spot Δ% · click to scan sector</span></div>
+      <div class="ph"><h2>Sector Flow Grid</h2><span class="sub" id="sec-sub">avg spot Δ% · click to scan sector</span>
+        <span class="spacer"></span><div style="display:flex;gap:6px" id="sec-chips"></div></div>
       <div id="sector-grid"></div>
     </div>
 
@@ -625,7 +626,20 @@ function drawRegime(){
 }
 
 /* ── SVG line-chart factory (crosshair + tooltip + direct labels) ────── */
-function lineChart(host,series,dates,{h=190,ymin,ymax,unit="%",markDate}={}){
+/* One marker treatment everywhere (Net Breadth, McClellan, A/D, Positioning):
+   amber dashed line + ◷ glyph — the glyph is what makes it findable on short
+   busy charts. */
+function addSessionMarker(svg,NS,x,top,bottom){
+  const mk=document.createElementNS(NS,"line");
+  mk.setAttribute("x1",x);mk.setAttribute("x2",x);mk.setAttribute("y1",top);mk.setAttribute("y2",bottom);
+  mk.setAttribute("stroke","rgba(232,180,92,.55)");mk.setAttribute("stroke-width",1);mk.setAttribute("stroke-dasharray","3 3");
+  svg.appendChild(mk);
+  const g=document.createElementNS(NS,"text");
+  g.setAttribute("x",x);g.setAttribute("y",top+9);g.setAttribute("text-anchor","middle");
+  g.setAttribute("fill","#E8B45C");g.setAttribute("style","font-size:8.5px;letter-spacing:.1em");
+  g.textContent="◷";svg.appendChild(g);
+}
+function lineChart(host,series,dates,{h=190,ymin,ymax,unit="%",markDate,shadow}={}){
   const el=$(host);el.innerHTML="";
   const W=el.clientWidth||600,H=h,ml=34,mr=64,mt=8,mb=22;
   const iw=W-ml-mr,ih=H-mt-mb;
@@ -643,6 +657,22 @@ function lineChart(host,series,dates,{h=190,ymin,ymax,unit="%",markDate}={}){
   /* x labels: 4 */
   [0,Math.floor(dates.length/3),Math.floor(dates.length*2/3),dates.length-1].forEach(i=>{
     add("text",{x:X(i),y:H-6,"text-anchor":i===0?"start":i===dates.length-1?"end":"middle",class:"axis-t"}).textContent=fdate(dates[i]);});
+  /* shadow overlay: a reference series on its OWN min-max scale (shape only,
+     no y-axis claim — units differ from the main series). Drawn first so the
+     main series sits on top; real values surface in the tooltip. */
+  let shv=null;
+  if(shadow){
+    shv=shadow.v;
+    const sw=shv.filter(v=>v!=null);
+    if(sw.length>1){
+      const slo=Math.min(...sw),shi=Math.max(...sw);
+      const Ys=v=>mt+ih-(v-slo)/(shi-slo||1)*ih;
+      let d="",pen=false,li=-1;
+      shv.forEach((v,i)=>{if(v==null){pen=false;return}d+=(pen?"L":"M")+X(i).toFixed(1)+" "+Ys(v).toFixed(1);pen=true;li=i;});
+      add("path",{d,fill:"none",stroke:shadow.c,"stroke-width":1.5,"stroke-opacity":".85","stroke-linejoin":"round"});
+      if(li>=0)add("text",{x:X(li)+8,y:Ys(shv[li])+3.5,fill:shadow.c,class:"dlab","fill-opacity":".85"}).textContent=shadow.n;
+    }else shv=null;
+  }
   /* lines + endpoint + direct labels */
   series.forEach(s=>{
     const d=s.v.map((v,i)=>(i?"L":"M")+X(i).toFixed(1)+" "+Y(v).toFixed(1)).join("");
@@ -654,10 +684,7 @@ function lineChart(host,series,dates,{h=190,ymin,ymax,unit="%",markDate}={}){
   /* selected-session marker */
   if(markDate){
     const mi=dates.indexOf(markDate);
-    if(mi>=0){
-      add("line",{x1:X(mi),x2:X(mi),y1:mt,y2:mt+ih,stroke:"rgba(232,180,92,.55)","stroke-width":1,"stroke-dasharray":"3 3"});
-      add("text",{x:X(mi),y:mt+9,"text-anchor":"middle",fill:"#E8B45C",style:"font-size:8.5px;letter-spacing:.1em"}).textContent="◷";
-    }
+    if(mi>=0)addSessionMarker(svg,NS,X(mi),mt,mt+ih);
   }
   /* crosshair */
   const cross=add("line",{y1:mt,y2:mt+ih,stroke:"rgba(83,221,242,.4)","stroke-width":1,visibility:"hidden"});
@@ -666,8 +693,10 @@ function lineChart(host,series,dates,{h=190,ymin,ymax,unit="%",markDate}={}){
     const r=svg.getBoundingClientRect();
     const i=Math.max(0,Math.min(dates.length-1,Math.round((e.clientX-r.left-ml*(r.width/W))/(iw*(r.width/W))*(dates.length-1))));
     cross.setAttribute("x1",X(i));cross.setAttribute("x2",X(i));cross.setAttribute("visibility","visible");
+    const shRow=shv&&shv[i]!=null
+      ?`<div class="r"><span><i style="background:${shadow.c}"></i>${shadow.n}</span><b>${Math.round(shv[i]).toLocaleString("en-IN")}</b></div>`:"";
     showTip(`<div class="t">${fdate(dates[i])}</div>`+series.map(s=>
-      `<div class="r"><span><i style="background:${s.c}"></i>${s.n}</span><b>${s.v[i]?.toFixed(1)}${unit}</b></div>`).join(""),e.clientX,e.clientY);
+      `<div class="r"><span><i style="background:${s.c}"></i>${s.n}</span><b>${s.v[i]?.toFixed(1)}${unit}</b></div>`).join("")+shRow,e.clientX,e.clientY);
   });
   hot.addEventListener("mouseleave",()=>{cross.setAttribute("visibility","hidden");hideTip()});
   el.appendChild(svg);
@@ -815,14 +844,9 @@ function drawInternals(){
     rc.addEventListener("mouseleave",hideTip);
     svg.appendChild(rc);
   });
-  /* selected-session marker */
-  if(mcSel>=0&&mcSel<mc.length){
-    const xm=mcSel*(W/mc.length)+bw/2+1;
-    const mk=document.createElementNS(NS,"line");
-    mk.setAttribute("x1",xm);mk.setAttribute("x2",xm);mk.setAttribute("y1",mt);mk.setAttribute("y2",mt+ih);
-    mk.setAttribute("stroke","rgba(232,180,92,.55)");mk.setAttribute("stroke-width",1);mk.setAttribute("stroke-dasharray","3 3");
-    svg.appendChild(mk);
-  }
+  /* selected-session marker — shared treatment, see addSessionMarker */
+  if(mcSel>=0&&mcSel<mc.length)
+    addSessionMarker(svg,NS,mcSel*(W/mc.length)+bw/2+1,mt,mt+ih);
   el.appendChild(svg);
   /* signed value readout for the selected session */
   const mval=last.cm_mcclellan_osc;
@@ -858,14 +882,10 @@ function drawInternals(){
   const ep=document.createElementNS(NS,"circle");
   ep.setAttribute("cx",X(vs.length-1));ep.setAttribute("cy",Y(vs[vs.length-1]));ep.setAttribute("r",3.5);
   ep.setAttribute("fill",C.cyan);ep.setAttribute("stroke","#050810");ep.setAttribute("stroke-width",2);svg2.appendChild(ep);
-  /* selected-session marker */
+  /* selected-session marker — shared treatment, see addSessionMarker */
   const adSel=selIdx-(CM.length-ad.length);
-  if(adSel>=0&&adSel<ad.length){
-    const mk2=document.createElementNS(NS,"line");
-    mk2.setAttribute("x1",X(adSel));mk2.setAttribute("x2",X(adSel));mk2.setAttribute("y1",4);mk2.setAttribute("y2",H2-4);
-    mk2.setAttribute("stroke","rgba(232,180,92,.55)");mk2.setAttribute("stroke-width",1);mk2.setAttribute("stroke-dasharray","3 3");
-    svg2.appendChild(mk2);
-  }
+  if(adSel>=0&&adSel<ad.length)
+    addSessionMarker(svg2,NS,X(adSel),4,H2-4);
   const hot=document.createElementNS(NS,"rect");
   hot.setAttribute("x",0);hot.setAttribute("y",0);hot.setAttribute("width",W2);hot.setAttribute("height",H2);hot.setAttribute("fill","transparent");
   hot.addEventListener("mousemove",e=>{
@@ -882,16 +902,36 @@ function drawInternals(){
 }
 
 /* ── sector flow grid ────────────────────────────────────────────────── */
-let sectorFilter=null;
+/* Horizons: 1W/1M compound each symbol's daily spot_change_pct over the
+   trailing window ending at the selected session, then average per sector.
+   conv μ + bull rail stay 1D always — conviction and structural bias are
+   state at the selected session, not something you can average over a month.
+   Payload holds 30 sessions, so 1M truncates when time-traveling back; the
+   header shows the actual window so a short one never masquerades as a month. */
+let sectorFilter=null,sectorHorizon="1D";
+const SEC_HORIZONS={"1D":[1,1.2],"1W":[5,2.5],"1M":[21,4]};   // [sessions, color threshold %]
 function drawSectors(){
+  const[hn,hth]=SEC_HORIZONS[sectorHorizon];
+  const si=SESSIONS.indexOf(SDATE);
+  const win=new Set(SESSIONS.slice(Math.max(0,si-hn+1),si+1));
+  const hret={};   // per-symbol compounded % over the window
+  if(hn>1)MS.forEach(r=>{
+    let g=1;(msBySymbol[r.symbol]||[]).forEach(h=>{if(win.has(h.date))g*=1+(h.spot_change_pct||0)/100;});
+    hret[r.symbol]=(g-1)*100;});
   const agg={};
   MS.forEach(r=>{const s=r.sector||"UNMAPPED";(agg[s]??=({n:0,chg:0,conv:0,bull:0}));
-    const a=agg[s];a.n++;a.chg+=r.spot_change_pct||0;a.conv+=r.conviction_score||0;
+    const a=agg[s];a.n++;a.chg+=hn>1?hret[r.symbol]:(r.spot_change_pct||0);a.conv+=r.conviction_score||0;
     if(biasKind(r.structural_bias)==="bull"||["Support Building","Expansion"].includes(r.structural_bias))a.bull++;});
   const rows=Object.entries(agg).map(([s,a])=>({s,n:a.n,chg:a.chg/a.n,conv:a.conv/a.n,bull:a.bull}))
     .sort((a,b)=>b.chg-a.chg);
+  $("#sec-chips").innerHTML=Object.keys(SEC_HORIZONS).map(m=>
+    `<button class="chip" data-hz="${m}" aria-pressed="${sectorHorizon===m}">${m.toLowerCase()}</button>`).join("");
+  document.querySelectorAll("#sec-chips .chip").forEach(b=>
+    b.addEventListener("click",()=>{sectorHorizon=b.dataset.hz;drawSectors();}));
+  $("#sec-sub").textContent=(sectorHorizon==="1D"?"avg spot Δ%":
+    `avg spot Δ% · ${sectorHorizon.toLowerCase()} (${win.size} session${win.size>1?"s":""})`)+" · click to scan sector";
   $("#sector-grid").innerHTML=rows.map(r=>{
-    const col=divg(r.chg,1.2);
+    const col=divg(r.chg,hth);
     return`<div class="sec-tile" tabindex="0" role="button" data-sec="${esc(r.s)}">
       <div class="nm">${esc(r.s)}</div>
       <div class="chg" style="color:${col}">${fmtP(r.chg)}</div>
@@ -906,7 +946,7 @@ function drawSectors(){
     t.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();go()}});
     t.addEventListener("mousemove",e=>{const r=rows.find(x=>x.s===t.dataset.sec);
       showTip(`<div class="t">${esc(r.s)}</div>
-        <div class="r"><span>avg spot Δ</span><b>${fmtP(r.chg)}</b></div>
+        <div class="r"><span>avg spot Δ ${sectorHorizon.toLowerCase()}</span><b>${fmtP(r.chg)}</b></div>
         <div class="r"><span>constituents</span><b>${r.n}</b></div>
         <div class="r"><span>bullish structure</span><b>${r.bull}/${r.n}</b></div>`,e.clientX,e.clientY)});
     t.addEventListener("mouseleave",hideTip);
@@ -1026,13 +1066,18 @@ function drawPositioning(){
     b.addEventListener("click",()=>{posMode=b.dataset.pm;drawPositioning();}));
   const opt=posMode==="OPT"&&hasOpt;
   const fii=dates.map(d=>((opt?tilt(byDate[d].FII):net(byDate[d].FII))||0)/1000);
-  lineChart("#pos-chart",[{n:"FII",c:C.cyan,v:fii}],dates,{h:150,unit:"k",markDate:SDATE});
+  /* NIFTY rides along shape-only (own min-max scale, no shared axis — contracts
+     vs index points): FII net vs price IS the divergence read this panel is for */
+  const nfv=dates.map(d=>NF_BY_DATE[d]??null);
+  lineChart("#pos-chart",[{n:"FII",c:C.cyan,v:fii}],dates,
+    {h:150,unit:"k",markDate:SDATE,shadow:{n:"NIFTY",c:C.amber,v:nfv}});
   $("#pos-cap").textContent=opt?"FII index-options tilt (net calls − net puts)":"FII net index futures";
   $("#pos-fii-val").textContent=fmtOI(Math.round(fii[di]*1000))+" contracts";
   $("#pos-fii-val").style.color=fii[di]>=0?C.bull:C.bear;
-  $("#pos-legend").innerHTML=opt
+  $("#pos-legend").innerHTML=(opt
     ?`<span><i style="background:${C.cyan}"></i>tilt = (call L−S) − (put L−S) · not delta-adjusted</span>`
-    :`<span><i style="background:${C.cyan}"></i>net = index-fut long − short</span>`;
+    :`<span><i style="background:${C.cyan}"></i>net = index-fut long − short</span>`)
+    +`<span><i style="background:${C.amber}"></i>NIFTY (shape only)</span>`;
 }
 
 /* ── flip radar ──────────────────────────────────────────────────────── */
