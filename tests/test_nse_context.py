@@ -165,3 +165,28 @@ class TestBan(unittest.TestCase):
         self.assertIn("RELIANCE", book)
         book2 = load_armed_book(con, ban_arming="annotate")
         self.assertIn("KAYNES", book2)
+
+
+class TestApiDatasets(unittest.TestCase):
+    def test_fii_dii_golden(self):
+        from vanguard.pipeline.context.api_datasets import parse_fii_dii
+        df = parse_fii_dii(fx("fiidii.json"))
+        self.assertEqual(sorted(df.category), ["DII", "FII"])
+        fii = df[df.category == "FII"].iloc[0]
+        self.assertAlmostEqual(fii.net_cr, -376.41)
+
+    def test_events_results_classified(self):
+        from vanguard.pipeline.context.api_datasets import parse_events
+        df = parse_events(fx("events.json"))
+        self.assertGreater((df.event_type == "RESULTS").sum(), 50)
+        self.assertIn("ACE", set(df.symbol))
+
+    def test_corp_actions_typed(self):
+        from vanguard.pipeline.context.api_datasets import parse_corp_actions
+        df = parse_corp_actions(fx("corpact.json"))
+        self.assertIn("EX_DIVIDEND", set(df.event_type))
+
+    def test_shape_drift_raises(self):
+        from vanguard.pipeline.context.api_datasets import parse_fii_dii, ApiShapeDrift
+        with self.assertRaises(ApiShapeDrift):
+            parse_fii_dii(b'[{"category":"FII"}]')

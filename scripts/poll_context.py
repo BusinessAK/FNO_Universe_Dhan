@@ -22,6 +22,7 @@ sys.path.insert(0, str(ROOT))
 from vanguard.pipeline.context.client import NseClient          # noqa: E402
 from vanguard.pipeline.context.datasets import DATASETS         # noqa: E402
 from vanguard.pipeline.context.ingest import ingest_date        # noqa: E402
+from vanguard.pipeline.context.api_datasets import ingest_api_datasets  # noqa: E402
 
 
 def main() -> int:
@@ -40,6 +41,17 @@ def main() -> int:
         days = [date.fromisoformat(args.date) if args.date else date.today()]
 
     worst = 0
+    if not args.backfill and not args.only:
+        import duckdb
+        from vanguard.config.paths import DB
+        con = duckdb.connect(str(DB))
+        try:
+            api_status = ingest_api_datasets(client, con)
+        finally:
+            con.close()
+        print("[context] api " + " · ".join(f"{k}={v}" for k, v in api_status.items()), flush=True)
+        if any(v.startswith("error") for v in api_status.values()):
+            worst = 1
     for d in days:
         if d.weekday() >= 5:
             continue

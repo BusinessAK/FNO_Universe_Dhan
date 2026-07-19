@@ -256,6 +256,22 @@ def _context_blocks(con, data, sessions, ph):
             f"SELECT date, symbol FROM daily_ban WHERE date IN ({ph}) "
             "ORDER BY date, symbol", ["date", "symbol"], sessions)
         _ban_signal_rows(data, sessions)
+    if "daily_fii_dii" in tables:
+        fd = table(con, "SELECT date, category, buy_cr, sell_cr, net_cr "
+                        "FROM daily_fii_dii ORDER BY date DESC LIMIT ?",
+                   ["date", "category", "buy_cr", "sell_cr", "net_cr"],
+                   (2 * TREND_WINDOW_SESSIONS,))
+        fd["rows"].reverse()
+        data["fii_dii"] = fd
+    if "corporate_events" in tables:
+        # forward-looking events for universe symbols, within +14 calendar days
+        data["events"] = table(con, f"""
+            SELECT symbol, event_type, event_date, details FROM corporate_events
+            WHERE symbol IN (SELECT DISTINCT symbol FROM daily_market_structure)
+              AND event_date >= ? AND event_date <= CAST(? AS TIMESTAMP) + INTERVAL 14 DAY
+            ORDER BY event_date""",
+            ["symbol", "event_type", "event_date", "details"],
+            (sessions[-1], sessions[-1]))
     if "daily_delivery" in tables:
         # ratio vs the symbol's OWN trailing 20 sessions (level is structural;
         # the ratio is the signal) — window excludes the current day

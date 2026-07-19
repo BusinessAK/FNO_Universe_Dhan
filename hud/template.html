@@ -443,6 +443,9 @@ const POS  = VG.positioning ? unpack(VG.positioning) : [];
 const VIXH = VG.vix ? unpack(VG.vix) : [];
 const DLV_BY_DATE = {};
 (VG.delivery ? unpack(VG.delivery) : []).forEach(r => { (DLV_BY_DATE[r.date] ??= {})[r.symbol] = r; });
+const FIIDII = VG.fii_dii ? unpack(VG.fii_dii) : [];
+const EVENTS_BY_SYM = {};
+(VG.events ? unpack(VG.events) : []).forEach(r => { (EVENTS_BY_SYM[r.symbol] ??= []).push(r); });
 const BAN_BY_DATE = {};
 (VG.ban ? unpack(VG.ban) : []).forEach(r => { (BAN_BY_DATE[r.date] ??= new Set()).add(r.symbol); });
 const META = VG.meta;
@@ -765,6 +768,18 @@ function drawInternals(){
     [">50 DMA",pct(p50),c50,pct(last.cm_pct_above_20dma)+" >20D"+dlt(p50,prev?.cm_pct_above_50dma,1,"pt")],
     [">200 DMA",pct(p200),c200,dlt(p200,prev?.cm_pct_above_200dma,1,"pt")||"structural"],
     ["NH − NL",(nh-nl>0?"+":"")+(nh-nl),cNH,nh+"H / "+nl+"L"+dlt(nh-nl,prev?(prev.cm_new_highs??0)-(prev.cm_new_lows??0):null,0)],
+    ...(function(){
+      /* C4: FII/DII provisional cash flows — latest row at-or-before SDATE */
+      const rows=FIIDII.filter(r=>r.date<=SDATE);
+      if(!rows.length)return[];
+      const last=rows[rows.length-1].date;
+      return ["FII","DII"].map(cat=>{
+        const r=rows.filter(x=>x.category===cat&&x.date===last).pop();
+        if(!r)return null;
+        const col=r.net_cr>0?C.bull:r.net_cr<0?C.bear:C.ink;
+        return[cat+" CASH",(r.net_cr>0?"+":"")+Math.round(r.net_cr).toLocaleString("en-IN")+"Cr",col,"provisional · "+fdate(r.date)];
+      }).filter(Boolean);
+    })(),
   ].map(([k,v,c,d])=>`<div class="tile"><span class="k">${k}</span><div class="v" style="color:${c}">${v}</div><span class="d">${d}</span></div>`).join("");
 
   /* McClellan: thin bars around zero, diverging by sign, 2px gaps.
@@ -935,7 +950,7 @@ function drawSetups(){
   $("#setup-cards").innerHTML=list.map(s=>{
     const k=biasKind(s.bias);
     return`<div class="sc ${k}" tabindex="0" role="button" data-sym="${esc(s.symbol)}">
-      <div class="top"><span class="sym">${esc(s.symbol)}${bySym[s.symbol]?._ban?' <span title="F&O ban — setup NOT armed live" style="color:var(--bear-hi);font-size:11px">⛔ BAN</span>':""}</span><span class="typ">${esc(s.setup_type.replace(/_/g," "))}</span></div>
+      <div class="top"><span class="sym">${esc(s.symbol)}${bySym[s.symbol]?._ban?' <span title="F&O ban — setup NOT armed live" style="color:var(--bear-hi);font-size:11px">⛔ BAN</span>':""}${(EVENTS_BY_SYM[s.symbol]||[]).some(e=>e.event_type==="RESULTS"&&e.event_date>=SDATE)?' <span title="results inside the event window — this is an event bet" style="color:#E8B45C;font-size:10px">📅</span>':""}</span><span class="typ">${esc(s.setup_type.replace(/_/g," "))}</span></div>
       <span class="bias ${k}">${esc(s.bias)}</span>
       <div class="strikes">
         <span><span class="k">Trigger</span>${fmtPr(s.trigger_strike)}</span>
@@ -1226,8 +1241,10 @@ function openDossier(sym){
       ?` · <span style="color:${C.bullHi};border:1px solid rgba(62,213,152,.35);border-radius:3px;padding:0 5px;font-size:10px;font-weight:700;white-space:nowrap">🔄 BEAR→BULL ${fconf(r.flip_confidence)}</span>`
       :` · <span style="color:${C.bearHi};border:1px solid rgba(255,122,146,.35);border-radius:3px;padding:0 5px;font-size:10px;font-weight:700;white-space:nowrap">🔻 BULL→BEAR ${fconf(r.flip_confidence)}</span>`)
     :"";
+  const evs=(EVENTS_BY_SYM[r.symbol]||[]).filter(e=>e.event_date>=SDATE);
+  const evChip=evs.length?` · <span style="color:#E8B45C;border:1px solid rgba(179,136,56,.4);border-radius:3px;padding:0 5px;font-size:10px;font-weight:700">📅 ${esc(evs[0].event_type.replace(/_/g," "))} ${fdate(evs[0].event_date)}</span>`:"";
   const banChip=r._ban?` · <span style="color:var(--bear-hi);border:1px solid rgba(255,122,146,.4);border-radius:3px;padding:0 5px;font-size:10px;font-weight:700">⛔ F&O BAN — OI flows partly forced</span>`:"";
-  $("#dss-sub").innerHTML=`${banChip?banChip.slice(3)+" · ":""}${esc(r.sector||"—")} · ${fmtPr(r.spot_close)} <span class="${cls(r.spot_change_pct)}">${fmtP(r.spot_change_pct)}</span> · <span class="bias ${biasKind(r.structural_bias)}">${esc(r.structural_bias)}</span> · ${esc((r.gamma_regime||"").replace(/_/g," "))}${flipChip}`;
+  $("#dss-sub").innerHTML=`${banChip?banChip.slice(3)+" · ":""}${esc(r.sector||"—")}${evChip} · ${fmtPr(r.spot_close)} <span class="${cls(r.spot_change_pct)}">${fmtP(r.spot_change_pct)}</span> · <span class="bias ${biasKind(r.structural_bias)}">${esc(r.structural_bias)}</span> · ${esc((r.gamma_regime||"").replace(/_/g," "))}${flipChip}`;
   ladder(r);
   wallTrail(sym);
   /* Δ vs previous session (suppressed on the oldest exported session) */
