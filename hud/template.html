@@ -414,7 +414,12 @@ figure figcaption{font-size:10px;color:var(--muted);letter-spacing:.06em;margin-
 <div id="toast"></div>
 
 <script>
-const VG = __VANGUARD_DATA__;
+/* Entire deck runs inside __boot(VG) so the SAME code renders either data
+   source (wave 3 / P1): served over http it prefers a fresh /session/latest
+   from the bridge (same builder that baked this file — vanguard/store/
+   export_service.py); on file:// or fetch failure it falls back to the baked
+   payload below. */
+function __boot(VG){
 
 /* ── data unpack ─────────────────────────────────────────────────────── */
 const unpack = t => t.rows.map(r => Object.fromEntries(t.cols.map((c,i)=>[c,r[i]])));
@@ -1460,4 +1465,15 @@ if(location.protocol.startsWith("http")){ pollLive(); setInterval(pollLive, 5000
 
 let rsz;addEventListener("resize",()=>{clearTimeout(rsz);rsz=setTimeout(()=>{drawBreadth();drawInternals()},180)});
 requestAnimationFrame(()=>requestAnimationFrame(()=>document.body.classList.remove("boot")));
+}
+(async()=>{
+  let data=__VANGUARD_DATA__;
+  if(location.protocol.startsWith("http")){
+    try{
+      const r=await fetch("/session/latest",{cache:"no-store"});
+      if(r.ok){const d=await r.json();if(d?.meta?.sessions?.length)data=d;}
+    }catch(e){/* bridge absent — baked payload stands */}
+  }
+  __boot(data);
+})();
 </script>
