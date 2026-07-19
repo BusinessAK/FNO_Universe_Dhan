@@ -41,10 +41,10 @@ case "$MODE" in
     echo "  VANGUARD LIVE MODE — NSE Real-Time Bridge"
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     echo "[*] Starting NSE live polling in background..."
-    python3 run_live_nse.py > data/processed/live_bridge.log 2>&1 &
+    python3 scripts/run_live.py > data/live/daemon_stdout.log 2>&1 &
     BRIDGE_PID=$!
     echo "[OK] Live bridge started (PID: $BRIDGE_PID)"
-    echo "[*] Tail logs: tail -f data/processed/live_bridge.log"
+    echo "[*] Tail logs: tail -f data/live/daemon_stdout.log"
     echo ""
     echo "[*] Launching Streamlit dashboard (toggle AUTO REFRESH ON)..."
     trap "echo '[*] Stopping live bridge...'; kill $BRIDGE_PID 2>/dev/null" EXIT

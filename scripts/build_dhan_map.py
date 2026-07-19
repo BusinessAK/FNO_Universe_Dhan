@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 """Build the NSE-ticker → Dhan display-symbol map used by HUD chart deep links.
 
-Dhan's TradingView terminal (tv.dhan.co) resolves instruments by its Symbol
-Search symbology — "{TRADING_SYMBOL}-{SERIES}" for equities (BHARTIARTL-EQ)
-and the index trading symbol for indices (NIFTY, NIFTY BANK). A bare NSE
-ticker or a display name in ?symbol= sets the pane label but never resolves
-data. This script derives the mapping from Dhan's public scrip master and
-writes data/compiled/dhan_symbol_map.json, which scripts/build_hud.py embeds
-into the HUD payload.
+tv.dhan.co's ?symbol= param feeds the TradingView widget's initial symbol
+(verified 2026-07 by deobfuscating bundle3.0.7.js), and the string its
+datafeed resolves is the Dhan DISPLAY name (scrip master SEM_CUSTOM_SYMBOL:
+"Dixon Technologies", "Nifty 50") — the DESCRIPTION column in Symbol Search
+and the legend text on a resolved chart. "{TRADING_SYMBOL}-{SERIES}"
+(MOTHERSON-EQ) sets the pane label but returns no data. This script derives
+ticker → SEM_CUSTOM_SYMBOL from Dhan's public scrip master and writes
+data/compiled/dhan_symbol_map.json, which scripts/build_hud.py embeds into
+the HUD payload.
 
 Usage:
     python3 scripts/build_dhan_map.py [--csv PATH]   # PATH skips the download
@@ -23,16 +25,9 @@ ROOT = Path(__file__).resolve().parent.parent
 SCRIP_URL = "https://images.dhan.co/api-data/api-scrip-master.csv"
 OUT = ROOT / "data" / "compiled" / "dhan_symbol_map.json"
 
-# NSE F&O index tickers used in the compiled DB → Dhan index trading symbols.
-# Dhan's index segment uses the F&O tickers verbatim (verified in scrip master),
-# so this is an identity map — indices take no -EQ suffix.
-INDEX_NAMES = {
-    "NIFTY": "NIFTY",
-    "BANKNIFTY": "BANKNIFTY",
-    "FINNIFTY": "FINNIFTY",
-    "MIDCPNIFTY": "MIDCPNIFTY",
-    "NIFTYNXT50": "NIFTYNXT50",
-}
+# NSE F&O index tickers used in the compiled DB. Values resolve to the index's
+# SEM_CUSTOM_SYMBOL from the scrip master ("Nifty 50", "Nifty Bank").
+INDEX_TICKERS = ["NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY", "NIFTYNXT50"]
 
 
 def main() -> None:
@@ -46,14 +41,16 @@ def main() -> None:
 
     eq = df[(df["SEM_EXM_EXCH_ID"] == "NSE") & (df["SEM_SEGMENT"] == "E")
             & (df["SEM_SERIES"] == "EQ")]
-    mapping = {str(t): f"{t}-EQ" for t in eq["SEM_TRADING_SYMBOL"]}
-    # Validate the index symbols exist in the NSE index segment before mapping
-    idx_syms = set(df[(df["SEM_EXM_EXCH_ID"] == "NSE") & (df["SEM_SEGMENT"] == "I")]
-                   ["SEM_TRADING_SYMBOL"].astype(str))
-    for k, v in INDEX_NAMES.items():
-        if v not in idx_syms:
-            print(f"[!] index symbol '{v}' (for {k}) not found in scrip master")
-        mapping[k] = v
+    mapping = {str(t): str(c) for t, c in
+               zip(eq["SEM_TRADING_SYMBOL"], eq["SEM_CUSTOM_SYMBOL"]) if pd.notna(c)}
+    # Indices: display name from the NSE index segment
+    idx = df[(df["SEM_EXM_EXCH_ID"] == "NSE") & (df["SEM_SEGMENT"] == "I")]
+    idx_map = {str(t): str(c) for t, c in
+               zip(idx["SEM_TRADING_SYMBOL"], idx["SEM_CUSTOM_SYMBOL"]) if pd.notna(c)}
+    for k in INDEX_TICKERS:
+        if k not in idx_map:
+            print(f"[!] index '{k}' not found in scrip master index segment")
+        mapping[k] = idx_map.get(k, k)
 
     # sanity: warn on compiled F&O symbols we cannot map
     try:
