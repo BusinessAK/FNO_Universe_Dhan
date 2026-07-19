@@ -133,6 +133,10 @@ Derived at export time (build_hud), not stored: participant *net* columns, FII n
 
 ## 5. Integration points (each is a separate reviewable change)
 
+> **Seam update (2026-07-19, per docs/ARCHITECTURE.md):** all UI-bound data below
+> wires through `vanguard/store/export_service.py` (one payload builder, baked or
+> served) — not directly into build_hud. Fetchers live in `vanguard/pipeline/context/`.
+
 1. **build_hud.py:** new payload blocks — `positioning` (participant OI, 60 sessions), `context` per symbol/date (`banned, mwpl_pct, delivery_pct, delivery_ratio, next_event`), `vix` (60 sessions), `fii_dii` (60 sessions). HUD renders per §2; every new panel degrades to hidden when its block is absent (missing dataset ≠ broken deck).
 2. **run_live.py / trigger_engine:** `load_armed_book()` gains a ban-list join — banned symbols' setups load into a `suppressed` book (visible in logs, never armed) under `BAN_ARMING="exclude"`.
 3. **catalyst_service.py:** `fetch_nse_announcements()` as an additional source + `INSIDER` category + cross-source dedup.

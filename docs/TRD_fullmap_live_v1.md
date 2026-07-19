@@ -126,6 +126,10 @@ Journal schema fix (V5): `TickJournal` must write an **explicit, stable column s
 
 ## 9. Snapshot schema v2 & bridge
 
+> **Seam update (2026-07-19, per docs/ARCHITECTURE.md):** the bridge grows into
+> `vanguard/serve/api.py` (adds `/session/<date>` etc. at wave 3); snapshot v2 is
+> unchanged. Module paths in this doc read `src/…` = `vanguard/…` post-wave-1.
+
 ```jsonc
 {
   "ts": 1789538700.1,            // writer clock (loop alive)
