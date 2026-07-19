@@ -136,3 +136,32 @@ class TestIngest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestBan(unittest.TestCase):
+    def test_parse_golden(self):
+        from vanguard.pipeline.context.datasets import parse_ban
+        df = parse_ban(fx("fo_secban_17072026.csv"), date(2026, 7, 17))
+        self.assertEqual(df.symbol.tolist(), ["KAYNES"])
+
+    def test_empty_ban_day_ok(self):
+        from vanguard.pipeline.context.datasets import parse_ban
+        df = parse_ban(b"Securities in Ban For Trade Date 01-JAN-2026:\n", date(2026, 1, 1))
+        self.assertEqual(len(df), 0)
+
+    def test_arming_gate_excludes_banned(self):
+        from vanguard.live.trigger_engine import load_armed_book
+        con = duckdb.connect()
+        con.execute("CREATE TABLE daily_setups (date TIMESTAMP, symbol VARCHAR, "
+                    "setup_type VARCHAR, bias VARCHAR, trigger_strike DOUBLE, "
+                    "invalidation_strike DOUBLE)")
+        con.execute("INSERT INTO daily_setups VALUES "
+                    "('2026-07-17','KAYNES','GAMMA_SQUEEZE','Bullish Breakout',100,90),"
+                    "('2026-07-17','RELIANCE','PINCH_ZONE','Compression',1300,1315)")
+        con.execute("CREATE TABLE daily_ban (date TIMESTAMP, symbol VARCHAR)")
+        con.execute("INSERT INTO daily_ban VALUES ('2026-07-17','KAYNES')")
+        book = load_armed_book(con, ban_arming="exclude")
+        self.assertNotIn("KAYNES", book)
+        self.assertIn("RELIANCE", book)
+        book2 = load_armed_book(con, ban_arming="annotate")
+        self.assertIn("KAYNES", book2)

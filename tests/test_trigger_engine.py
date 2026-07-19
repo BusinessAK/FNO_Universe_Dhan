@@ -135,6 +135,12 @@ class TestLoadArmedBookSkipsNullLevels(unittest.TestCase):
 
         class FakeCon:
             def execute(self, sql, params=None):
+                # the C3 ban gate also queries daily_ban — no bans here
+                if "daily_ban" in sql:
+                    class B:
+                        def fetchone(_): return (None,)
+                        def fetchall(_): return []
+                    return B()
                 class R:
                     def fetchone(_): return ("2026-07-16",)
                     def fetchall(_):

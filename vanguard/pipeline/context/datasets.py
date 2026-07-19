@@ -138,6 +138,22 @@ def parse_delivery(raw: bytes, d: date) -> pd.DataFrame:
     return out
 
 
+# ── F&O ban list (names only; MWPL % deferred — combined-OI zip is gone and
+#    the .xls alternative needs a legacy parser; see NSE PRD 2.2 note) ────────
+
+def parse_ban(raw: bytes, d: date) -> pd.DataFrame:
+    text = raw.decode("utf-8", errors="replace").strip()
+    if "Ban For Trade Date" not in text.splitlines()[0]:
+        raise SchemaDrift(f"fo_secban: unexpected header {text.splitlines()[0][:60]!r}")
+    syms = []
+    for line in text.splitlines()[1:]:
+        parts = [p.strip() for p in line.split(",")]
+        if len(parts) >= 2 and parts[1]:
+            syms.append(parts[1])
+    # an empty ban day is legitimate — zero rows, not an error
+    return pd.DataFrame({"date": pd.Timestamp(d), "symbol": syms})
+
+
 # ── registry ─────────────────────────────────────────────────────────────────
 
 DATASETS: dict[str, Dataset] = {
@@ -171,4 +187,10 @@ DATASETS: dict[str, Dataset] = {
             date TIMESTAMP, symbol VARCHAR, traded_qty BIGINT,
             delivered_qty BIGINT, delivery_pct DOUBLE)""",
         parse=parse_delivery),
+    "ban": Dataset(
+        name="ban",
+        url_template="https://nsearchives.nseindia.com/archives/fo/sec_ban/fo_secban_{d}.csv",
+        table="daily_ban",
+        ddl="CREATE TABLE IF NOT EXISTS daily_ban (date TIMESTAMP, symbol VARCHAR)",
+        parse=parse_ban),
 }

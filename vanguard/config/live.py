@@ -53,3 +53,6 @@ LIVE_DIR = ROOT / "data" / "live"
 INSTRUMENT_MASTER = LIVE_DIR / "instrument_master.parquet"
 SNAPSHOT_JSON = LIVE_DIR / "live_snapshot.json"
 BRIDGE_HOST, BRIDGE_PORT = "127.0.0.1", 8787
+
+# C3 ban-arming gate: "exclude" (never arm banned symbols) | "annotate"
+BAN_ARMING = "exclude"

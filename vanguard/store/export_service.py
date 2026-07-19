@@ -199,6 +199,32 @@ def _build(con, n_sessions: int) -> dict:
 # ── NSE context layer (C2) — every block optional: absent table = absent key,
 #    and the HUD hides the panel (PRD degradation contract) ──────────────────
 
+def _ban_signal_rows(data, sessions):
+    """Synthesize ban_enter/ban_exit Signal Feed rows by diffing consecutive
+    sessions inside the export window (PRD 2.2) — no compiler change needed."""
+    by_date = {}
+    for d, sym in data["ban"]["rows"]:
+        by_date.setdefault(d, set()).add(sym)
+    ch = data["changes"]
+    ci = {c: i for i, c in enumerate(ch["cols"])}
+    for prev, cur in zip(sessions[:-1], sessions[1:]):
+        p, c = by_date.get(clean(prev), set()), by_date.get(clean(cur), set())
+        for sym in sorted(c - p):
+            row = [None] * len(ch["cols"])
+            row[ci["date"]], row[ci["symbol"]] = clean(cur), sym
+            row[ci["icon"]], row[ci["type"]] = "⛔", "ban_enter"
+            row[ci["msg"]] = f"{sym}: entered F&O ban (MWPL >= 95%) — no new positions"
+            row[ci["rank"]] = 0
+            ch["rows"].append(row)
+        for sym in sorted(p - c):
+            row = [None] * len(ch["cols"])
+            row[ci["date"]], row[ci["symbol"]] = clean(cur), sym
+            row[ci["icon"]], row[ci["type"]] = "✅", "ban_exit"
+            row[ci["msg"]] = f"{sym}: exited F&O ban — new positions allowed"
+            row[ci["rank"]] = 0
+            ch["rows"].append(row)
+
+
 POS_COLS = ["date", "participant", "fut_idx_long", "fut_idx_short",
             "fut_stk_long", "fut_stk_short"]
 VIX_COLS = ["date", "close", "chg_pct"]
@@ -224,6 +250,12 @@ def _context_blocks(con, data, sessions, ph):
             VIX_COLS)
         vix["rows"].reverse()
         data["vix"] = vix
+    if "daily_ban" in tables:
+        data["ban"] = table(
+            con,
+            f"SELECT date, symbol FROM daily_ban WHERE date IN ({ph}) "
+            "ORDER BY date, symbol", ["date", "symbol"], sessions)
+        _ban_signal_rows(data, sessions)
     if "daily_delivery" in tables:
         # ratio vs the symbol's OWN trailing 20 sessions (level is structural;
         # the ratio is the signal) — window excludes the current day

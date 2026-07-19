@@ -22,7 +22,7 @@ TRIGGER_BUFFER = 1.01      # matches vanguard/core/classifier.py:37 (call-side b
 INVALIDATE_BUFFER = 0.99   # matches vanguard/core/classifier.py:38 (put-side breakdown)
 
 
-def load_armed_book(con, date=None) -> dict[str, list[dict]]:
+def load_armed_book(con, date=None, ban_arming: str | None = None) -> dict[str, list[dict]]:
     """Read one day's daily_setups into {symbol: [setup, ...]}, each setup starting
     WAITING. Defaults to the latest date in the table (today's compiled setups)."""
     if date is None:
@@ -31,9 +31,26 @@ def load_armed_book(con, date=None) -> dict[str, list[dict]]:
         "SELECT symbol, setup_type, bias, trigger_strike, invalidation_strike "
         "FROM daily_setups WHERE date = ?", [date]
     ).fetchall()
+    # C3 arming gate: symbols in the F&O ban cannot open new positions —
+    # arming their setups is noise. "exclude" (default) drops them loudly;
+    # "annotate" keeps them armed (config BAN_ARMING in vanguard/config/live.py).
+    from vanguard.config.live import BAN_ARMING
+    mode = ban_arming or BAN_ARMING
+    banned: set[str] = set()
+    try:
+        latest_ban = con.execute("SELECT MAX(date) FROM daily_ban").fetchone()[0]
+        if latest_ban is not None:
+            banned = {r[0] for r in con.execute(
+                "SELECT symbol FROM daily_ban WHERE date = ?", [latest_ban]).fetchall()}
+    except Exception:
+        pass                       # pre-C3 DB without daily_ban — gate inactive
     book: dict[str, list[dict]] = {}
+    suppressed = 0
     for symbol, setup_type, bias, trig, inval in rows:
         if trig is None or inval is None:
+            continue
+        if mode == "exclude" and symbol in banned:
+            suppressed += 1
             continue
         book.setdefault(symbol, []).append({
             "setup_type": setup_type,
@@ -42,6 +59,9 @@ def load_armed_book(con, date=None) -> dict[str, list[dict]]:
             "invalidation_strike": float(inval),
             "status": "WAITING",
         })
+    if suppressed:
+        print(f"[triggers] ban gate suppressed {suppressed} setups "
+              f"({', '.join(sorted(banned))})")
     return book
 
 

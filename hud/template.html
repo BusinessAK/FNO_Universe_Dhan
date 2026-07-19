@@ -443,6 +443,8 @@ const POS  = VG.positioning ? unpack(VG.positioning) : [];
 const VIXH = VG.vix ? unpack(VG.vix) : [];
 const DLV_BY_DATE = {};
 (VG.delivery ? unpack(VG.delivery) : []).forEach(r => { (DLV_BY_DATE[r.date] ??= {})[r.symbol] = r; });
+const BAN_BY_DATE = {};
+(VG.ban ? unpack(VG.ban) : []).forEach(r => { (BAN_BY_DATE[r.date] ??= new Set()).add(r.symbol); });
 const META = VG.meta;
 const SESSIONS = META.sessions;
 /* Shared lookback for all trend charts (waveform, McClellan, A/D line).
@@ -472,8 +474,10 @@ let MS = [], SET = [], SIG = [], bySym = {};
 function bindSession(){
   MS = MSD[SDATE] || []; SET = SETD[SDATE] || []; SIG = SIGD[SDATE] || [];
   const dlv = DLV_BY_DATE[SDATE] || {};
+  const banned = BAN_BY_DATE[SDATE] || new Set();
   MS.forEach(r => { const x = dlv[r.symbol];
-    r._dlv = x ? x.delivery_pct : null; r._dlvr = x ? x.ratio_20d : null; });
+    r._dlv = x ? x.delivery_pct : null; r._dlvr = x ? x.ratio_20d : null;
+    r._ban = banned.has(r.symbol); });
   bySym = Object.fromEntries(MS.map(r=>[r.symbol,r]));
 }
 bindSession();
@@ -898,7 +902,8 @@ const SIGMETA={
   option_wall_pinch:["🌀","PINCH","vol"],option_wall_expansion:["💥","EXPANSION","vol"],
   support_drop:["🔻","SUPPORT↓","dn"],support_rise:["🛡","SUPPORT↑","up"],
   resistance_fall:["⚔","RESIST↓","up"],resistance_rise:["🧱","RESIST↑","dn"],
-  dual_wall_fall:["⏬","DUAL↓","dn"],dual_wall_rise:["⏫","DUAL↑","up"]};
+  dual_wall_fall:["⏬","DUAL↓","dn"],dual_wall_rise:["⏫","DUAL↑","up"],
+  ban_enter:["⛔","BAN ENTER","dn"],ban_exit:["✅","BAN EXIT","up"]};
 let sigFilter=null;
 function drawSignals(){
   const counts={};SIG.forEach(s=>counts[s.type]=(counts[s.type]||0)+1);
@@ -930,7 +935,7 @@ function drawSetups(){
   $("#setup-cards").innerHTML=list.map(s=>{
     const k=biasKind(s.bias);
     return`<div class="sc ${k}" tabindex="0" role="button" data-sym="${esc(s.symbol)}">
-      <div class="top"><span class="sym">${esc(s.symbol)}</span><span class="typ">${esc(s.setup_type.replace(/_/g," "))}</span></div>
+      <div class="top"><span class="sym">${esc(s.symbol)}${bySym[s.symbol]?._ban?' <span title="F&O ban — setup NOT armed live" style="color:var(--bear-hi);font-size:11px">⛔ BAN</span>':""}</span><span class="typ">${esc(s.setup_type.replace(/_/g," "))}</span></div>
       <span class="bias ${k}">${esc(s.bias)}</span>
       <div class="strikes">
         <span><span class="k">Trigger</span>${fmtPr(s.trigger_strike)}</span>
@@ -1047,7 +1052,7 @@ function drawFlips(){
 
 /* ── scanner table ───────────────────────────────────────────────────── */
 const COLS=[
-  ["symbol","SYM",r=>esc(r.symbol),!1],
+  ["symbol","SYM",r=>esc(r.symbol)+(r._ban?' <span title="F&O ban (MWPL) — no new positions" style="color:var(--bear-hi)">⛔</span>':""),!1],
   ["sector","SECTOR",r=>esc(r.sector||"—"),!1],
   ["spot_close","SPOT",r=>fmtPr(r.spot_close)+`<span class="live-px" data-sym="${esc(r.symbol)}"></span>`,!0],
   ["spot_change_pct","Δ%",r=>`<span class="${cls(r.spot_change_pct)}">${fmtP(r.spot_change_pct)}</span>`,!0],
@@ -1221,7 +1226,8 @@ function openDossier(sym){
       ?` · <span style="color:${C.bullHi};border:1px solid rgba(62,213,152,.35);border-radius:3px;padding:0 5px;font-size:10px;font-weight:700;white-space:nowrap">🔄 BEAR→BULL ${fconf(r.flip_confidence)}</span>`
       :` · <span style="color:${C.bearHi};border:1px solid rgba(255,122,146,.35);border-radius:3px;padding:0 5px;font-size:10px;font-weight:700;white-space:nowrap">🔻 BULL→BEAR ${fconf(r.flip_confidence)}</span>`)
     :"";
-  $("#dss-sub").innerHTML=`${esc(r.sector||"—")} · ${fmtPr(r.spot_close)} <span class="${cls(r.spot_change_pct)}">${fmtP(r.spot_change_pct)}</span> · <span class="bias ${biasKind(r.structural_bias)}">${esc(r.structural_bias)}</span> · ${esc((r.gamma_regime||"").replace(/_/g," "))}${flipChip}`;
+  const banChip=r._ban?` · <span style="color:var(--bear-hi);border:1px solid rgba(255,122,146,.4);border-radius:3px;padding:0 5px;font-size:10px;font-weight:700">⛔ F&O BAN — OI flows partly forced</span>`:"";
+  $("#dss-sub").innerHTML=`${banChip?banChip.slice(3)+" · ":""}${esc(r.sector||"—")} · ${fmtPr(r.spot_close)} <span class="${cls(r.spot_change_pct)}">${fmtP(r.spot_change_pct)}</span> · <span class="bias ${biasKind(r.structural_bias)}">${esc(r.structural_bias)}</span> · ${esc((r.gamma_regime||"").replace(/_/g," "))}${flipChip}`;
   ladder(r);
   wallTrail(sym);
   /* Δ vs previous session (suppressed on the oldest exported session) */
