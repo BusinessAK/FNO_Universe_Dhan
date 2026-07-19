@@ -343,11 +343,12 @@ figure figcaption{font-size:10px;color:var(--muted);letter-spacing:.06em;margin-
   </section>
 
   <section class="panel" style="--i:4" id="p-positioning" hidden>
-    <div class="ph"><h2>Positioning</h2><span class="sub">participant-wise OI (NSE) · net index-futures contracts</span>
-      <span class="spacer"></span><div class="legend" id="pos-legend"></div></div>
-    <div class="tiles" id="pos-tiles" style="margin-bottom:12px"></div>
+    <div class="ph"><h2>Positioning</h2><span class="sub">participant-wise OI (NSE) · net index contracts</span>
+      <span class="spacer"></span><div style="display:flex;gap:6px" id="pos-chips"></div><div class="legend" id="pos-legend"></div></div>
+    <div class="tiles" id="pos-tiles" style="margin-bottom:8px"></div>
+    <div class="tiles" id="pos-opt-tiles" style="margin-bottom:12px"></div>
     <figure><div id="pos-chart"></div>
-      <figcaption>FII net index futures · last 60 sessions · <b id="pos-fii-val"></b></figcaption></figure>
+      <figcaption><span id="pos-cap">FII net index futures</span> · last 60 sessions · <b id="pos-fii-val"></b></figcaption></figure>
   </section>
 
   <section class="panel" style="--i:4" id="p-flips">
@@ -982,6 +983,11 @@ function drawVix(){
     (v.chg_pct!=null?` <span class="${cls(v.chg_pct)}" style="font-size:10.5px">${v.chg_pct>=0?"▲":"▼"}${Math.abs(v.chg_pct).toFixed(2)}%</span>`:"");
   t.title=`India VIX ${v.close.toFixed(2)} — p${pct} of the last ${VIXH.length} sessions`;
 }
+/* Option nets are stance, not exposure: contract counts, no delta adjustment
+   (NSE file has no strikes). Index legs only — stock-option legs stay
+   research-only until backtested. Coloring is directional: net long CALLS =
+   bullish green, net long PUTS = bearish red. */
+let posMode="FUT";
 function drawPositioning(){
   const p=$("#p-positioning");if(!p)return;
   if(!POS.length){p.hidden=true;return}
@@ -992,17 +998,41 @@ function drawPositioning(){
   let di=dates.length-1;while(di>0&&dates[di]>SDATE)di--;
   const cur=byDate[dates[di]],prev=di>0?byDate[dates[di-1]]:null;
   const net=r=>r?r.fut_idx_long-r.fut_idx_short:null;
+  const nc=r=>r&&r.opt_idx_call_long!=null?r.opt_idx_call_long-r.opt_idx_call_short:null;
+  const np=r=>r&&r.opt_idx_put_long!=null?r.opt_idx_put_long-r.opt_idx_put_short:null;
+  const tilt=r=>{const c=nc(r),q=np(r);return c!=null&&q!=null?c-q:null};
   $("#pos-tiles").innerHTML=["FII","DII","PRO","CLIENT"].map(pt=>{
     const n=net(cur[pt]),d=prev&&net(prev[pt])!=null&&n!=null?n-net(prev[pt]):null;
     const col=n>0?C.bullHi:n<0?C.bearHi:"var(--ink)";
     const dch=d?`<span style="color:${d>0?C.bull:C.bear}">${d>0?"▲":"▼"}${fmtOI(Math.abs(d))}</span>`:"&nbsp;";
     return`<div class="tile"><span class="k">${pt} idx fut net</span><div class="v" style="color:${col};font-size:15px">${n==null?"—":fmtOI(n)}</div><span class="d">${dch}</span></div>`;
   }).join("");
-  const fii=dates.map(d=>net(byDate[d].FII)/1000);
+  const hasOpt=nc(cur.FII)!=null;
+  const leg=(tag,v,d,bullPos)=>{
+    if(v==null)return`${tag} —`;
+    const col=v===0?"var(--ink)":(v>0)===bullPos?C.bullHi:C.bearHi;
+    const dch=d?`<span style="color:${(d>0)===bullPos?C.bull:C.bear};font-size:9.5px">${d>0?"▲":"▼"}${fmtOI(Math.abs(d))}</span>`:"";
+    return`${tag} <span style="color:${col}">${fmtOI(v)}</span> ${dch}`;
+  };
+  $("#pos-opt-tiles").innerHTML=hasOpt?["FII","DII","PRO","CLIENT"].map(pt=>{
+    const c=nc(cur[pt]),q=np(cur[pt]);
+    const dc=prev&&nc(prev[pt])!=null&&c!=null?c-nc(prev[pt]):null;
+    const dq=prev&&np(prev[pt])!=null&&q!=null?q-np(prev[pt]):null;
+    return`<div class="tile" title="${pt} index options, net contracts (long − short). Stance only — not delta-adjusted."><span class="k">${pt} idx opt net</span><div class="v" style="font-size:11.5px;line-height:1.55">${leg("CALLS",c,dc,true)}<br>${leg("PUTS",q,dq,false)}</div></div>`;
+  }).join(""):"";
+  $("#pos-chips").innerHTML=hasOpt?[["FUT","fut net"],["OPT","opt tilt"]].map(([m,lb])=>
+    `<button class="chip" data-pm="${m}" aria-pressed="${posMode===m}">${lb}</button>`).join(""):"";
+  document.querySelectorAll("#pos-chips .chip").forEach(b=>
+    b.addEventListener("click",()=>{posMode=b.dataset.pm;drawPositioning();}));
+  const opt=posMode==="OPT"&&hasOpt;
+  const fii=dates.map(d=>((opt?tilt(byDate[d].FII):net(byDate[d].FII))||0)/1000);
   lineChart("#pos-chart",[{n:"FII",c:C.cyan,v:fii}],dates,{h:150,unit:"k",markDate:SDATE});
+  $("#pos-cap").textContent=opt?"FII index-options tilt (net calls − net puts)":"FII net index futures";
   $("#pos-fii-val").textContent=fmtOI(Math.round(fii[di]*1000))+" contracts";
   $("#pos-fii-val").style.color=fii[di]>=0?C.bull:C.bear;
-  $("#pos-legend").innerHTML=`<span><i style="background:${C.cyan}"></i>net = index-fut long − short</span>`;
+  $("#pos-legend").innerHTML=opt
+    ?`<span><i style="background:${C.cyan}"></i>tilt = (call L−S) − (put L−S) · not delta-adjusted</span>`
+    :`<span><i style="background:${C.cyan}"></i>net = index-fut long − short</span>`;
 }
 
 /* ── flip radar ──────────────────────────────────────────────────────── */

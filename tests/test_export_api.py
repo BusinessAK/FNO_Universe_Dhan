@@ -95,3 +95,11 @@ class TestContextDegradation(unittest.TestCase):
         # positioning: 4 participants per date
         parts = {r[1] for r in p["positioning"]["rows"]}
         self.assertEqual(parts, {"CLIENT", "DII", "FII", "PRO"})
+        # index-option legs ride along (options tilt on the HUD); values sane
+        cols = p["positioning"]["cols"]
+        for c in ("opt_idx_call_long", "opt_idx_call_short",
+                  "opt_idx_put_long", "opt_idx_put_short"):
+            self.assertIn(c, cols)
+        ci = {c: i for i, c in enumerate(cols)}
+        fii = next(r for r in p["positioning"]["rows"] if r[ci["participant"]] == "FII")
+        self.assertGreater(fii[ci["opt_idx_call_long"]], 0)

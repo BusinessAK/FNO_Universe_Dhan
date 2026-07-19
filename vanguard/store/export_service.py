@@ -226,7 +226,9 @@ def _ban_signal_rows(data, sessions):
 
 
 POS_COLS = ["date", "participant", "fut_idx_long", "fut_idx_short",
-            "fut_stk_long", "fut_stk_short"]
+            "fut_stk_long", "fut_stk_short",
+            "opt_idx_call_long", "opt_idx_call_short",
+            "opt_idx_put_long", "opt_idx_put_short"]
 VIX_COLS = ["date", "close", "chg_pct"]
 DLV_COLS = ["date", "symbol", "delivery_pct", "ratio_20d"]
 
