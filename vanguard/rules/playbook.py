@@ -231,8 +231,10 @@ def build_playbook(
             "dealer_behavior": "Post Event Unwinding"
         }
     elif "IV_SKEW_ACCUMULATION" in setups:
-        is_bullish_skew = spot_t > 0 and call_wall_t > 0 and 0 < (call_wall_t - spot_t) / spot_t <= 0.03 and skew_slope > 1.15
-        if is_bullish_skew:
+        # Single-sourced skew predicate (wave 2) — previously a drifting inline
+        # copy of the screener's condition.
+        from vanguard.rules.setup_screener import skew_state
+        if skew_state(spot_t, call_wall_t, put_wall_t, skew_slope) == "BULLISH":
             playbook = {
                 "bias": "Bullish Breakout",
                 "trigger_strike": float(call_wall_t),

@@ -19,7 +19,8 @@ sys.path.insert(0, os.path.dirname(__file__))
 from vanguard.intelligence import InstitutionalIntelligence
 from vanguard.core.longitudinal import LongitudinalEngine
 from vanguard.core.playbook import build_playbook
-from vanguard.core.config import MIN_WALL_MIGRATION_PCT, GEX_INTENSITY_PIN_THRESHOLD, SETUP_PRIORITY
+from vanguard.core.config import SETUP_PRIORITY
+from vanguard.rules.setup_screener import screen, SetupInputs
 from vanguard.core.classifier import StructureClassifier
 from vanguard.core.breadth import MarketBreadthEngine
 from vanguard.core.cash_market_breadth import CashMarketBreadthEngine
@@ -252,62 +253,17 @@ def main():
                 if row.get('CLOSE_CE_T', 0.0) > 0 and row.get('CLOSE_PE_T', 0.0) > 0:
                     skew_slope = float(row.get('CLOSE_CE_T') / row.get('CLOSE_PE_T'))
 
-                # Setup screener scan rules
-                setups = []
-                # 1. GAMMA_SQUEEZE (Tier 1: Volatility Expansion)
-                if (gamma_regime == "SHORT_GAMMA" and spot_t > 0 and call_wall_t > 0 and 0 < (call_wall_t - spot_t) / spot_t <= 0.025 and net_bull_inv_shift > 0) or (spot_chg > 2.0 and gamma_regime == "SHORT_GAMMA"):
-                    setups.append("GAMMA_SQUEEZE")
-                
-                # 2. VOLATILITY_COIL (Tier 1: Volatility Compression)
-                if abs(spot_chg) <= 0.4 and abs(gex_intensity) < 15:
-                    setups.append("VOLATILITY_COIL")
-                
-                # 3. FLOOR_BOUNCE (Tier 2: Support Floor Bounce)
-                if gamma_regime == "LONG_GAMMA" and spot_t > 0 and put_wall_t > 0 and abs(spot_t - put_wall_t) / spot_t <= 0.025 and net_bull_inv_shift > 20000:
-                    setups.append("FLOOR_BOUNCE")
-                
-                # 4. DEALER_DEFENSE (Tier 2: Dealer Pin Zones)
-                if gamma_regime == "LONG_GAMMA" and abs(gex_intensity) > GEX_INTENSITY_PIN_THRESHOLD and gamma_flip_t > 0 and abs(spot_t - gamma_flip_t) / spot_t <= 0.015:
-                    setups.append("DEALER_DEFENSE")
-                
-                # 5. REGIME_SHIFT (Tier 3: Regime Flip Transition)
-                if (spot_t > gamma_flip_t > 0 and 0 < spot_tm1 <= gamma_flip_tm1 and net_bull_inv_shift > 0) or (gamma_flip_t > 0 and abs(spot_t - gamma_flip_t) / spot_t <= 0.008):
-                    setups.append("REGIME_SHIFT")
-                
-                # 6. INVENTORY_MIGRATION (Tier 3: Wall Migration Breakout / Collapse)
-                # Walls jump in whole strike intervals — require a minimum shift
-                # magnitude so routine strike-to-strike drift doesn't fire it.
-                pw_shift_pct = (abs(put_wall_t - put_wall_tm1) / put_wall_tm1 * 100.0) if (put_wall_t > 0 and put_wall_tm1 > 0) else 0.0
-                cw_shift_pct = (abs(call_wall_t - call_wall_tm1) / call_wall_tm1 * 100.0) if (call_wall_t > 0 and call_wall_tm1 > 0) else 0.0
-                if max(pw_shift_pct, cw_shift_pct) >= MIN_WALL_MIGRATION_PCT:
-                    setups.append("INVENTORY_MIGRATION")
-                
-                # 7. PINCH_ZONE (Tier 2: All walls converged — Compression Breakout Setup)
-                # Fires only when INVENTORY_MIGRATION did NOT trigger (walls static but all pinched)
-                if (
-                    "INVENTORY_MIGRATION" not in setups
-                    and call_wall_t > 0 and put_wall_t > 0 and gamma_flip_t > 0
-                    and abs(call_wall_t - put_wall_t) < 1.0
-                    and abs(call_wall_t - gamma_flip_t) < 1.0
-                    and spot_t > 0
-                    and abs(spot_t - gamma_flip_t) / spot_t <= 0.04
-                ):
-                    setups.append("PINCH_ZONE")
-
-                # 8. IV_SPIKE Setup (Vol Spike - Premium Rich)
-                # iv_shift is in decimal vol units (0.045 = 4.5 IV points)
-                if iv_shift > 0.045 and iv_rank > 70:
-                    setups.append("IV_SPIKE")
-
-                # 9. IV_CRUSH Setup (Vol Crush - Post Event)
-                if iv_shift < -0.045 and iv_rank < 35:
-                    setups.append("IV_CRUSH")
-
-                # 10. IV_SKEW_ACCUMULATION Setup (Speculative Skew Chase)
-                is_bullish_skew = spot_t > 0 and call_wall_t > 0 and 0 < (call_wall_t - spot_t) / spot_t <= 0.03 and skew_slope > 1.15
-                is_bearish_skew = spot_t > 0 and put_wall_t > 0 and 0 < (spot_t - put_wall_t) / spot_t <= 0.03 and skew_slope < 0.85
-                if is_bullish_skew or is_bearish_skew:
-                    setups.append("IV_SKEW_ACCUMULATION")
+                # Setup screener — the 10 rules live in vanguard/rules/setup_screener.py
+                # (wave 2 / R1 extraction; parity-gated against the old inline block).
+                setups = screen(SetupInputs(
+                    spot_t=spot_t, spot_tm1=spot_tm1, spot_chg=spot_chg,
+                    call_wall_t=call_wall_t, call_wall_tm1=call_wall_tm1,
+                    put_wall_t=put_wall_t, put_wall_tm1=put_wall_tm1,
+                    gamma_flip_t=gamma_flip_t, gamma_flip_tm1=gamma_flip_tm1,
+                    gamma_regime=gamma_regime, gex_intensity=gex_intensity,
+                    net_bull_inv_shift=net_bull_inv_shift,
+                    iv_shift=iv_shift, iv_rank=iv_rank, skew_slope=skew_slope,
+                ))
                 
                 # Ratios for conviction circle
                 instab_factor = min(10.0, abs(gex_intensity) / 15.0) / 10.0
@@ -367,6 +323,8 @@ def main():
                     "suggested_strategy": row.get('SUGGESTED_STRATEGY', 'Wait for Setup'),
                     # Expiry rollover flag — True on days when an index weekly series
                     # expired overnight and was stripped from T-1 before delta computation.
+                    "skew_slope": skew_slope,
+                    "iv_rank": iv_rank,
                     "expiry_filtered": expiry_filtered,
                     "dropped_expiry_dates": dropped_expiry_dates,
                 }
@@ -423,6 +381,23 @@ def main():
                     pe_interp=row.get('PE_INTERP', ''),
                 )
                 day_data["suggested_strategy"] = s_strat
+
+                setup_biases = {}
+                for _s in setups:
+                    if _s == primary_setup:
+                        setup_biases[_s] = playbook.get("bias", "Neutral")
+                    else:
+                        _pb, _ = build_playbook(
+                            setups=[_s], spot_t=spot_t, call_wall_t=call_wall_t,
+                            put_wall_t=put_wall_t, gamma_flip_t=gamma_flip_t,
+                            call_wall_tm1=call_wall_tm1, put_wall_tm1=put_wall_tm1,
+                            ifs_final=ifs_final, gamma_regime=gamma_regime,
+                            spot_chg=spot_chg, skew_slope=skew_slope,
+                            base_strategy=row.get('SUGGESTED_STRATEGY', 'Wait for Setup'),
+                            pe_interp=row.get('PE_INTERP', ''),
+                        )
+                        setup_biases[_s] = _pb.get("bias", "Neutral")
+                day_data["setup_biases"] = setup_biases
 
                 # Save updated longitudinal stats
                 day_data["conviction_score"] = conviction_score
@@ -526,6 +501,8 @@ def main():
                 "gamma_regime": day_data["gamma_regime"],
                 "iv": day_data["iv"],
                 "iv_shift": day_data["iv_shift"],
+                "iv_rank": day_data.get("iv_rank", 50.0),
+                "skew_slope": day_data.get("skew_slope", 1.0),
                 "ce_interp": day_data.get("ce_interp", "Neutral"),
                 "pe_interp": day_data.get("pe_interp", "Neutral"),
                 "suggested_strategy": day_data.get("suggested_strategy", "Wait for Setup"),
@@ -552,6 +529,8 @@ def main():
                     "date": d_t,
                     "setup_type": primary_type,
                     "setup_types": "|".join(setups_list),
+                    "setup_biases": "|".join(
+                        f"{k}:{v}" for k, v in day_data.get("setup_biases", {}).items()),
                     "bias": playbook.get("bias", "Neutral"),
                     "trigger_strike": playbook.get("trigger_strike", 0.0),
                     "invalidation_strike": playbook.get("invalidation_strike", 0.0),
