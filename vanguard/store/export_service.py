@@ -192,7 +192,51 @@ def _build(con, n_sessions: int) -> dict:
     for r in data["changes"]["rows"]:
         r[mi] = TAG_RE.sub("", r[mi] or "")
 
+    _context_blocks(con, data, sessions, ph)
     return data
+
+
+# ── NSE context layer (C2) — every block optional: absent table = absent key,
+#    and the HUD hides the panel (PRD degradation contract) ──────────────────
+
+POS_COLS = ["date", "participant", "fut_idx_long", "fut_idx_short",
+            "fut_stk_long", "fut_stk_short"]
+VIX_COLS = ["date", "close", "chg_pct"]
+DLV_COLS = ["date", "symbol", "delivery_pct", "ratio_20d"]
+
+
+def _context_blocks(con, data, sessions, ph):
+    tables = {r[0] for r in con.execute("SHOW TABLES").fetchall()}
+    if "daily_participant_oi" in tables:
+        data["positioning"] = table(
+            con,
+            f"SELECT {', '.join(POS_COLS)} FROM daily_participant_oi "
+            "WHERE date IN (SELECT DISTINCT date FROM daily_participant_oi "
+            "               ORDER BY date DESC LIMIT ?) "
+            "ORDER BY date, participant",
+            POS_COLS, (TREND_WINDOW_SESSIONS,))
+    if "daily_index_close" in tables:
+        # 252 sessions so the HUD can place today's VIX on a 1-year percentile
+        vix = table(
+            con,
+            f"SELECT {', '.join(VIX_COLS)} FROM daily_index_close "
+            "WHERE upper(index_name) = 'INDIA VIX' ORDER BY date DESC LIMIT 252",
+            VIX_COLS)
+        vix["rows"].reverse()
+        data["vix"] = vix
+    if "daily_delivery" in tables:
+        # ratio vs the symbol's OWN trailing 20 sessions (level is structural;
+        # the ratio is the signal) — window excludes the current day
+        data["delivery"] = table(
+            con,
+            f"""SELECT date, symbol, delivery_pct,
+                delivery_pct / NULLIF(AVG(delivery_pct) OVER (
+                    PARTITION BY symbol ORDER BY date
+                    ROWS BETWEEN 20 PRECEDING AND 1 PRECEDING), 0) AS ratio_20d
+                FROM daily_delivery
+                WHERE symbol IN (SELECT DISTINCT symbol FROM daily_market_structure)
+                QUALIFY date IN ({ph}) ORDER BY date, symbol""",
+            DLV_COLS, sessions)
 
 
 def payload_json(db_path=None, sessions: int = 30) -> str:

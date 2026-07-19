@@ -64,3 +64,34 @@ class TestTemplateBootWrap(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+@unittest.skipUnless(HAVE_DB, "no compiled DB")
+class TestContextDegradation(unittest.TestCase):
+    def test_payload_without_context_tables(self):
+        """PRD degradation contract: a pre-C1 DB (no context tables) must
+        still build a full payload — context keys absent, nothing raises."""
+        import tempfile, duckdb
+        from pathlib import Path
+        core = ["daily_market_structure", "daily_setups", "daily_changes",
+                "daily_market_breadth", "daily_cm_breadth"]
+        with tempfile.TemporaryDirectory() as tmp:
+            db2 = Path(tmp) / "no_context.duckdb"
+            con = duckdb.connect(str(db2))
+            con.execute(f"ATTACH '{DB}' AS prod (READ_ONLY)")
+            for t in core:
+                con.execute(f"CREATE TABLE {t} AS SELECT * FROM prod.{t}")
+            con.close()
+            p = build_payload(db_path=db2, sessions=2)
+        for k in ("positioning", "vix", "delivery"):
+            self.assertNotIn(k, p)
+        self.assertIn("market_structure", p)
+
+    def test_context_blocks_present_on_real_db(self):
+        p = build_payload(sessions=2)
+        self.assertIn("positioning", p)
+        self.assertIn("vix", p)
+        self.assertIn("delivery", p)
+        # positioning: 4 participants per date
+        parts = {r[1] for r in p["positioning"]["rows"]}
+        self.assertEqual(parts, {"CLIENT", "DII", "FII", "PRO"})

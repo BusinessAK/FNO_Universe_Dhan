@@ -290,6 +290,7 @@ figure figcaption{font-size:10px;color:var(--muted);letter-spacing:.06em;margin-
     <div class="cb-stat"><span class="k">Universe</span><span class="v" id="cb-count">—</span></div>
     <div class="cb-stat"><span class="k">Net structure</span><span class="v" id="cb-net">—</span></div>
     <div class="cb-stat"><span class="k">Gamma regime</span><span class="v" id="cb-gamma">—</span></div>
+    <div class="cb-stat" id="vix-tile" hidden><span class="k">India VIX <span id="vix-pct" style="color:var(--faint)"></span></span><span class="v" id="vix-val">—</span></div>
     <div class="spacer"></div>
     <div class="cb-stat" id="live-badge" hidden><span class="k" style="color:var(--bull-hi)"><span class="pulse" style="background:var(--bull-hi)"></span>LIVE</span><span class="v" id="live-n" style="color:var(--bull-hi)">—</span></div>
     <div class="cb-stat"><span class="k"><span class="pulse"></span>IST</span><span class="v" id="clock">—</span></div>
@@ -339,6 +340,14 @@ figure figcaption{font-size:10px;color:var(--muted);letter-spacing:.06em;margin-
           <span class="legend" id="adl-legend" style="margin-left:8px"></span></figcaption>
       </figure>
     </div>
+  </section>
+
+  <section class="panel" style="--i:4" id="p-positioning" hidden>
+    <div class="ph"><h2>Positioning</h2><span class="sub">participant-wise OI (NSE) · net index-futures contracts</span>
+      <span class="spacer"></span><div class="legend" id="pos-legend"></div></div>
+    <div class="tiles" id="pos-tiles" style="margin-bottom:12px"></div>
+    <figure><div id="pos-chart"></div>
+      <figcaption>FII net index futures · last 60 sessions · <b id="pos-fii-val"></b></figcaption></figure>
   </section>
 
   <section class="panel" style="--i:4" id="p-flips">
@@ -430,6 +439,10 @@ const BR   = unpack(VG.breadth);
 const CM   = unpack(VG.cm_breadth);
 const NF   = unpack(VG.nifty || {cols: [], rows: []});
 const NF_BY_DATE = Object.fromEntries(NF.map(r => [r.date, r.spot_close]));
+const POS  = VG.positioning ? unpack(VG.positioning) : [];
+const VIXH = VG.vix ? unpack(VG.vix) : [];
+const DLV_BY_DATE = {};
+(VG.delivery ? unpack(VG.delivery) : []).forEach(r => { (DLV_BY_DATE[r.date] ??= {})[r.symbol] = r; });
 const META = VG.meta;
 const SESSIONS = META.sessions;
 /* Shared lookback for all trend charts (waveform, McClellan, A/D line).
@@ -458,6 +471,9 @@ let SDATE = SESSIONS[SESSIONS.length-1];
 let MS = [], SET = [], SIG = [], bySym = {};
 function bindSession(){
   MS = MSD[SDATE] || []; SET = SETD[SDATE] || []; SIG = SIGD[SDATE] || [];
+  const dlv = DLV_BY_DATE[SDATE] || {};
+  MS.forEach(r => { const x = dlv[r.symbol];
+    r._dlv = x ? x.delivery_pct : null; r._dlvr = x ? x.ratio_20d : null; });
   bySym = Object.fromEntries(MS.map(r=>[r.symbol,r]));
 }
 bindSession();
@@ -929,6 +945,46 @@ function drawSetups(){
   });
 }
 
+/* ── NSE context (C2): VIX tile + Positioning panel ──────────────────── */
+/* Both render from optional payload blocks and honour SDATE (time travel):
+   values shown are the latest at-or-before the selected session, never after. */
+function drawVix(){
+  const t=$("#vix-tile");if(!t)return;
+  if(!VIXH.length){t.hidden=true;return}
+  let i=VIXH.length-1;while(i>0&&VIXH[i].date>SDATE)i--;
+  const v=VIXH[i];
+  if(!v||v.date>SDATE){t.hidden=true;return}
+  const pct=Math.round(VIXH.filter(x=>x.close<=v.close).length*100/VIXH.length);
+  const col=pct>=75?C.bearHi:pct<=25?C.bullHi:"var(--ink)";
+  t.hidden=false;
+  $("#vix-pct").textContent="p"+pct;
+  $("#vix-val").innerHTML=`<span style="color:${col}">${v.close.toFixed(2)}</span>`+
+    (v.chg_pct!=null?` <span class="${cls(v.chg_pct)}" style="font-size:10.5px">${v.chg_pct>=0?"▲":"▼"}${Math.abs(v.chg_pct).toFixed(2)}%</span>`:"");
+  t.title=`India VIX ${v.close.toFixed(2)} — p${pct} of the last ${VIXH.length} sessions`;
+}
+function drawPositioning(){
+  const p=$("#p-positioning");if(!p)return;
+  if(!POS.length){p.hidden=true;return}
+  const byDate={};POS.forEach(r=>{(byDate[r.date]??={})[r.participant]=r;});
+  const dates=Object.keys(byDate).sort().filter(d=>byDate[d].FII);
+  if(!dates.length){p.hidden=true;return}
+  p.hidden=false;
+  let di=dates.length-1;while(di>0&&dates[di]>SDATE)di--;
+  const cur=byDate[dates[di]],prev=di>0?byDate[dates[di-1]]:null;
+  const net=r=>r?r.fut_idx_long-r.fut_idx_short:null;
+  $("#pos-tiles").innerHTML=["FII","DII","PRO","CLIENT"].map(pt=>{
+    const n=net(cur[pt]),d=prev&&net(prev[pt])!=null&&n!=null?n-net(prev[pt]):null;
+    const col=n>0?C.bullHi:n<0?C.bearHi:"var(--ink)";
+    const dch=d?`<span style="color:${d>0?C.bull:C.bear}">${d>0?"▲":"▼"}${fmtOI(Math.abs(d))}</span>`:"&nbsp;";
+    return`<div class="tile"><span class="k">${pt} idx fut net</span><div class="v" style="color:${col};font-size:15px">${n==null?"—":fmtOI(n)}</div><span class="d">${dch}</span></div>`;
+  }).join("");
+  const fii=dates.map(d=>net(byDate[d].FII)/1000);
+  lineChart("#pos-chart",[{n:"FII",c:C.cyan,v:fii}],dates,{h:150,unit:"k",markDate:SDATE});
+  $("#pos-fii-val").textContent=fmtOI(Math.round(fii[di]*1000))+" contracts";
+  $("#pos-fii-val").style.color=fii[di]>=0?C.bull:C.bear;
+  $("#pos-legend").innerHTML=`<span><i style="background:${C.cyan}"></i>net = index-fut long − short</span>`;
+}
+
 /* ── flip radar ──────────────────────────────────────────────────────── */
 /* Whipsaw guard: a flip whose symbol also flipped within the prior 3 sessions
    is mostly IFS churn (67% of all flips historically) — those are tagged,
@@ -999,6 +1055,7 @@ const COLS=[
   ["iv","IV",r=>r.iv==null?"—":(r.iv*100).toFixed(1)+"%",!0],
   ["gex_intensity","GEX-I",r=>fmt2(r.gex_intensity),!0],
   ["futures_oi_chg","FUT OIΔ",r=>`<span class="${cls(r.futures_oi_chg)}">${fmtOI(r.futures_oi_chg)}</span>`,!0],
+  ["_dlv","DLV%",r=>r._dlv==null?"—":r._dlv.toFixed(1)+"%"+(r._dlvr?`<span class="dim" style="font-size:10px"> ${r._dlvr.toFixed(1)}×</span>`:""),!0],
   ["conviction_score","CONV",r=>{const v=Math.max(0,Math.min(100,r.conviction_score||0));
      return fmt2(r.conviction_score)+`<span class="meter"><i style="width:${v}%"></i></span>`},!0],
   ["priority_score","PRI",r=>`<b>${(r.priority_score??0).toFixed(0)}</b>`,!0],
@@ -1184,6 +1241,7 @@ function openDossier(sym){
     ["FUT OI",fmtOI(r.futures_oi),fmtOI(r.futures_oi_chg)+" Δ"],
     ["NET INV",fmtOI(r.net_inv_shift),""],
     ["CE / PE",fmtOI(r.delta_ce_oi)+" / "+fmtOI(r.delta_pe_oi),"Δ OI"],
+    ["DLV%",r._dlv==null?"—":r._dlv.toFixed(1)+"%",r._dlvr?r._dlvr.toFixed(2)+"× 20d avg":"cash delivery"],
   ].map(([k,v,d])=>`<div class="tile"><span class="k">${k}</span><div class="v" style="font-size:14px">${v}</div><span class="d">${d}</span></div>`).join("");
   const st=SET.filter(s=>s.symbol===sym);
   const s0=st[0]||null;
@@ -1284,7 +1342,7 @@ document.addEventListener("keydown",e=>{
 /* ── boot ────────────────────────────────────────────────────────────── */
 document.body.classList.add("boot");
 function renderSession(){
-  drawCmdbar();drawRegime();drawFlips();drawSectors();drawSignals();
+  drawCmdbar();drawRegime();drawVix();drawPositioning();drawFlips();drawSectors();drawSignals();
   drawSetups();renderScan();drawBreadth();drawInternals();
   if(!$("#dossier").hidden)$("#dossier").hidden=true;
 }
