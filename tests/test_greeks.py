@@ -2,7 +2,7 @@ import unittest
 from datetime import datetime, timedelta
 import numpy as np
 import pandas as pd
-from src.greeks_engine import GreeksEngine
+from vanguard.greeks_engine import GreeksEngine
 
 class TestGreeksEngine(unittest.TestCase):
     def setUp(self):

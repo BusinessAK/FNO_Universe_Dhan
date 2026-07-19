@@ -14,10 +14,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from src.data.dhan_client import DhanClient          # noqa: E402
-from src.data.instrument_master import InstrumentMaster  # noqa: E402
-from src.live.feed_handler import normalize            # noqa: E402
-from src.live import config as C                       # noqa: E402
+from vanguard.data.dhan_client import DhanClient          # noqa: E402
+from vanguard.data.instrument_master import InstrumentMaster  # noqa: E402
+from vanguard.live.feed_handler import normalize            # noqa: E402
+from vanguard.live import config as C                       # noqa: E402
 
 DURATION = int(sys.argv[1]) if len(sys.argv) > 1 else 15
 MODE = sys.argv[2] if len(sys.argv) > 2 else "light"
@@ -44,7 +44,7 @@ if MODE == "light":
     if not fut.empty:
         add(C.SEG_NSE_FNO, fut.iloc[0].security_id, "RELIANCE fut")
 else:
-    from src.live.subscription_mgr import SubscriptionManager
+    from vanguard.live.subscription_mgr import SubscriptionManager
     import duckdb
     con = duckdb.connect(str(ROOT / "data/compiled/vanguard.duckdb"), read_only=True)
     latest = con.execute("SELECT MAX(date) FROM daily_market_structure").fetchone()[0]

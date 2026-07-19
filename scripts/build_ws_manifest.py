@@ -22,9 +22,9 @@ sys.path.insert(0, str(ROOT))
 
 import pandas as pd                                    # noqa: E402
 
-from src.live import config as C                       # noqa: E402
-from src.live.manifest import build_manifest, ManifestError  # noqa: E402
-from src.data.instrument_master import InstrumentMaster      # noqa: E402
+from vanguard.live import config as C                       # noqa: E402
+from vanguard.live.manifest import build_manifest, ManifestError  # noqa: E402
+from vanguard.data.instrument_master import InstrumentMaster      # noqa: E402
 
 
 def latest_bhav() -> str:

@@ -8,7 +8,7 @@ from datetime import datetime, timedelta, timezone
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(__file__)), 'src'))
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-from src.data_fetcher import NSEDataFetcher
+from vanguard.data_fetcher import NSEDataFetcher
 
 def fetch_history(days_back=365):
     print("=" * 80)

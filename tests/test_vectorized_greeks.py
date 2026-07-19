@@ -12,7 +12,7 @@ from datetime import datetime
 import numpy as np
 import pandas as pd
 
-from src.greeks_engine import GreeksEngine
+from vanguard.greeks_engine import GreeksEngine
 
 
 def synthetic_grid(n=4000, seed=7):

@@ -10,8 +10,8 @@ from unittest.mock import patch
 
 import pandas as pd
 
-from src.live import config as C
-from src.live.tick_journal import TickJournal, JOURNAL_COLS
+from vanguard.live import config as C
+from vanguard.live.tick_journal import TickJournal, JOURNAL_COLS
 
 
 class TestJournalSchema(unittest.TestCase):

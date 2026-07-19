@@ -33,7 +33,7 @@ DB_PATH  = ROOT / "data" / "compiled" / "vanguard.duckdb"
 RPT_DIR  = ROOT / "data" / "reports"
 
 sys.path.insert(0, str(ROOT))
-from src.services.briefing_service import (
+from vanguard.services.briefing_service import (
     get_regime_context,
     get_top_setups,
     get_sector_pulse,
@@ -41,7 +41,7 @@ from src.services.briefing_service import (
     get_ifs_leaders,
     get_structural_alerts,
 )
-from src.services.catalyst_service import run_catalyst_scan, load_catalysts
+from vanguard.services.catalyst_service import run_catalyst_scan, load_catalysts
 
 CATALYST_PATH = ROOT / "data" / "compiled" / "daily_catalysts.json"
 

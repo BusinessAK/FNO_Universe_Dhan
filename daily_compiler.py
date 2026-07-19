@@ -13,17 +13,17 @@ import numpy as np
 from datetime import datetime
 
 # Setup workspace paths
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+
 sys.path.insert(0, os.path.dirname(__file__))
 
-from src.intelligence import InstitutionalIntelligence
-from src.core.longitudinal import LongitudinalEngine
-from src.core.playbook import build_playbook
-from src.core.config import MIN_WALL_MIGRATION_PCT, GEX_INTENSITY_PIN_THRESHOLD, SETUP_PRIORITY
-from src.core.classifier import StructureClassifier
-from src.core.breadth import MarketBreadthEngine
-from src.core.cash_market_breadth import CashMarketBreadthEngine
-from src.config.sector_mapping import get_sector
+from vanguard.intelligence import InstitutionalIntelligence
+from vanguard.core.longitudinal import LongitudinalEngine
+from vanguard.core.playbook import build_playbook
+from vanguard.core.config import MIN_WALL_MIGRATION_PCT, GEX_INTENSITY_PIN_THRESHOLD, SETUP_PRIORITY
+from vanguard.core.classifier import StructureClassifier
+from vanguard.core.breadth import MarketBreadthEngine
+from vanguard.core.cash_market_breadth import CashMarketBreadthEngine
+from vanguard.config.sector_mapping import get_sector
 
 def extract_date(filename):
     """Extracts YYYY-MM-DD from NSE bhavcopy filename."""
@@ -222,7 +222,7 @@ def main():
                 # Scale-free gamma regime: spot vs gamma flip, shared with
                 # market_structure_engine + the live structure engine so all
                 # three can never silently diverge (see InstitutionalIntelligence
-                # .gamma_regime in src/intelligence.py).
+                # .gamma_regime in vanguard/intelligence.py).
                 gamma_regime = InstitutionalIntelligence.gamma_regime(spot_t, gamma_flip_t, gex_t)
                 
                 # Fetch history compiled so far to run true longitudinal models
@@ -401,7 +401,7 @@ def main():
                 # Rapid crossover regime shift
                 regime_transition = migrations["regime_change"]
                 
-                # Compile playbook + setup-aware strategy override (src/core/playbook.py)
+                # Compile playbook + setup-aware strategy override (vanguard/core/playbook.py)
                 # Primary setup by shared precedence; the playbook is built for
                 # THAT setup only, so setup_type and playbook always agree.
                 primary_setup = next((p for p in SETUP_PRIORITY if p in setups),

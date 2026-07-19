@@ -1,7 +1,7 @@
 import unittest
 import pandas as pd
-from src.core.market_structure_engine import MarketStructureEngine
-from src.models.states import MarketState
+from vanguard.core.market_structure_engine import MarketStructureEngine
+from vanguard.models.states import MarketState
 
 class TestMarketStructureEngine(unittest.TestCase):
     def setUp(self):

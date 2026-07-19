@@ -14,11 +14,11 @@ from http.server import ThreadingHTTPServer
 from pathlib import Path
 from unittest.mock import patch
 
-from src.live import config as C
-from src.live import bridge as bridge_mod
-from src.live.feed_handler import normalize
-from src.live.snapshot import write_snapshot
-from src.live.state_store import StateStore
+from vanguard.live import config as C
+from vanguard.live import bridge as bridge_mod
+from vanguard.live.feed_handler import normalize
+from vanguard.live.snapshot import write_snapshot
+from vanguard.live.state_store import StateStore
 
 
 def sdk_quote(seg, sid, ltp, vol=100, oi=None):

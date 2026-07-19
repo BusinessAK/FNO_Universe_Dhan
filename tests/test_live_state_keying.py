@@ -15,10 +15,10 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from src.live import config as C
-from src.live.feed_handler import normalize
-from src.live.snapshot import build_key_symbol_map, write_snapshot
-from src.live.state_store import StateStore
+from vanguard.live import config as C
+from vanguard.live.feed_handler import normalize
+from vanguard.live.snapshot import build_key_symbol_map, write_snapshot
+from vanguard.live.state_store import StateStore
 
 NIFTY_KEY = (C.SEG_IDX, 13)          # NIFTY spot
 ABB_KEY = (C.SEG_NSE_EQ, 13)         # ABB equity — same security_id, other segment
@@ -174,7 +174,7 @@ class TestRealUniverseHasNoKeyCollisions(unittest.TestCase):
     def test_every_symbol_gets_a_distinct_key(self):
         if not C.INSTRUMENT_MASTER.exists():
             self.skipTest("instrument_master.parquet not built")
-        from src.data.instrument_master import InstrumentMaster
+        from vanguard.data.instrument_master import InstrumentMaster
 
         im = InstrumentMaster(C.INSTRUMENT_MASTER)
         symbols = sorted({s for s in im.df[im.df.kind.isin(["EQ", "INDEX"])].underlying

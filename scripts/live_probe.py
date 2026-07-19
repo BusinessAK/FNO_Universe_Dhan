@@ -26,9 +26,9 @@ sys.path.insert(0, str(ROOT))
 
 import pandas as pd                                   # noqa: E402
 
-from src.live import config as C                      # noqa: E402
-from src.live import calendar as cal                  # noqa: E402
-from src.live.subscription_mgr import SubscriptionManager  # noqa: E402
+from vanguard.live import config as C                      # noqa: E402
+from vanguard.live import calendar as cal                  # noqa: E402
+from vanguard.live.subscription_mgr import SubscriptionManager  # noqa: E402
 
 
 class Stats:
@@ -102,7 +102,7 @@ def main():
         print("[probe] market closed — run during 09:15-15:30 IST (or --force)")
         return 1
 
-    from src.data.dhan_client import DhanClient
+    from vanguard.data.dhan_client import DhanClient
     client = DhanClient()
     ok, msg = client.check_auth()
     print(f"[auth] {'OK' if ok else 'FAIL'} — {msg}")
@@ -142,7 +142,7 @@ def main():
     try:
         opt = mf[(mf.symbol == "NIFTY") & (mf.kind == "OPT")]
         expiry = sorted(opt.expiry.unique())[0]
-        from src.data.instrument_master import InstrumentMaster
+        from vanguard.data.instrument_master import InstrumentMaster
         im = InstrumentMaster()
         idx = im.df[(im.df.kind == "INDEX") & (im.df.underlying == "NIFTY")].iloc[0]
         time.sleep(3.0)                       # respect the 1/3s bucket

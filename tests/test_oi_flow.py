@@ -1,4 +1,4 @@
-"""Unit tests for src/intelligence.InstitutionalIntelligence.classify_oi_flow."""
+"""Unit tests for vanguard/intelligence.InstitutionalIntelligence.classify_oi_flow."""
 import os
 import sys
 
@@ -7,7 +7,7 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from src.intelligence import InstitutionalIntelligence
+from vanguard.intelligence import InstitutionalIntelligence
 
 classify = InstitutionalIntelligence.classify_oi_flow
 verified_flow = InstitutionalIntelligence.verified_oi_flow
@@ -216,7 +216,7 @@ class TestRealBhavcopyRow:
 
     @pytest.mark.skipif(not os.path.exists(BHAV), reason="bhavcopy not present")
     def test_sonacoms_put_buying_confirmed_from_premium(self):
-        from src.processor import DataProcessor
+        from vanguard.processor import DataProcessor
 
         df_t, _ = DataProcessor().normalize(self.BHAV)
         out = classify(df_t)
@@ -231,7 +231,7 @@ class TestRealBhavcopyRow:
         # The raw OI delta (CHG_IN_OI_PE_T=+305,025) looks bullish under the old
         # "rising PE OI = written puts" assumption. Verified flow correctly reads
         # it as net bearish, since the added PE OI was bought, not written.
-        from src.processor import DataProcessor
+        from vanguard.processor import DataProcessor
 
         df_t, _ = DataProcessor().normalize(self.BHAV)
         out = verified_flow(df_t)

@@ -8,17 +8,17 @@ import os, sys
 from typing import Any
 
 # Setup package paths
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+
 sys.path.insert(0, os.path.dirname(__file__))
 
 # Import Centralized Abstractions & Services Layer
-from src.services.database_service import DatabaseService
-from src.services.session_cache import SessionCache
-from src.services.ui_state import UIStateService
-from src.core.market_structure_engine import MarketStructureEngine
-from src.core.historical_engine import HistoricalSessionResolver
-from src.core.config import INDEX_SYMBOLS
-from src.core.setups import categorize_and_sort
+from vanguard.services.database_service import DatabaseService
+from vanguard.services.session_cache import SessionCache
+from vanguard.services.ui_state import UIStateService
+from vanguard.core.market_structure_engine import MarketStructureEngine
+from vanguard.core.historical_engine import HistoricalSessionResolver
+from vanguard.core.config import INDEX_SYMBOLS
+from vanguard.core.setups import categorize_and_sort
 
 def format_date_safe(value: Any, fmt: str = '%d %b %Y') -> str:
     """Safely format a date or return it as string if parsing fails."""
@@ -28,18 +28,18 @@ def format_date_safe(value: Any, fmt: str = '%d %b %Y') -> str:
         return str(value)
 
 # Import UI components and logic modules
-from src.ui.styling import inject_styles
-from src.ui.sidebar import render_sidebar
-from src.ui.matrix import render_inventory_matrix
-from src.ui.setups_grid import render_setups_grid, render_structure_flip_watch
-from src.ui.cards import (
+from vanguard.ui.styling import inject_styles
+from vanguard.ui.sidebar import render_sidebar
+from vanguard.ui.matrix import render_inventory_matrix
+from vanguard.ui.setups_grid import render_setups_grid, render_structure_flip_watch
+from vanguard.ui.cards import (
     render_html, render_metric_row, render_alerts, render_intelligence_panel,
     render_greeks_ledger, sig_colors,
     render_daily_changes_panel, render_playbook_card,
     render_cm_breadth_panel, render_market_breadth_panel
 )
-from src.ui.watchlist import render_watchlist_briefing
-from src.charts import (
+from vanguard.ui.watchlist import render_watchlist_briefing
+from vanguard.charts import (
     render_wall_migration_chart, render_cumulative_oi_chart,
     render_gex_profile_chart, render_oi_concentration_chart,
     render_iv_skew_chart

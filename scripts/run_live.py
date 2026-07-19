@@ -19,14 +19,14 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from src.live import config as C          # noqa: E402
-from src.live import calendar as cal      # noqa: E402
-from src.live.state_store import StateStore        # noqa: E402
-from src.live.tick_journal import TickJournal      # noqa: E402
-from src.live.subscription_mgr import SubscriptionManager  # noqa: E402
-from src.live.trigger_engine import TriggerEngine, load_armed_book  # noqa: E402
-from src.live.alert_sink import AlertSink                  # noqa: E402
-from src.live import live_compute as lc                    # noqa: E402
+from vanguard.live import config as C          # noqa: E402
+from vanguard.live import calendar as cal      # noqa: E402
+from vanguard.live.state_store import StateStore        # noqa: E402
+from vanguard.live.tick_journal import TickJournal      # noqa: E402
+from vanguard.live.subscription_mgr import SubscriptionManager  # noqa: E402
+from vanguard.live.trigger_engine import TriggerEngine, load_armed_book  # noqa: E402
+from vanguard.live.alert_sink import AlertSink                  # noqa: E402
+from vanguard.live import live_compute as lc                    # noqa: E402
 
 
 def compiled_universe() -> list[str] | None:
@@ -202,7 +202,7 @@ def main():
     # auth probe
     auth_ok = False
     try:
-        from src.data.dhan_client import DhanClient
+        from vanguard.data.dhan_client import DhanClient
         client = DhanClient()
         auth_ok, msg = client.check_auth()
         print(f"[auth] {'OK' if auth_ok else 'FAIL'} — {msg}")
@@ -222,7 +222,7 @@ def main():
         except Exception as e:
             print(f"[triggers] dry-run armed-book check failed: {e}")
         try:
-            from src.data.instrument_master import InstrumentMaster
+            from vanguard.data.instrument_master import InstrumentMaster
             sm = SubscriptionManager()
             im = InstrumentMaster()
             spot_closes = eod_spot_closes()
@@ -244,10 +244,10 @@ def main():
         sys.exit(1)
 
     # ── live loop ─────────────────────────────────────────────────────────
-    from src.live.feed_handler import FeedHandler
-    from src.live.snapshot import build_key_symbol_map, write_snapshot
-    from src.live.bridge import Bridge
-    from src.data.instrument_master import InstrumentMaster
+    from vanguard.live.feed_handler import FeedHandler
+    from vanguard.live.snapshot import build_key_symbol_map, write_snapshot
+    from vanguard.live.bridge import Bridge
+    from vanguard.data.instrument_master import InstrumentMaster
 
     im = InstrumentMaster()
     key_symbol = build_key_symbol_map(im, spot_symbols)

@@ -3,7 +3,7 @@ import tempfile
 
 import pandas as pd
 
-from src.research.swing_backtester import (
+from vanguard.research.swing_backtester import (
     BacktestConfig,
     classify_long_candidate,
     compute_alpha_score,

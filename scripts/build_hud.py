@@ -19,8 +19,8 @@ import duckdb
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
-from src.config.sector_mapping import get_sector  # noqa: E402
-from src.core.config import TREND_WINDOW_SESSIONS  # noqa: E402
+from vanguard.config.sector_mapping import get_sector  # noqa: E402
+from vanguard.core.config import TREND_WINDOW_SESSIONS  # noqa: E402
 
 MS_COLS = [
     "date", "symbol", "sector", "spot_close", "spot_change_pct", "pcr", "iv", "iv_shift",

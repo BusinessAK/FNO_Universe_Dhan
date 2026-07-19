@@ -1,5 +1,5 @@
 import unittest
-from src.core.historical_engine import HistoricalSessionResolver
+from vanguard.core.historical_engine import HistoricalSessionResolver
 
 class TestHistoricalSessionResolver(unittest.TestCase):
     def setUp(self):

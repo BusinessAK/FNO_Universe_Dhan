@@ -1,10 +1,10 @@
-"""Unit tests for src/core/playbook.build_playbook (extracted from daily_compiler)."""
+"""Unit tests for vanguard/core/playbook.build_playbook (extracted from daily_compiler)."""
 import os
 import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from src.core.playbook import build_playbook
+from vanguard.core.playbook import build_playbook
 
 
 def _build(**overrides):

@@ -1,7 +1,7 @@
 import unittest
 import pandas as pd
 import numpy as np
-from src.core.cash_market_breadth import _build_adjusted_close, CashMarketBreadthEngine
+from vanguard.core.cash_market_breadth import _build_adjusted_close, CashMarketBreadthEngine
 
 class TestCashMarketBreadth(unittest.TestCase):
     def test_corporate_action_adjustment(self):

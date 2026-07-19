@@ -17,7 +17,7 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from src.intelligence import InstitutionalIntelligence
+from vanguard.intelligence import InstitutionalIntelligence
 
 SYMBOL = "TESTCO"
 SPOT = 100.0

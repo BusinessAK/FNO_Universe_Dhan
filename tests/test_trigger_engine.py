@@ -1,5 +1,5 @@
 """
-Tests for src/live/trigger_engine.py — the armed-setup live watcher.
+Tests for vanguard/live/trigger_engine.py — the armed-setup live watcher.
 
 Covers: direction inference from the trigger/invalidation pair (both shapes +
 the degenerate equal-levels case), one-shot semantics, multi-setup-per-symbol
@@ -8,8 +8,8 @@ independence, and that alert_sink.notify_macos never raises.
 import unittest
 from unittest.mock import patch
 
-from src.live.trigger_engine import TriggerEngine, _direction
-from src.live import alert_sink
+from vanguard.live.trigger_engine import TriggerEngine, _direction
+from vanguard.live import alert_sink
 
 KEY = (2, 1001)   # (NSE_FNO segment, arbitrary security_id)
 SYM = "TESTCO"
@@ -131,7 +131,7 @@ class TestMultiSetupIndependence(unittest.TestCase):
 
 class TestLoadArmedBookSkipsNullLevels(unittest.TestCase):
     def test_rows_with_null_trigger_or_invalidation_are_skipped(self):
-        from src.live.trigger_engine import load_armed_book
+        from vanguard.live.trigger_engine import load_armed_book
 
         class FakeCon:
             def execute(self, sql, params=None):
@@ -162,7 +162,7 @@ class TestAlertSinkNeverRaises(unittest.TestCase):
             self.assertFalse(alert_sink.notify_macos("t", "m"))
 
     def test_fire_appends_to_recent_even_if_notify_fails(self):
-        with patch("src.live.alert_sink.notify_macos", return_value=False):
+        with patch("vanguard.live.alert_sink.notify_macos", return_value=False):
             sink = alert_sink.AlertSink()
             sink.fire({"symbol": SYM, "setup_type": "GAMMA_SQUEEZE", "to": "TRIGGERED",
                        "level": 110.0, "spot": 112.0})

@@ -1,16 +1,16 @@
 """
-Tests for src/live/live_compute.py (M2 — live structure engine) and the shared
-compute_walls_and_flip/gamma_regime helpers it reuses from src/intelligence.py.
+Tests for vanguard/live/live_compute.py (M2 — live structure engine) and the shared
+compute_walls_and_flip/gamma_regime helpers it reuses from vanguard/intelligence.py.
 """
 import time
 import unittest
 
 import pandas as pd
 
-from src.intelligence import InstitutionalIntelligence
-from src.live import live_compute as lc
-from src.live.state_store import StateStore
-from src.live import alert_sink
+from vanguard.intelligence import InstitutionalIntelligence
+from vanguard.live import live_compute as lc
+from vanguard.live.state_store import StateStore
+from vanguard.live import alert_sink
 
 SYM = "TESTCO"
 
@@ -181,7 +181,7 @@ class TestSelectCoveredNames(unittest.TestCase):
         names = lc.select_covered_names(FakeCon(), top_n=2)
         self.assertIn("HIGHOI_A", names)
         self.assertIn("HIGHOI_B", names)
-        from src.live import config as C
+        from vanguard.live import config as C
         for idx in C.INDEX_SYMBOLS:
             self.assertIn(idx, names)
 
@@ -214,7 +214,7 @@ class TestPerfRegression(unittest.TestCase):
 
     def test_top60_shaped_frame_stays_well_under_cycle_budget(self):
         import numpy as np
-        from src.greeks_engine import GreeksEngine
+        from vanguard.greeks_engine import GreeksEngine
 
         rng = np.random.default_rng(7)
         n_symbols = 60

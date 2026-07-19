@@ -10,7 +10,7 @@ Quick Commands
 
 Important Files & Directories
 - **Entry scripts:** [daily_compiler.py](daily_compiler.py#L1-L40), [main.py](main.py#L1-L40), [dashboard.py](dashboard.py)
-- **Core code:** [src/](src/) — engines, data fetchers, ML, services
+- **Core code:** [vanguard/](vanguard/) — engines, data fetchers, ML, services
 - **Compiled data:** [data/compiled/](data/compiled/) and `vanguard.duckdb` (authoritative compiled dataset)
 - **Processed intermediates:** [data/processed/](data/processed/)
 - **Models:** [data/models/](data/models/)

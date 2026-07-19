@@ -343,7 +343,7 @@ figure figcaption{font-size:10px;color:var(--muted);letter-spacing:.06em;margin-
 
   <section class="panel" style="--i:4" id="p-flips">
     <div class="ph"><h2>Flip Radar</h2><span class="sub" id="flip-count">structural polarity flips · sorted by confidence</span>
-      <span class="sub dim" title="Pre-registered backtest (src/research/flip_backtester.py): STRONG flips return -0.12% fwd-3d / 48.2% hit rate; WEAK flips return +0.16% / 52.2% hit rate. The score ranks flips, it does not predict them — see data/research/flip_backtest_report.md.">⚠ confidence is not predictive — see backtest</span>
+      <span class="sub dim" title="Pre-registered backtest (vanguard/research/flip_backtester.py): STRONG flips return -0.12% fwd-3d / 48.2% hit rate; WEAK flips return +0.16% / 52.2% hit rate. The score ranks flips, it does not predict them — see data/research/flip_backtest_report.md.">⚠ confidence is not predictive — see backtest</span>
       <span class="spacer"></span><div style="display:flex;gap:6px;flex-wrap:wrap" id="flip-chips"></div></div>
     <div id="flip-cards"></div>
   </section>
@@ -428,7 +428,7 @@ const NF_BY_DATE = Object.fromEntries(NF.map(r => [r.date, r.spot_close]));
 const META = VG.meta;
 const SESSIONS = META.sessions;
 /* Shared lookback for all trend charts (waveform, McClellan, A/D line).
-   Mirrors TREND_WINDOW_SESSIONS in src/core/config.py — keep in sync. */
+   Mirrors TREND_WINDOW_SESSIONS in vanguard/config/eod.py — keep in sync. */
 const TREND_WINDOW = 60;
 /* Dhan terminal link. tv.dhan.co DOES resolve ?symbol= (re-verified 2026-07
    by deobfuscating bundle3.0.7.js: an ff("symbol") URL-param getter feeds the

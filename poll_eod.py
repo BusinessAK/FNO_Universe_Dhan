@@ -77,7 +77,7 @@ try:
                                 print(f"[SUCCESS] CM saved: {cm_expected}")
                     # Rebuild cash_market_prices.parquet to include the new date
                     subprocess.run(
-                        ["python3", "src/research/cash_market_builder.py", "--raw-dir", raw_dir],
+                        ["python3", "vanguard/research/cash_market_builder.py", "--raw-dir", raw_dir],
                         check=False  # best-effort — never block the main pipeline
                     )
                 else:

@@ -22,8 +22,8 @@ import requests
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-from src.data_fetcher import NSEDataFetcher
-from src.research.cash_market_builder import build_cash_market_prices
+from vanguard.data_fetcher import NSEDataFetcher
+from vanguard.research.cash_market_builder import build_cash_market_prices
 
 
 FO_RE = re.compile(r"FO_BhavCopy_NSE_FO_0_0_0_(\d{8})_F_0000\.csv$")

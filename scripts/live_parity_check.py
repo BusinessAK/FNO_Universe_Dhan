@@ -12,7 +12,7 @@ or any time after that day's EOD compile has run, since the compiled DB
 doesn't change again until the next day.
 
 A pass writes data/live/parity_YYYYMMDD.json with "passed": true, which
-src/live/snapshot.py's is_structure_validated() checks to clear the HUD's
+vanguard/live/snapshot.py's is_structure_validated() checks to clear the HUD's
 "INDICATIVE" watermark on live structure going forward.
 
     python3 scripts/live_parity_check.py                # compare vs the latest compiled date
@@ -25,7 +25,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from src.live import config as C  # noqa: E402
+from vanguard.live import config as C  # noqa: E402
 
 WALL_MATCH_TARGET = 0.90
 GEX_DELTA_TARGET = 0.15

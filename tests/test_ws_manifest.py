@@ -8,8 +8,8 @@ from datetime import date
 
 import pandas as pd
 
-from src.live import config as C
-from src.live.manifest import build_manifest, ManifestError, select_oi_strikes
+from vanguard.live import config as C
+from vanguard.live.manifest import build_manifest, ManifestError, select_oi_strikes
 
 
 class FakeIM:

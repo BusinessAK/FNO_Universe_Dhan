@@ -18,14 +18,14 @@ def _wd():
     print("[watchdog] force exit", flush=True); os._exit(0)
 threading.Thread(target=_wd, daemon=True).start()
 
-from src.data.dhan_client import DhanClient
-from src.data.instrument_master import InstrumentMaster
-from src.live import config as C
-from src.live.state_store import StateStore
-from src.live.tick_journal import TickJournal
-from src.live.feed_handler import FeedHandler
-from src.live.snapshot import build_key_symbol_map, write_snapshot
-from src.live.bridge import Bridge
+from vanguard.data.dhan_client import DhanClient
+from vanguard.data.instrument_master import InstrumentMaster
+from vanguard.live import config as C
+from vanguard.live.state_store import StateStore
+from vanguard.live.tick_journal import TickJournal
+from vanguard.live.feed_handler import FeedHandler
+from vanguard.live.snapshot import build_key_symbol_map, write_snapshot
+from vanguard.live.bridge import Bridge
 
 # ABB/ADANIENT share a security_id with NIFTY/BANKNIFTY — keep both pairs here so
 # a live run proves the (segment, security_id) keying holds against the real feed.
