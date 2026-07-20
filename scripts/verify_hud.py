@@ -54,6 +54,12 @@ class Oracle:
             "FROM daily_market_structure WHERE date >= ? ORDER BY date",
             [self.sessions[0]]).df()
         self.ms["date"] = self.ms["date"].astype(str).str[:10]
+        # export_service.clean() rounds every float to 6dp before it reaches
+        # the payload (payload size, not precision loss by intent). Folding
+        # 5-21 already-rounded numbers vs full-precision DB values drifts
+        # past our 1e-6 tolerance by session 21 — replicate the rounding so
+        # the oracle compounds exactly what the browser compounds.
+        self.ms["chg"] = self.ms["chg"].round(6)
         # export-time sector remap: mapping wins unless it says "Other"
         self.ms["sec"] = [
             m if (m := get_sector(sym)) != "Other" else (raw or "UNMAPPED")
@@ -167,11 +173,17 @@ class Oracle:
 
         exp["setups"] = {"n": self._one(
             "SELECT COUNT(*) FROM daily_setups WHERE date=?", [sdate])[0]}
-        exp["scan"] = {"shown": len(cur), "total": len(cur)}
+        exp["scan"] = self.scan(sdate, "1D")
         return exp
 
-    def sectors(self, sdate, horizon):
-        hn = {"1D": 1, "1W": 5, "1M": 21}[horizon]
+    HZ_SESSIONS = {"1D": 1, "1W": 5, "1M": 21}
+
+    def _per_symbol_return(self, sdate, horizon):
+        """Compound each symbol's daily spot_change_pct over the trailing
+        window ending at sdate — mirrors hud/template.html's symbolReturn(),
+        the one function both the Sector Flow Grid and the Scanner Δ%
+        toggle call, so this single oracle method covers both panels."""
+        hn = self.HZ_SESSIONS[horizon]
         S = self.sessions
         si = S.index(sdate)
         win = S[max(0, si - hn + 1): si + 1]
@@ -179,14 +191,32 @@ class Oracle:
         if hn == 1:
             per_sym = cur.set_index("symbol").chg
         else:
+            # Sequential fold in date-ascending order — must match JS's
+            # forEach compounding bit-for-bit. numpy's .prod() reduces in a
+            # different internal order and drifts past our 1e-6 tolerance
+            # after ~20 chained multiplications: real float non-associativity,
+            # not a data bug, so the fix is matching order, not loosening tol.
             hist = self.ms[self.ms.date.isin(win) & self.ms.symbol.isin(cur.symbol)]
-            per_sym = hist.groupby("symbol").chg.apply(
-                lambda c: ((1 + c / 100).prod() - 1) * 100)
+            def fold(c):
+                g = 1.0
+                for v in c:
+                    g *= 1 + v / 100
+                return (g - 1) * 100
+            per_sym = hist.groupby("symbol", sort=False).chg.apply(fold)
+        return per_sym, win, cur
+
+    def sectors(self, sdate, horizon):
+        per_sym, win, cur = self._per_symbol_return(sdate, horizon)
         df = cur[["symbol", "sec"]].merge(
             per_sym.rename("ret"), left_on="symbol", right_index=True)
         g = df.groupby("sec").ret
         return {"horizon": horizon, "win": len(win),
                 "avg": g.mean().to_dict(), "n": g.size().astype(int).to_dict()}
+
+    def scan(self, sdate, horizon):
+        per_sym, win, cur = self._per_symbol_return(sdate, horizon)
+        return {"shown": len(cur), "total": len(cur), "horizon": horizon,
+                "win": len(win), "chg": per_sym.reindex(cur.symbol).to_dict()}
 
     def _flip_repeats(self, flips, sdate) -> int:
         """Mirror export_service.add_flip_repeat exactly: lookback window is
@@ -311,6 +341,18 @@ def main() -> int:
                 "h => window.__VG_CHECK__.sectors.horizon===h", arg=hz)
             check(f"sectors[{hz}]", ref.sectors(latest, hz),
                   registry()["sectors"], failures)
+
+        # 2b) scanner Δ% horizon toggle — same win/compounding math as
+        # sectors, applied per-symbol; also exercises the sort comparator
+        # since default sortKey is priority_score, not Δ%
+        for hz in ("1W", "1M", "1D"):
+            page.click(f'#scan-hz-chips .chip[data-hz="{hz}"]')
+            page.wait_for_function(
+                "h => window.__VG_CHECK__.scan.horizon===h", arg=hz)
+            check(f"scan[{hz}]", ref.scan(latest, hz), registry()["scan"], failures)
+            hdr, want = page.inner_text("#scan thead"), (f"Δ% {hz}" if hz != "1D" else "Δ%")
+            if want not in hdr:
+                failures.append((f"dom.#scan thead[{hz}]", want, hdr[:120]))
 
         # 3) positioning fut/opt toggle
         page.click('#pos-chips .chip[data-pm="OPT"]')

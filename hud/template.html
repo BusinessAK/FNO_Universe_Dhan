@@ -382,6 +382,7 @@ figure figcaption{font-size:10px;color:var(--muted);letter-spacing:.06em;margin-
     <div class="ph"><h2>Symbol Scanner</h2><span class="sub" id="scan-count"></span></div>
     <div id="scan-ctl">
       <input id="scan-q" type="search" placeholder="/ symbol · sector · strategy" aria-label="Filter scanner">
+      <div style="display:flex;gap:6px" id="scan-hz-chips"></div>
       <button class="chip" id="scan-clear" hidden>clear sector ✕</button>
     </div>
     <div id="scan-wrap"><table id="scan" aria-label="Market structure scanner"><thead></thead><tbody></tbody></table></div>
@@ -923,14 +924,20 @@ function drawInternals(){
    header shows the actual window so a short one never masquerades as a month. */
 let sectorFilter=null,sectorHorizon="1D";
 const SEC_HORIZONS={"1D":[1,1.2],"1W":[5,2.5],"1M":[21,4]};   // [sessions, color threshold %]
+/* Shared by sectors AND the scanner Δ% toggle: compound a symbol's daily
+   spot_change_pct over a session window. Single source of truth so both
+   panels' "1w"/"1m" mean exactly the same math (and the parity referee only
+   has to model it once). */
+function symbolReturn(sym,win){
+  let g=1;(msBySymbol[sym]||[]).forEach(h=>{if(win.has(h.date))g*=1+(h.spot_change_pct||0)/100;});
+  return(g-1)*100;
+}
+function hzWindow(hn){const si=SESSIONS.indexOf(SDATE);return new Set(SESSIONS.slice(Math.max(0,si-hn+1),si+1));}
 function drawSectors(){
   const[hn,hth]=SEC_HORIZONS[sectorHorizon];
-  const si=SESSIONS.indexOf(SDATE);
-  const win=new Set(SESSIONS.slice(Math.max(0,si-hn+1),si+1));
+  const win=hzWindow(hn);
   const hret={};   // per-symbol compounded % over the window
-  if(hn>1)MS.forEach(r=>{
-    let g=1;(msBySymbol[r.symbol]||[]).forEach(h=>{if(win.has(h.date))g*=1+(h.spot_change_pct||0)/100;});
-    hret[r.symbol]=(g-1)*100;});
+  if(hn>1)MS.forEach(r=>{hret[r.symbol]=symbolReturn(r.symbol,win);});
   const agg={};
   MS.forEach(r=>{const s=r.sector||"UNMAPPED";(agg[s]??=({n:0,chg:0,conv:0,bull:0}));
     const a=agg[s];a.n++;a.chg+=hn>1?hret[r.symbol]:(r.spot_change_pct||0);a.conv+=r.conviction_score||0;
@@ -1170,7 +1177,7 @@ const COLS=[
   ["symbol","SYM",r=>esc(r.symbol)+(r._ban?' <span title="F&O ban (MWPL) — no new positions" style="color:var(--bear-hi)">⛔</span>':""),!1],
   ["sector","SECTOR",r=>esc(r.sector||"—"),!1],
   ["spot_close","SPOT",r=>fmtPr(r.spot_close)+`<span class="live-px" data-sym="${esc(r.symbol)}"></span>`,!0],
-  ["spot_change_pct","Δ%",r=>`<span class="${cls(r.spot_change_pct)}">${fmtP(r.spot_change_pct)}</span>`,!0],
+  ["spot_change_pct","Δ%",r=>{const v=SCAN_HZ_VALS[r.symbol];return`<span class="${cls(v)}">${fmtP(v)}</span>`},!0],
   ["pcr","PCR",r=>fmt2(r.pcr),!0],
   ["iv","IV",r=>r.iv==null?"—":(r.iv*100).toFixed(1)+"%",!0],
   ["gex_intensity","GEX-I",r=>fmt2(r.gex_intensity),!0],
@@ -1183,17 +1190,36 @@ const COLS=[
   ["suggested_strategy","DESK LINE",r=>`<span class="dim">${esc(r.suggested_strategy||"—")}</span>`,!1],
 ];
 let sortKey="priority_score",sortDir=-1;
+/* Δ% horizon toggle — same compounding as Sector Flow Grid (symbolReturn/
+   SEC_HORIZONS, defined above), applied per-symbol instead of per-sector
+   average. SCAN_HZ_VALS is recomputed once per render and read by both the
+   Δ% column formatter and the sort comparator, so there's one number per
+   symbol per render rather than two independent computations drifting. */
+let scanHorizon="1D",SCAN_HZ_VALS={};
 function renderScan(){
+  const[hn]=SEC_HORIZONS[scanHorizon];
+  const win=hn>1?hzWindow(hn):null;
+  SCAN_HZ_VALS={};
+  MS.forEach(r=>{SCAN_HZ_VALS[r.symbol]=hn>1?symbolReturn(r.symbol,win):(r.spot_change_pct||0);});
   const q=$("#scan-q").value.trim().toLowerCase();
   let rows=MS.filter(r=>!sectorFilter||r.sector===sectorFilter);
   if(q)rows=rows.filter(r=>(r.symbol+" "+(r.sector||"")+" "+(r.suggested_strategy||"")+" "+(r.structural_bias||"")).toLowerCase().includes(q));
-  rows=rows.slice().sort((a,b)=>{const x=a[sortKey],y=b[sortKey];
+  rows=rows.slice().sort((a,b)=>{
+    const val=r=>sortKey==="spot_change_pct"?SCAN_HZ_VALS[r.symbol]:r[sortKey];
+    const x=val(a),y=val(b);
     if(x==null)return 1;if(y==null)return -1;
     return(typeof x==="string"?x.localeCompare(y):x-y)*sortDir});
-  CHK.scan={shown:rows.length,total:MS.length};
-  $("#scan-count").textContent=rows.length+" / "+MS.length+" symbols"+(sectorFilter?" · "+sectorFilter:"");
-  $("#scan thead").innerHTML="<tr>"+COLS.map(([k,l])=>
-    `<th data-k="${k}" aria-sort="${k===sortKey?(sortDir>0?"ascending":"descending"):"none"}">${l}${k===sortKey?`<span class="arr">${sortDir>0?" ▲":" ▼"}</span>`:""}</th>`).join("")+"</tr>";
+  CHK.scan={shown:rows.length,total:MS.length,horizon:scanHorizon,
+    win:win?win.size:1,chg:{...SCAN_HZ_VALS}};
+  $("#scan-count").textContent=rows.length+" / "+MS.length+" symbols"+(sectorFilter?" · "+sectorFilter:"")
+    +(scanHorizon!=="1D"?` · ${scanHorizon.toLowerCase()} (${win.size}s)`:"");
+  $("#scan-hz-chips").innerHTML=Object.keys(SEC_HORIZONS).map(m=>
+    `<button class="chip" data-hz="${m}" aria-pressed="${scanHorizon===m}">${m.toLowerCase()}</button>`).join("");
+  document.querySelectorAll("#scan-hz-chips .chip").forEach(b=>
+    b.addEventListener("click",()=>{scanHorizon=b.dataset.hz;renderScan();}));
+  $("#scan thead").innerHTML="<tr>"+COLS.map(([k,l])=>{
+    const lab=k==="spot_change_pct"&&scanHorizon!=="1D"?`Δ% ${scanHorizon}`:l;
+    return`<th data-k="${k}" aria-sort="${k===sortKey?(sortDir>0?"ascending":"descending"):"none"}">${lab}${k===sortKey?`<span class="arr">${sortDir>0?" ▲":" ▼"}</span>`:""}</th>`;}).join("")+"</tr>";
   $("#scan tbody").innerHTML=rows.map(r=>
     `<tr data-sym="${esc(r.symbol)}">${COLS.map(c=>`<td>${c[2](r)}</td>`).join("")}</tr>`).join("");
   document.querySelectorAll("#scan th").forEach(th=>th.addEventListener("click",()=>{
