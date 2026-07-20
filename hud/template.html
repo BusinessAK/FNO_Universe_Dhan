@@ -432,6 +432,12 @@ figure figcaption{font-size:10px;color:var(--muted);letter-spacing:.06em;margin-
    payload below. */
 function __boot(VG){
 
+/* Parity registry: every draw fn records its raw computed numbers (pre-format)
+   here. scripts/verify_hud.py reads this and compares against an independent
+   SQL recomputation from DuckDB — the math is verified at full precision, the
+   DOM only loosely. A missing key means a panel never rendered. */
+const CHK=window.__VG_CHECK__={};
+
 /* ── data unpack ─────────────────────────────────────────────────────── */
 const unpack = t => t.rows.map(r => Object.fromEntries(t.cols.map((c,i)=>[c,r[i]])));
 const ALL_MS  = unpack(VG.market_structure);
@@ -532,6 +538,8 @@ function drawCmdbar(){
   }else{
     $("#cb-gamma").textContent="MIXED "+es.map(([,v])=>Math.round(v/tot*100)).join("/")+"%";
   }
+  CHK.session=SDATE;
+  CHK.cmdbar={universe:MS.length,pcr_mu:pcrAvg,gamma:{...gm}};
   $("#regime-date").textContent="EOD "+fdate(SDATE);
   $("#histbadge").hidden = SDATE===SESSIONS[SESSIONS.length-1];
   $("#d-prev").disabled = SESSIONS.indexOf(SDATE)===0;
@@ -611,6 +619,7 @@ function drawRegime(){
   const BULL_BIAS=new Set(["Support Building","Resistance Weakening","Bullish Accumulation","Bullish Breakout","Bullish Bias","Strong Bullish Momentum","Bullish Mean Reversion"]);
   const BEAR_BIAS=new Set(["Support Weakening","Resistance Building","Bearish Breakdown","Bearish Consolidation","Bearish Bias","Strong Bearish Momentum"]);
   const bc={};MS.forEach(r=>bc[r.structural_bias]=(bc[r.structural_bias]||0)+1);
+  CHK.regime={long_gamma:counts[0],transition:counts[1],short_gamma:counts[2],bias:{...bc}};
   const pbc={};if(prevMS)prevMS.forEach(r=>pbc[r.structural_bias]=(pbc[r.structural_bias]||0)+1);
   const rows=Object.entries(bc).sort((a,b)=>b[1]-a[1]);
   const mx=rows.length?rows[0][1]:1;
@@ -712,6 +721,8 @@ function drawBreadth(){
   const kE=2/6;let eAcc=null;
   const ema=raw.map(v=>eAcc=(eAcc===null?v:v*kE+eAcc*(1-kE)));
   const coil=B.map(r=>r.compression_pct||0);
+  {const bi=B.findIndex(r=>r.date===SDATE);
+   CHK.breadth=bi>=0?{date:SDATE,net:raw[bi],coil:coil[bi]}:null;}
   const el=$("#bw-chart");el.innerHTML="";
   const W=el.clientWidth||600,H=230,ml=34,mr=64,mt=8,mb=22,iw=W-ml-mr,ih=H-mt-mb;
   const M=Math.max(10,...raw.map(Math.abs),...coil);
@@ -793,23 +804,25 @@ function drawInternals(){
   const c200=p200==null?C.ink:p200>=50?C.bull:C.bear;
   const cNH=(nh-nl)>0?C.bull:(nh-nl)<0?C.bear:C.ink;
   const pct=v=>v==null?"—":Math.round(v)+"%";
+  /* C4: FII/DII provisional cash flows — latest row at-or-before SDATE
+     (hoisted so the parity registry captures exactly what renders) */
+  const cashRows=FIIDII.filter(r=>r.date<=SDATE);
+  const cashDate=cashRows.length?cashRows[cashRows.length-1].date:null;
+  const cashBy=cat=>cashRows.filter(x=>x.category===cat&&x.date===cashDate).pop();
+  CHK.internals={date:last.date,ad_ratio:ad_r,net_advances:last.cm_net_advances,
+    p50:p50,p200:p200,nh:nh,nl:nl,mcclellan:last.cm_mcclellan_osc,
+    cash_date:cashDate,fii_cash:cashBy("FII")?.net_cr??null,dii_cash:cashBy("DII")?.net_cr??null};
   $("#cm-tiles").innerHTML=[
     ["A/D",fmt2(ad_r),cAD,(last.cm_net_advances>0?"+":"")+last.cm_net_advances+" net"+dlt(ad_r,prev?.cm_ad_ratio,2)],
     [">50 DMA",pct(p50),c50,pct(last.cm_pct_above_20dma)+" >20D"+dlt(p50,prev?.cm_pct_above_50dma,1,"pt")],
     [">200 DMA",pct(p200),c200,dlt(p200,prev?.cm_pct_above_200dma,1,"pt")||"structural"],
     ["NH − NL",(nh-nl>0?"+":"")+(nh-nl),cNH,nh+"H / "+nl+"L"+dlt(nh-nl,prev?(prev.cm_new_highs??0)-(prev.cm_new_lows??0):null,0)],
-    ...(function(){
-      /* C4: FII/DII provisional cash flows — latest row at-or-before SDATE */
-      const rows=FIIDII.filter(r=>r.date<=SDATE);
-      if(!rows.length)return[];
-      const last=rows[rows.length-1].date;
-      return ["FII","DII"].map(cat=>{
-        const r=rows.filter(x=>x.category===cat&&x.date===last).pop();
+    ...(cashDate?["FII","DII"].map(cat=>{
+        const r=cashBy(cat);
         if(!r)return null;
         const col=r.net_cr>0?C.bull:r.net_cr<0?C.bear:C.ink;
         return[cat+" CASH",(r.net_cr>0?"+":"")+Math.round(r.net_cr).toLocaleString("en-IN")+"Cr",col,"provisional · "+fdate(r.date)];
-      }).filter(Boolean);
-    })(),
+      }).filter(Boolean):[]),
   ].map(([k,v,c,d])=>`<div class="tile"><span class="k">${k}</span><div class="v" style="color:${c}">${v}</div><span class="d">${d}</span></div>`).join("");
 
   /* McClellan: thin bars around zero, diverging by sign, 2px gaps.
@@ -924,6 +937,9 @@ function drawSectors(){
     if(biasKind(r.structural_bias)==="bull"||["Support Building","Expansion"].includes(r.structural_bias))a.bull++;});
   const rows=Object.entries(agg).map(([s,a])=>({s,n:a.n,chg:a.chg/a.n,conv:a.conv/a.n,bull:a.bull}))
     .sort((a,b)=>b.chg-a.chg);
+  CHK.sectors={horizon:sectorHorizon,win:win.size,
+    avg:Object.fromEntries(rows.map(r=>[r.s,r.chg])),
+    n:Object.fromEntries(rows.map(r=>[r.s,r.n]))};
   $("#sec-chips").innerHTML=Object.keys(SEC_HORIZONS).map(m=>
     `<button class="chip" data-hz="${m}" aria-pressed="${sectorHorizon===m}">${m.toLowerCase()}</button>`).join("");
   document.querySelectorAll("#sec-chips .chip").forEach(b=>
@@ -963,6 +979,7 @@ const SIGMETA={
 let sigFilter=null;
 function drawSignals(){
   const counts={};SIG.forEach(s=>counts[s.type]=(counts[s.type]||0)+1);
+  CHK.signals={n:SIG.length,by_type:{...counts}};
   $("#sig-count").textContent=SIG.length+" structure events · "+fdate(SDATE);
   $("#sig-chips").innerHTML=Object.entries(counts).sort((a,b)=>b[1]-a[1]).map(([t,n])=>
     `<button class="chip" data-t="${t}" aria-pressed="${sigFilter===t}">${(SIGMETA[t]||["·",t])[1]} <span class="n">${n}</span></button>`).join("");
@@ -981,6 +998,7 @@ function drawSignals(){
 let setupFilter=null;
 function drawSetups(){
   const counts={};SET.forEach(s=>counts[s.setup_type]=(counts[s.setup_type]||0)+1);
+  CHK.setups={n:SET.length};
   $("#setup-count").textContent=SET.length+" active · "+fdate(SDATE);
   $("#setup-chips").innerHTML=Object.entries(counts).sort((a,b)=>b[1]-a[1]).map(([t,n])=>
     `<button class="chip" data-t="${t}" aria-pressed="${setupFilter===t}">${t.replace(/_/g," ")} <span class="n">${n}</span></button>`).join("");
@@ -1016,6 +1034,7 @@ function drawVix(){
   const v=VIXH[i];
   if(!v||v.date>SDATE){t.hidden=true;return}
   const pct=Math.round(VIXH.filter(x=>x.close<=v.close).length*100/VIXH.length);
+  CHK.vix={date:v.date,close:v.close,chg_pct:v.chg_pct,pctile:pct};
   const col=pct>=75?C.bearHi:pct<=25?C.bullHi:"var(--ink)";
   t.hidden=false;
   $("#vix-pct").textContent="p"+pct;
@@ -1041,6 +1060,11 @@ function drawPositioning(){
   const nc=r=>r&&r.opt_idx_call_long!=null?r.opt_idx_call_long-r.opt_idx_call_short:null;
   const np=r=>r&&r.opt_idx_put_long!=null?r.opt_idx_put_long-r.opt_idx_put_short:null;
   const tilt=r=>{const c=nc(r),q=np(r);return c!=null&&q!=null?c-q:null};
+  CHK.positioning={date:dates[di],mode:posMode,
+    fut:Object.fromEntries(["FII","DII","PRO","CLIENT"].map(k=>[k,net(cur[k])])),
+    calls:Object.fromEntries(["FII","DII","PRO","CLIENT"].map(k=>[k,nc(cur[k])])),
+    puts:Object.fromEntries(["FII","DII","PRO","CLIENT"].map(k=>[k,np(cur[k])])),
+    fii_tilt:tilt(cur.FII)};
   $("#pos-tiles").innerHTML=["FII","DII","PRO","CLIENT"].map(pt=>{
     const n=net(cur[pt]),d=prev&&net(prev[pt])!=null&&n!=null?n-net(prev[pt]):null;
     const col=n>0?C.bullHi:n<0?C.bearHi:"var(--ink)";
@@ -1103,6 +1127,7 @@ function drawFlips(){
     .sort((a,b)=>(a._whip-b._whip)||(b.flip_confidence||0)-(a.flip_confidence||0));
   const nStrong=flipsAll.filter(r=>r.flip_strength==="STRONG").length;
   const nWhip=flipsAll.filter(r=>r._whip).length;
+  CHK.flips={n:flipsAll.length,strong:nStrong,repeat:nWhip};
   $("#flip-count").textContent=`${flipsAll.length} flips · ${nStrong} strong · ${nWhip} repeat · ${fdate(SDATE)}`;
   $("#flip-chips").innerHTML=
     ["ALL","STRONG","MODERATE","WEAK"].map(s=>
@@ -1165,6 +1190,7 @@ function renderScan(){
   rows=rows.slice().sort((a,b)=>{const x=a[sortKey],y=b[sortKey];
     if(x==null)return 1;if(y==null)return -1;
     return(typeof x==="string"?x.localeCompare(y):x-y)*sortDir});
+  CHK.scan={shown:rows.length,total:MS.length};
   $("#scan-count").textContent=rows.length+" / "+MS.length+" symbols"+(sectorFilter?" · "+sectorFilter:"");
   $("#scan thead").innerHTML="<tr>"+COLS.map(([k,l])=>
     `<th data-k="${k}" aria-sort="${k===sortKey?(sortDir>0?"ascending":"descending"):"none"}">${l}${k===sortKey?`<span class="arr">${sortDir>0?" ▲":" ▼"}</span>`:""}</th>`).join("")+"</tr>";
