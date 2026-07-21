@@ -75,6 +75,8 @@ def _build_adjusted_close(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy().sort_values(["symbol", "date"])
 
     adj_closes = []
+    adj_highs  = []
+    adj_lows   = []
     ca_flags   = []
 
     for sym, grp in df.groupby("symbol", sort=False):
@@ -82,6 +84,8 @@ def _build_adjusted_close(df: pd.DataFrame) -> pd.DataFrame:
         closes      = grp["close"].values.astype(float)
         prev_closes = grp["prev_close"].values.astype(float)
         opens       = grp["open"].values.astype(float)
+        highs       = grp["high"].values.astype(float) if "high" in grp.columns else closes
+        lows        = grp["low"].values.astype(float) if "low" in grp.columns else closes
 
         n = len(grp)
         ratios  = np.ones(n)
@@ -111,14 +115,20 @@ def _build_adjusted_close(df: pd.DataFrame) -> pd.DataFrame:
         for i in range(n - 2, -1, -1):
             cum_factor[i] = cum_factor[i + 1] * ratios[i + 1]
 
-        adj_close_sym = closes * cum_factor
-        adj_closes.extend(adj_close_sym.tolist())
+        adj_closes.extend((closes * cum_factor).tolist())
+        adj_highs.extend((highs * cum_factor).tolist())
+        adj_lows.extend((lows * cum_factor).tolist())
         ca_flags.extend(ca_flag.tolist())
 
     df["adj_close"]  = adj_closes
+    df["adj_high"]   = adj_highs
+    df["adj_low"]    = adj_lows
     df["ca_adjusted"] = ca_flags
 
-    # adj_prev_close = adj_close[T-1] per symbol — used for pct_chg in _compute_day.
+    # adj_prev_close = adj_close[T-1] per symbol — used for pct_chg in _compute_day,
+    # and for True Range in equity_technicals.py (needs yesterday's adjusted close
+    # on the SAME adjustment basis as today's adj_high/adj_low, or a stock with a
+    # split between t-1 and t would show a fake multi-hundred-percent "gap").
     df["adj_prev_close"] = df.groupby("symbol")["adj_close"].shift(1)
 
     return df
