@@ -83,7 +83,7 @@ class TestContextDegradation(unittest.TestCase):
                 con.execute(f"CREATE TABLE {t} AS SELECT * FROM prod.{t}")
             con.close()
             p = build_payload(db_path=db2, sessions=2)
-        for k in ("positioning", "vix", "delivery"):
+        for k in ("positioning", "vix", "delivery", "setup_positions"):
             self.assertNotIn(k, p)
         self.assertIn("market_structure", p)
 
@@ -103,3 +103,26 @@ class TestContextDegradation(unittest.TestCase):
         ci = {c: i for i, c in enumerate(cols)}
         fii = next(r for r in p["positioning"]["rows"] if r[ci["participant"]] == "FII")
         self.assertGreater(fii[ci["opt_idx_call_long"]], 0)
+
+    def test_setup_positions_present_and_point_in_time_consistent(self):
+        p = build_payload(sessions=2)
+        self.assertIn("setup_positions", p)
+        cols = p["setup_positions"]["cols"]
+        ci = {c: i for i, c in enumerate(cols)}
+        for c in ("symbol", "sector", "setup_type", "bias", "direction",
+                  "trigger_date", "trigger_price", "sl_price", "target_price",
+                  "status", "resolved_date", "resolved_price"):
+            self.assertIn(c, cols)
+        sessions = p["meta"]["sessions"]
+        for r in p["setup_positions"]["rows"]:
+            status, resolved_date = r[ci["status"]], r[ci["resolved_date"]]
+            # Export filter contract: every exported row must be either still
+            # OPEN, or resolved at/after the earliest exported session — a
+            # row resolved entirely before the window would be irrelevant to
+            # any date the HUD can currently display (see export_service.py).
+            self.assertTrue(status == "OPEN" or resolved_date >= sessions[0])
+            # STALE/resolved rows always carry a resolved_price; OPEN never does.
+            if status == "OPEN":
+                self.assertIsNone(r[ci["resolved_price"]])
+            else:
+                self.assertIsNotNone(r[ci["resolved_price"]])

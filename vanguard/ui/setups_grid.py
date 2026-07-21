@@ -393,14 +393,32 @@ def _load_daily_catalysts() -> dict:
     return mapping
 
 def _get_setup_status_info(spot_price: float, bias: str, trig_strike: float, invalid_strike: float) -> tuple[str, str, str, str]:
-    """Returns (status_str, color, bg, border)."""
+    """Returns (status_str, color, bg, border).
+
+    Direction comes from bias text when it says Bullish/Bearish/Volatility
+    Expansion; biases that don't (Regime Transition, Mean Reversion,
+    Volatility Stable Range, ...) fall back to inferring shape from trigger
+    vs invalidation — same rule vanguard/live/trigger_engine.py's _direction()
+    uses — instead of sitting permanently in Monitoring despite having real
+    trigger/invalidation levels.
+    """
     status_str = "Neutral"
     status_color = "#7888aa"
     status_bg = "rgba(120, 136, 170, 0.08)"
     status_border = "rgba(120, 136, 170, 0.2)"
-    
-    if spot_price > 0:
-        if "Bullish" in bias or bias in ("Strong Bullish Momentum", "Bullish Accumulation", "Bullish Breakout"):
+
+    is_vol = bias == "Volatility Expansion"
+    if "Bullish" in bias or bias in ("Strong Bullish Momentum", "Bullish Accumulation", "Bullish Breakout") or is_vol:
+        up = True
+    elif "Bearish" in bias or bias in ("Strong Bearish Momentum", "Bearish Breakdown", "Bearish Consolidation"):
+        up = False
+    elif trig_strike > 0 and invalid_strike > 0 and trig_strike != invalid_strike:
+        up = trig_strike > invalid_strike
+    else:
+        up = None
+
+    if spot_price > 0 and up is not None:
+        if up:
             if trig_strike > 0 and spot_price >= trig_strike:
                 status_str = "🟢 Triggered"
                 status_color = "#10b981"
@@ -411,12 +429,17 @@ def _get_setup_status_info(spot_price: float, bias: str, trig_strike: float, inv
                 status_color = "#ef4444"
                 status_bg = "rgba(239, 68, 68, 0.08)"
                 status_border = "rgba(239, 68, 68, 0.2)"
+            elif is_vol:
+                status_str = "🌀 Coiling"
+                status_color = "#a78bfa"
+                status_bg = "rgba(167, 139, 250, 0.08)"
+                status_border = "rgba(167, 139, 250, 0.2)"
             else:
                 status_str = "⏳ Waiting"
                 status_color = "#fbbf24"
                 status_bg = "rgba(251, 191, 36, 0.08)"
                 status_border = "rgba(251, 191, 36, 0.2)"
-        elif "Bearish" in bias or bias in ("Strong Bearish Momentum", "Bearish Breakdown", "Bearish Consolidation"):
+        else:
             if trig_strike > 0 and spot_price <= trig_strike:
                 status_str = "🟢 Triggered"
                 status_color = "#10b981"
@@ -432,27 +455,11 @@ def _get_setup_status_info(spot_price: float, bias: str, trig_strike: float, inv
                 status_color = "#fbbf24"
                 status_bg = "rgba(251, 191, 36, 0.08)"
                 status_border = "rgba(251, 191, 36, 0.2)"
-        elif bias == "Volatility Expansion":
-            if trig_strike > 0 and spot_price >= trig_strike:
-                status_str = "🟢 Triggered"
-                status_color = "#10b981"
-                status_bg = "rgba(16, 185, 129, 0.08)"
-                status_border = "rgba(16, 185, 129, 0.2)"
-            elif invalid_strike > 0 and spot_price <= invalid_strike:
-                status_str = "🔴 Invalidated"
-                status_color = "#ef4444"
-                status_bg = "rgba(239, 68, 68, 0.08)"
-                status_border = "rgba(239, 68, 68, 0.2)"
-            else:
-                status_str = "🌀 Coiling"
-                status_color = "#a78bfa"
-                status_bg = "rgba(167, 139, 250, 0.08)"
-                status_border = "rgba(167, 139, 250, 0.2)"
-        else:
-            status_str = "⇅ Monitoring"
-            status_color = "#38bdf8"
-            status_bg = "rgba(56, 189, 248, 0.08)"
-            status_border = "rgba(56, 189, 248, 0.2)"
+    else:
+        status_str = "⇅ Monitoring"
+        status_color = "#38bdf8"
+        status_bg = "rgba(56, 189, 248, 0.08)"
+        status_border = "rgba(56, 189, 248, 0.2)"
     return status_str, status_color, status_bg, status_border
 
 def render_setup_card(s_ticker: str, s_m: dict, s_type: str, select_stock_callback, prefix: str = ""):

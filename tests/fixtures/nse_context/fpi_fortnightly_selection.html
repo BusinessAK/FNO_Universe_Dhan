@@ -1,0 +1,870 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><title>
+	NSDL : Fortnightly Sector-wise FPI Investment data
+</title>
+    
+    
+    <script src="https://www.fpi.nsdl.co.in/web/Scripts/jquery-3.5.1.js?20180306" type="text/javascript"></script>    
+
+    
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-178257146-1"></script>
+<script type="text/javascript">
+    window.dataLayer = window.dataLayer || [];
+    function gtag() { dataLayer.push(arguments); }
+    gtag('js', new Date());
+
+    gtag('config', 'UA-178257146-1');
+</script>
+    
+
+    <script type="text/javascript">
+        function NewWindow(mypage, myname, w, h, scroll, pos) {
+            if (pos == "center") {
+                LeftPosition = (screen.width) ? (screen.width - w) / 2 : 100;
+                TopPosition = (screen.height) ? (screen.height - h) / 2 : 100;
+            }
+            settings = 'height=' + h + ',width=' + w + ',top=' + TopPosition + ',left=' + LeftPosition + ',scrollbars=' + scroll + ',resizable=no';
+            win = window.open(mypage, myname, settings);
+            if (win.focus) {
+                win.focus();
+            }
+        }
+    </script>
+    <style type="text/css">
+        #li li {
+            padding: 5px;
+            background-color: #FFFFFF;
+            list-style: circle;
+        }
+
+        #li a {
+            padding: 5px;
+            color: #8b0101;
+            font-family: verdana;
+            font-size: 12px;
+            border-bottom: #8b0101 dotted 1px;
+        }
+
+            #li a:hover {
+                padding: 7px;
+                font-family: verdana;
+                font-size: 12px;
+                color: #8b0101;
+                color: #FFFFFF;
+                background-color: #8b0101;
+            }
+    </style>
+</head>
+<body>
+    <link href="https://www.fpi.nsdl.co.in/web/Css/nsdl.css?ref=20180306" rel="stylesheet" />
+    <form method="post" action="./FPI_Fortnightly_Selection.aspx" id="form1">
+<div class="aspNetHidden">
+<input type="hidden" name="__EVENTTARGET" id="__EVENTTARGET" value="" />
+<input type="hidden" name="__EVENTARGUMENT" id="__EVENTARGUMENT" value="" />
+<input type="hidden" name="__VIEWSTATE" id="__VIEWSTATE" value="DFmfnfZ2ptg2lOISv4ngCGNe57nKu3V7yBMIGRcGd7N4KCfCnNRJWFR32v0FX7nfIcJQD7eVON2FOAyqAzcNg04TFinkuh4a7F0RtYYbNvKcMGwWYT0wXqkLWXIdzAs4Xf0nvseLmc5wfsDppG9tAft0HKhnfZH1IlymLmEKqGmPws+7jFA3Co1ADBshI707Rlm3PoA/yWSbhZOZ7+0ID0oHaxr1XMo+/pj0gl8lccXZOoEnDZwFYDOMwJrvzVXnS5i0J96iYagcY9j5h2U6CLJbrU6cpjK9XHzRAROtZ7NWJ27VspfpSDAWVdR04Oehu19+CTkVRI13wVRonRuxIgIXxLEaUIqR4t627QlgNPg6qX5Z8udu43cJUkkqZ/9E6q9DO6TIXTzV97ej755jbh/9Q4UmU5GkA54MwT9fzEndxDp6ThNqyc7I20TN7IJ8x2yrjtcT1SUfYgGTFQ8kYKHrOncvVhQf/Oj2rKbI0nDeGIv3x/gF8VJ3IaDx3keAm7Gc//Y6zWCTLxhlCQj9EV/qpFzV7Yh0Jehk2l33NGAKWeIc2LNej/CYnkid6oYblLy6VD6q2tObrrplecN9AMQDv5ZqIL0cc+k0xcUX4+Az4tdN78C5Csurd4mDkXuEVoTZRrbhT9Iw9cnfWZcluCauL02LcFtOMhRuLANMRvKzkJJCOycuJQpmNDHHiLGr" />
+</div>
+
+<script type="text/javascript">
+//<![CDATA[
+var theForm = document.forms['form1'];
+if (!theForm) {
+    theForm = document.form1;
+}
+function __doPostBack(eventTarget, eventArgument) {
+    if (!theForm.onsubmit || (theForm.onsubmit() != false)) {
+        theForm.__EVENTTARGET.value = eventTarget;
+        theForm.__EVENTARGUMENT.value = eventArgument;
+        theForm.submit();
+    }
+}
+//]]>
+</script>
+
+
+<div class="aspNetHidden">
+
+	<input type="hidden" name="__VIEWSTATEGENERATOR" id="__VIEWSTATEGENERATOR" value="0B76475F" />
+	<input type="hidden" name="__EVENTVALIDATION" id="__EVENTVALIDATION" value="i/fDvUtxqd5yucRn+92u9WrM1mmFOlSTMEi4wVJRlBRtJxwDPlBeD1YWkWFpSnrZbK3v8cd29mx3HmhrlO9xe58y2m6ZeYaGIWoFr+Rsqr7g7zqZed1m5cGB9BzVbMN2Z13cMbH3JDCM2wnoFUs39Aem7mtZtAxE02ts/PfqujcdRZzTuDX9wZcCJmvm1bbprwZtk8upoMYN1bDYX+u7XHHEgvbmoNlH/kG/aYwpOVWby0BV87s6y13rBQQrbIWD+mQtn6cu8QRXV5BtJzouD5G3YeTSAVIqqwVFmwoHxwiKOvpMRQk9FW3GKO/KzpN0VVwM49HlXIxTlGSVGRlwILK8CKMHHDswT6pA2H1ZYU6Ehfq8FueUr+IXa4fua4ug4sA7R81K5VAQppzVc4N9TV1cN+Z+PLYys8Zhwkzc+XqPNaCK7aegMr+hW5W3gw5IxjXGhihN7Dj9CSJLp89048YaN4d53O4UeZWW6uphjAzJoAl0mbF4NcyJ/u927FSQMtG3hUEHY/nQ41C350W5ok/KyE1MYcItvY1hZfz/0zrv41JOYP6pM+gg9UlckrXmua7THDWSExKSxHC1g4stiH/9vUfq3GjaLkNRynzTSc3b+ivQGrX1AtrGle0Q/qfysZoYjCO1LlyOX1SiS6zS7vBDVcCpSrnhS/WJm9ZXQWeRiiGytVYbro8LcIaOY0KceAxweQUetG749R+cwSdZW4Y0FMooSQGRU1ELhxYxXs8ghbcrkRRtSR+FU79VCQUn74oiTftkJDzJk1hNeQhHBrPGvA5bqqQpQQWNw2ulyjhBpsWkbTu/DtQu7dFTsuqvyoT4Fhq8bpflQJLaTodhbuwFPtthc9dRMixiqJsvqEYmVyfJIJRRgX/rAWuWaFzajNsBjjkAK3tomr92sRdDlyDfZzh/w4mn3bKKw0xfL0+AqUZgfHncR/QDgLTYpDTwMgVUPYJKD/IwnT8xeBHFNEdc3TP4F+vvZqNt0Tl+UAcQbP7KC79eNsVJF6rETqsbAA8WlWjW4jaM0K6SDEIjZJe0cxXeThpiqictuQLxxBEWpVR0Z+SK6kr8Jp8p4SpVywmsjlUjaAPNWuC/20Vzo/CyL5Ai6epgUgx6FhqThVAXnWzmfQlozpQpfo1q25GSFi1GfCPLf/rM4g411fi+NS/F8+SBLbAMGKZVG9LGRY4qmWWk7E6eCTRr5vkGMRRF1d2Rft2dLZB6SsoNuI9nZtIf7vuSHJRtIZGyhQI6N38PwDOBzFEtRO4W6tfp5R8Xb9cOu3Wr6fv1/Z8CIsw8EA94FPcrDS2IURlW//K3N73ISa6Km7Iw1+nHCJGh3EswET57aEOfs4vGpa9tvcoJPT2siwjkbNfq7SoZmjYgkwUOEwdNVC/sTU5sSlLShClFyj5dNwxDSgQ155mZ8ChINEowxx7+u5htH8rrOqL5trKmx2/2KjEO8Xtd6xFDrVu3Y1zon8GKNC3/Z7lx19hxqAp8f4iFetqMRJo4DIlpW3OFihOj3KILTiA0fkC74hChfOcVSa03T1PO900P/fpPAds0fJkGLf6TbNHqVBEvhhs0BBzxfVesUkXpkeKIw7+cIUpmmXJwgcfAjmMEdkJlb7Gp1sBlWmf/AloSdC5rAkA88YNdNqz1D7vk3Ev3WbCtzSbIl5wQVLbqX8Uc/9jmGOSKtTJcwHzs5yp2o2jnuLBl0k4wPysOtAzdJGjWaQrS3Bw4xYAcXtnkZHIr6QcRZCaYzR32FNEQgUe70BRKwPhW2nzQxj4dvVSOHgY4/8Q5/9IF/XfFr0L6vb/6udoEgILFX0p+lBxvs0TjcCfNdmL3mYOOwZheu+SuF4mraIFdjOM3Yte6YLDWYkUsBwH+78yAFVBLFmg7pHJuvzcMe8WTGKy2fljV9f7qXNJPmC2KKD3c8Gd5H27Pg92b9RBuC8enPDagw8a2vYoMAOSRiBkNF0a21FgkU2wBGggi8S3APmAM0Uoo5hSf+6V+K+SrC9hQBRDX1GZGferPnUe3StJF4RE2udvx08OlJKMOjPklI2Z0kyZZSlu5jAKnFVxfNUf/Fkfm1etsFOsPqa1CIXGB11NaBt0rHDXL5Ba0hhWVVQ/nSIF4xKT1wAbw3izNUsOahCOYbnTv+Xk8Umg48lwrYVgCsZhByrSD5wDT2uKUfuOnty68bALYxR4AR9PeSqblqx62eox0Qg+BXfO/kw0ll3uDrw0dBZJXVUvvMXgWnhgbykGzP+bKlzxHmpuzM0CAGWDSB4RNluzubxisxsSU2//U4gnEVzpKT50qpaUcMFSHM3xoUCyeNa8n55C7GCXCYBoOg4ZeX3nk/yMp2YGjMPRLH8KLq74FQRFLk7Glk+RdzKqgsMW0rYN8M/uqn+7o96eNXbXsQ3pSVkwpoCxeGDnLGuC/m4JzlLnEhqrTxmyX8T1tyqkD2dceW/1PpVdSY4Z+4k1EkT2iV8Wb/u6xJHK416xuJDLN+CJJqAl7GsqsWwiGnRoYIIUO1Wo2aH4YMepLE0CzrrFRMj19dBjn1PmrI+CVzAUz/elUdVQb5xwWX9cMo8S27mEnEmCGAEBNVgP/EqsP6dJ7zUH3iC7X511HeAGIoDUvNJtL18vR5+pEuekjdvmqwYmvwC3VuPBR5wMhhbhP3sVHQbpgVkC1L7kH6j6ymqR42b7hJSGtHuo6MNl1yMrP8CySHonloQUpN+XUuLUieH7KqIpTxwzYm3QcSd0oP6Vgy9fZqtop2mlUYtXjdEfVOJa8dYhgwHd654wNniVkUHFYX9QIa/EcMfFOlcyTZedz1TtsoFtFjSaXmz4diyMVfVf7KNC/TLmYFLO8h2nKOLH+V1JtXENs3xt6PhSl8XilxnhjY/2wBMO4bKeXGthG0oSW5CA83HRRwatEZU08wyYY976w/PIYwAOjvklA/PmXl7lyNaRQ2L/7M8V2yAUbT6UGS5VKgA8md0zoXntttfED56cPCZ2KhSJ7HbxL53B1mE6K+lY25Sh40IpnX8C23vYH74+EhhHdgXbnJcPO83JWRTQHJxhRTlKoWtIif8IIb2Xh2XGqk2HLV/x8FqtW0eGFce4rXCUSBMBFYcTl9C7vefTyC4SIzss/Yf8uB4jV5VNLT/Gx089j0zasGA1SXyY8eMMDK+3WbyTGQPIpD5P7U7UkVTnQmAB95v8odpUKU3nfX1kedvbT/2N7VtYqlfZ0Eu/CsNH0qN6zGXKpzLFXGMJuPhvYw/Y7MQIRyKd4i0EXxrPV0bWrWCaAAXo3powtEG/dHvPMrO8Oo2Jb3zcoyfT5g8XTO2HyTLmHmQA7dizBC48JVp2M52J15y8HYB/qN1HFdhqCZK25kO8Bzlx0Eo/ige+XD+oqN3hGeEmXkpPP1qSZEjx7FLSzpAxDlkQ+J9avlh9Wc3iSraCVWM57F34DdEsELIHNLUdidrFq38XLvqGvDNOgOTRTmiG0cx2GnXGoJAAfk0ycIYMVVWRWtbnv/pJxMQXLahA3RP9lYw513J5bZgWlSykLVC928aJKVFIyOX/0IK4z3rxozrYrtacdnU9H3zRaYtUK9OGx0CkrLj/7Lb6Gc3cui8xuXX/XHVDW7JOZFevwx0e0jGe3ltL1oudSAqnLv4fe0sUQhfGU77lXKeotH8+wsyHMasT5XboJQfmNCcIpw/NAAd95Hh5zy4NTFvwGRglTaTVR2LTT4J8mUYP7auh4ewqUANKB8y43yDBGSSfGLLsdXiY70ZILmH/F/Y3xiLVDtMHAjiBRVfM75B/hpNiTozolVPexbdVvII+XrpN1xobx5KvZDHYg0iYtR6YrmX89uuSMiK2cwTs/fNg+L7vmGP0S/kcnz07ySw7mfLgI3laMIw9P+RBegKILLoB4X4FCBCN4cYD2L/PGxV6j3n4PyOysA6hPzsIKcejYQaZ+qAhM7br/wmYtoGMP1pmhSOLO+JJrd+q8gaj1Gw41pSv1oOdLlsbZJEwvY9u2LXUExcsd7e8HDAmRw91W0PPn4axOJOPyMYSBN4UWT1k6ib6PXL65WEWagzLlE2EpxgTMPjNF2N3Uz6ESdmEaFl7rhPzsprMFEcCcwr2fSTvR7Pvd6Jb+zjKJx+jDHM8Nj4lw0p/ISz4MQ33wUO9ssoPvedR9SauTlH1ItxhIkPAcWHvvpWlJFcafeDUi83M7r4wDs1NODaKWkU8FWIa7KM/MBEg6qF+gOGsBVjozTYPaPt7Dy22qynIMYvP8Bz+dnBEeM1N6VKoPEAW+jbyAhB7bxu1n5daAqE4KXGCuABWKHFgiF0lxWTaw9yaEWp5qXpsT3k/dLi72VrWk6n5ex64tlO0BtnGxeBrgp89Q9Of4IzmBeTqfSyEUb+nPmYtbpXQGLXJEIly+KZJJf9siABQz3xPC7ZOTkhrMshrAJD3I/FaHYXj06xpFdohUIz/MZxwRJeXgyF670Q0qLlv5nkmCJtbANAZuHqCcsFAOn8tRsaNxwApLUhIYI2aZs4nhOY5wpMf2GjIevTcECMA3Neq1MyIYvFvWGLz+YAMlIiYYtgQJjyJZV4WXWF8WPhrLXVYfiBSxLTjJY6Y2iBHkh1llCRbVFnwdQXapvb4/Y1fMEB2p/2kgAIypRm2j0sBp/fCBuK6VMQLsNa/p0lQSOjT8FyN1hoRHCVFvujxb28AP50KVlk/0sJq2vTSiKWZwWSJ9qkUp24jCAkZtemLlHBebmU3oEvJiXb4FnmxrN3ug1HdCxnpRL10JnyXCDb+FrJsTKoqgI1fjdBZjao+K9XS1N38oZnhNUcOAToDXe3AortnokXW1pnKn1GCAp0EG42sM7CVIDS4Gy28S5m8ifJQ0w0amkxp+dSKC9RlRgnC2QOmxXafYnl/xFefs0023HuVqJ1rF7BsMlMoDcGQJeXZJHCtrhTUdHKlOrzuDgHMd/iuniLSJ5RA/EFeTWCmTrmGc3BewH6W8ZnuZv41PbBbyYNUwk1TnxONQuMRdiE/+yXCSLJzsysFMmCo06CXSWkPjx/i8fwX45nM5UJw4tDOMZgulbxQHMA7Y5m1wdX0oECprVXpqcczKZkNyEN+SM/LrGIIbwgY0isl3bzd1etm/ZxwFCXC1Zdx3zpOotkjkQHnWnQRVV5jAP/LTWvryK3zlKuu/GNvbqQpmQo088nK2ctZxdDgSqsGTjhEDA14Dg2Nr9odlUCUBJ/aTzji640Dtem6sULK7uR+4J4OBr/rOnOGKzg3KP+E8A4eW8crfMLpocq/vIsQj40d/DlqrCEY+VbRksFUVpiUmjrJyDq4/NhgFXDMy/CGEIMX6ElizbCYOUZBOIAWI/1yJh0MFoSr2i5As11Cs0MaAswsJ5sfUVeAqXLxMTjiF2zBZs27klGgDPb/krjC9Gc2m+rWWB83sFeAqyVRzfpvl7LGKz6XrJicxWSkRvED4PDZY8eBMuP7Ln+W7eEcCXpFWGARcPEAAL6BnIEP92uL4yxAQhMyZmvDPSdy+lizPkTNhepFIaL8nbeIly6sUd+Fd8yu/ukcB5/upTAVUtb4KXUALrgIcYxnfyfUd/jQTuGMWNtd9cChlY54JonhfWcUbMrYdDEnCZSSSPSaQFAOGfZPSHzUxf+g6gnzeuLdtyKfC6TTJGvVExKDUbcI1pToElMJt+9VtSWA2MCXs7y+oTsn2oWpqyAZxfZwoGm9TQqzYDE0nEJ5/79TIsNzlHwbtUg013CFGLN7z3zKU0j9Rz+ussubsOSk1g7FQXLEB/7cVOpS6UkHPmSoHp4IyfeaB4LlNnus4lhHtyMccTV/UOJuzp40+Iky9Jrl/wrwOzE7nv+qcfrh1phb+DdKgnVcDei1BkZGENIgyT17iO4BDjIulxlDw7W7XCEU/YC/8dW2+Rko3KMK4bvlSEYW9OVXnozRWp74JjPkWvPE+3/riCs3i3KUHWgq6eeuSDnFe8ytf2BVd+NktC1ZqXzr/ZQfOG7UmfMUXZH9xw6k2l8/lePYffUzLyRpPj7kY0NwTFuY0TvII3VnCOLtuRVifGi9QwPVFNpycH4FNYHrkATiDo7cZiG3kb2NXDZQ0QdlUEOk9SUsd7LHxs3ay2AkWC1YnaripM9jjVhjFMviiaKgbCMJaMUySK7yNF8fIJxYomEudWPnTLWgz9ozQlutF6ncyTnykrhvlKPDQrLocbYnH2M1YlixYaXM3BlrdtGUBGEMrRp5ebBNb3x90SgIwgeYIxapIBmWZGGOokru6kVsEy+kolYrrx1pHAzx+BowNQtjgTzcvbu6AQG83I8mNT/9FJ+4KqiIm7jYEkVXvRtN2nFvlJ94WB+hrprer0hNZeiKuyrvgnOJxQf0/g1TxoO9aMylQ7t4SnSBO1zA2xSOl8adZVW6FU3hLMiOrrNXt9mmH1kt6HYIdtrbzWTh2aMP50A8aiNsngoqhgp45IWNT14P6yLNEBHaplRrRBCRosGCHC295725IWgsiGFeyZ9GILSqm91J3EvVmzohRmMMhSM8qKrOJbBlG21lC/oUgtFbPp63vrvjpcSOFMuA/y9edNWBJmA0CT1Li+yEGzW2ZlRts5B8zt7QHItCr+08DNU4RbkXfBPgiN1Sx30eoTbLDzdm68tbFl6I8y8UyJwr5EA1nS4eO6mNN19ERomC3KJV8VEYCctb4LiAV+/r67G11jsOmbuXewhXoRQh8YgmtRC9IlbSNBtbNFHRh8xLMEsNv5AGcZbTWJWm4+Q6LcWuqy5Rk3ptuA4ERSHPeBPr3fJwYa3uqxFUFnTDyKcv9Y4SsDT8CYtB7xFApUxrOmsY36wHxsi2dRmkYCA+9lgsPTEEy0v1XBrK1lPTWo62GH5o0WMX+8ErqMoZTEzQAy7hT/CU1xLNeNAmJkfE5IsehEyOFZiCNgZJlByS1bzp7R28UbvBkOg3YYWQq7Kq0+TOZLcReEihRJXCBfIwyYOvyRLf8gb8YLHN9TWNMBDszE1s8/g8Gdo94QQ51UOQPO4omKKm3BuJtLLqXb/hIfOX8Z7sjzvHrC+g6rcxoyiGkp+8lYaoqioSEBWJAXNxWaL0UQKuPf82MyHXgPwklnLzkVm6M+Aq7qIfq4kBRiV2a2EOhoC7I+lYS/8OgrdHoYxYSuXFLhs8I35NiSTf5/MNBG3KnPgKn38fV7blnDTpMZVfJ4A8fdoEtX+d7JG4g5iwmMIoa2IAnabaVOMCkIsy7I/SPCKNsqxxGouDw6ZQhWmO6pdr5rFbFxtaExWjCTann7tdaB4Xrj0/Jek4mX0Se3cDdESjXZ74CO10DSpfIA8ogZ+UbbB7CC32hCUrsiNEdw+B+7IdhqHYKjrAN/nnXzREU9PyZyOMtSc31GevfQjdZaWgOBSMBsG4AfgZFFvLKEYt8LofJNBdX0DQRLsv6oijADlO2M6/Mb6NXoDNOwtE+WOxMqTSiW4XY116kI6eHlcznyNRvPkRs6N2MeWC//CzSp64pRIDcdekZi7Gdm52Vkf9glE/FQ3M7qRsz/6HOLNEYUAzT+8HaVuvfkPYZEkMTEWQpnQJybdnrjfEWe5QZofO8puwlVADRudeUjf9Bdg==" />
+</div>
+        <div class="mainWrapper">
+            
+
+    <script type="text/javascript" src="https://www.fpi.nsdl.co.in/web/Scripts/dw_event.js"></script>
+    <script type="text/javascript" src="https://www.fpi.nsdl.co.in/web/Scripts/font.js"></script>
+
+<script type="text/javascript" language="javascript">
+    //function DisableBackButton() {
+    //    window.history.forward()
+    //}
+    //DisableBackButton();
+    //window.onload = DisableBackButton;
+    //window.onpageshow = function (evt) { if (evt.persisted) DisableBackButton() }
+    //window.onunload = function () { void (0) }
+ </script>
+
+
+
+<script type="text/javascript">
+    //window.history.pushState(null, null, window.location.href);
+    //window.onpopstate = function () {
+    //    window.history.go(1);
+    //};
+    window.history.forward();
+    window.onload = function () {
+        window.history.forward();
+    };
+
+    window.onunload = function () {
+        null;
+    };
+    </script>
+
+
+<script type="text/javascript">
+
+
+    /**
+      * Disable right-click of mouse, F12 key, and save key combinations on page
+      * By Arthur Gareginyan (arthurgareginyan[at]gmail[dot]com)
+      * For full source code, visit https://mycyberuniverse.com
+      */
+    window.onload = function () {
+        document.addEventListener("contextmenu", function (e) {
+            e.preventDefault();
+        }, false);
+        document.addEventListener("keydown", function (e) {
+            //document.onkeydown = function(e) {
+            // "I" key
+            if (e.ctrlKey && e.shiftKey && e.keyCode == 73) {
+                disabledEvent(e);
+            }
+            // "J" key
+            if (e.ctrlKey && e.shiftKey && e.keyCode == 74) {
+                disabledEvent(e);
+            }
+            // "S" key + macOS
+            if (e.keyCode == 83 && (navigator.platform.match("Mac") ? e.metaKey : e.ctrlKey)) {
+                disabledEvent(e);
+            }
+            // "U" key
+            if (e.ctrlKey && e.keyCode == 85) {
+                disabledEvent(e);
+            }
+            // "F12" key
+            if (event.keyCode == 123) {
+                disabledEvent(e);
+            }
+        }, false);
+        function disabledEvent(e) {
+            if (e.stopPropagation) {
+                e.stopPropagation();
+            } else if (window.event) {
+                window.event.cancelBubble = true;
+            }
+            e.preventDefault();
+            return false;
+        }
+    };
+</script>
+
+<div class="main_header position_R">
+			<div class="fL" style="background:#f5ecc4;height:100px;width:165px;">
+				<a href="https://www.fpi.nsdl.co.in/web/Default.aspx" ><img  class="mL5 mT25" src="https://www.fpi.nsdl.co.in/web/Images/nsdl_logo.png" alt="NSDL logo" height="52" width="152" /></a>
+			</div>
+			<div id="HeaderControl_fpilogo" class="fL mL20 mT50" style="display:;">
+				<a href="https://www.fpi.nsdl.co.in/web/Default.aspx"><img src="https://www.fpi.nsdl.co.in/web/Images/subhead_new.png" alt="NSDL Logo"  /></a>
+			</div>
+    		<div id="HeaderControl_tradelogo" class="fL mL20 mT50" style="display:none;">
+				<a href="https://www.fpi.nsdl.co.in/web/Default.aspx"><img src="https://www.fpi.nsdl.co.in/web/Images/subhead_new1.png" alt="NSDL Logo"  /></a>
+			</div>
+    
+			<div class="fR mT45 w350">
+				<div id="HeaderControl_dvHlinks" class="fL mR5 tabs01 mT5">
+					
+                    <div id="HeaderControl_headmenu">
+						<div class="tabslist"><a class="tabslist" href="https://www.fpi.nsdl.co.in/web/Reports/ReportsListing.aspx">FPI Investments</a></div>
+						<div class="pp1" style="color:floralwhite">|</div>
+                        <div class="tabslist"><a class="tabslist" title="Foreign Investment Limit Monitoring(FILM)" href="https://www.fpi.nsdl.co.in/web/Reports/ForeignInvestmentLimitMonitoringListing.aspx">Foreign Investment Limit Monitoring</a> </div>
+						<div class="pp1" style="color:floralwhite">|</div>
+						<div class="tabslist"> <a class="tabslist" href="https://www.fpi.nsdl.co.in/web/HomePage/FrmHomePage.aspx">Common Application Form</a></div>
+                        <div style="clear:both;"></div>
+					</div>
+                   
+				 </div>
+				
+				<div id="HeaderControl_dvLogin" class="fL mR5"><a id="HeaderControl_btnLogin" href="javascript:__doPostBack(&#39;HeaderControl$btnLogin&#39;,&#39;&#39;)"><img src="https://www.fpi.nsdl.co.in/web/Images/login.png" height="38" width="63" alt="Login" /></a></div>
+                
+				<div class="clr"></div>
+                <div class="position_A clr fontAdjust" id="sizer">
+					<div class="display_B mT4 s11 b clrYellow fL">Font Size :</div>
+					<a title="Decrease text size" href="#" class="decrease mT5 display_B fL"><img alt="" src="https://www.fpi.nsdl.co.in/web/Images/Sm_A.png"></a>
+					<a title="Restore default font-sizes" href="#" class="reset mT4 display_B fL"><img alt="" src="https://www.fpi.nsdl.co.in/web/Images/Md_A.png"></a>
+					<a title="Increase text size" href="#" class="increase mT4 display_B fL"><img alt="" src="https://www.fpi.nsdl.co.in/web/Images/Bg_A.png"></a>
+				</div>
+			</div>
+			<div class="clr"></div>
+		</div>
+
+<script type="text/javascript">
+    //Prevents backspace except in the case of textareas and text inputs to prevent user navigation.
+    $(document).keydown(function (e) {
+        var preventKeyPress;
+        if (e.keyCode == 8) {
+            var d = e.srcElement || e.target;
+            switch (d.tagName.toUpperCase()) {
+                case 'TEXTAREA':
+                    preventKeyPress = d.readOnly || d.disabled;
+                    break;
+                case 'INPUT':
+                    preventKeyPress = d.readOnly || d.disabled ||
+                        (d.attributes["type"] && $.inArray(d.attributes["type"].value.toLowerCase(), ["radio", "checkbox", "submit", "button"]) >= 0);
+                    break;
+                case 'DIV':
+                    preventKeyPress = d.readOnly || d.disabled || !(d.attributes["contentEditable"] && d.attributes["contentEditable"].value == "true");
+                    break;
+                default:
+                    preventKeyPress = true;
+                    break;
+            }
+        }
+        else
+            preventKeyPress = false;
+
+        if (preventKeyPress)
+            e.preventDefault();
+    });
+</script> 
+            
+            <div id="mainContent" class="main_content">
+                
+
+<div style="padding-bottom:10px;border-bottom:1px solid #edeeee;"><!-- Breadcrumbs -->
+    <div class="fL">
+	    <div id="BrdControl_dvBreadcrumbs" class="tabs03"><ul><li><a href='https://www.fpi.nsdl.co.in/web/Default.aspx'>Home</a></li><li><a href='https://www.fpi.nsdl.co.in/web/Reports/ReportsListing.aspx'>FPI Investments</a></li><li><span class='last s12'>View Report</span></li></ul></div>
+    </div>
+    <div class="clr"></div>
+</div>
+                <div id="Div1" class="heading01 mT10">Fortnightly Sector-wise FPI Investment data</div>
+                <div id="Div2" class="" style="background: url(&#39;../Images/top_arrow.png&#39;) no-repeat 30px 1px; padding-top: 6px; height: 5px;">
+                    <!--height:8px; -->
+                    <div style="border-bottom: 3px solid #4d4d4d; padding-bottom: 2px;"></div>
+                </div>
+                <table width="100%" border="0" cellspacing="0" cellpadding="0" align="center" class="common">
+                    <tr>
+                       
+                                    <td style="padding-top: 20px;">
+                                        <div id="dvDates">
+                                        </div>
+                                        <div>
+                                              <select name="ddlfortnighly" id="ddlfortnighly" class="select01">
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Jul152026.html">JUL 15, 2026</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_June302026.html">JUNE 30, 2026</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_June152026.html">JUNE 15, 2026</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_May312026.html">MAY 31, 2026</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_May152026.html">MAY 15, 2026</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Apr302026.html">APR 30, 2026</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Apr152026.html">APR 15, 2026</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Mar312026.html">MAR 31, 2026</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Mar152026.html">MAR 15, 2026</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Feb282026.html">FEB 28, 2026</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Feb152026.html">FEB 15, 2026</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Jan312026.html">JAN 31, 2026</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Jan152026.html">JAN 15, 2026</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Dec312025.html">DEC 31, 2025</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Dec152025.html">DEC 15, 2025</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Nov302025.html">NOV 30, 2025</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Nov152025.html">NOV 15, 2025</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Oct312025.html">OCT 31, 2025</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Oct152025.html">OCT 15, 2025</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Sep302025.html">SEP 30, 2025</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Sep152025.html">SEP 15, 2025</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Aug312025.html">AUG 31, 2025</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Aug152025.html">AUG 15, 2025</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_July312025.html">JULY 31, 2025</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_July152025.html">JULY 15, 2025</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_June302025.html">JUN 30, 2025</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_June152025.html">JUN 15, 2025</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_May312025.html">MAY 31, 2025</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_May152025.html">MAY 15, 2025</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Apr302025.html">APR 30, 2025</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Apr152025.html">APR 15, 2025</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Mar312025.html">MAR 31, 2025</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Mar152025.html">MAR 15, 2025</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Feb282025.html">FEB 28, 2025</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Feb152025.html">FEB 15, 2025</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Jan312025.html">JAN 31, 2025</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Jan152025.html">JAN 15, 2025</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Dec312024.html">DEC 31, 2024</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Dec152024.html">DEC 15, 2024</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Nov302024.html">NOV 30, 2024</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Nov152024.html">NOV 15, 2024</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Oct312024.html">OCT 31, 2024</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Oct152024.html">OCT 15, 2024</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Sep302024.html">SEP 30, 2024</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Sep152024.html">SEP 15, 2024</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Aug312024.html">AUG 31, 2024</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Aug152024.html">AUG 15, 2024</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_July312024.html">JULY 31, 2024</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_July152024.html">JULY 15, 2024</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_June302024.html">JUNE 30, 2024</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_June152024.html">JUNE 15, 2024</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_May312024.html">MAY 31, 2024</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_May152024.html">MAY 15, 2024</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Apr302024.html">APR 30, 2024</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Apr152024.html">APR 15, 2024</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Mar312024.html">MAR 31, 2024</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Mar152024.html">MAR 15, 2024</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Feb292024.html">FEB 29, 2024</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Feb152024.html">FEB 15, 2024</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Jan312024.html">JAN 31, 2024</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Jan152024.html">JAN 15, 2024</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Dec312023.html">DEC 31, 2023</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Dec152023.html">DEC 15, 2023</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Nov302023.html">NOV 30, 2023</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Nov152023.html">NOV 15, 2023</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Oct312023.html">OCT 31, 2023</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Oct152023.html">OCT 15, 2023</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Sep302023.html">SEP 30, 2023</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Sep152023.html">SEP 15, 2023</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Aug312023.html">AUG 31, 2023</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Aug152023.html">AUG 15, 2023</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Jul312023.html">JUL 31, 2023</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_JUL152023.html">Jul 15, 2023</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_JUN302023.html">Jun 30, 2023</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_JUN152023.html">Jun 15, 2023</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_May312023.html">May 31, 2023</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_May152023.html">May 15, 2023</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Apr302023.html">Apr 30, 2023</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Apr152023.html">Apr 15, 2023</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Mar312023.html">Mar 31, 2023</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Mar152023.html">Mar 15, 2023</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Feb282023.html">Feb 28, 2022</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Feb152023.html">Feb 15, 2023</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Jan312023.html">Jan 31, 2023</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Jan152023.html">Jan 15, 2023</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Dec312022.html">Dec 31, 2022</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Dec152022.html">Dec 15, 2022</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Nov302022.html">Nov 30, 2022</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Nov152022.html">Nov 15, 2022</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Oct312022.html">Oct 31, 2022</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Oct152022.html">Oct 15, 2022</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Sep302022.html">Sep 30, 2022</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Sep152022.html">Sep 15, 2022</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Aug312022.html">Aug 31, 2022</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Aug152022.html">Aug 15, 2022</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_July312022.html">July 31, 2022</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_July152022.html">July 15, 2022</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_June302022.html">June 30, 2022</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_June152022.html">June 15, 2022</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_May312022.html">May 31, 2022</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_May152022.html">May 15, 2022</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Apr302022.html">Apr 30, 2022</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Apr152022.html">Apr 15, 2022</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Mar312022.html">Mar 31, 2022</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Mar152022.html">Mar 15, 2022</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Feb282022.html">Feb 28, 2022</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Feb152022.html">Feb 15, 2022</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Jan312022.html">Jan 31, 2022</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Jan152022.html">Jan 15, 2022</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Dec312021.html">Dec 31, 2021</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Dec152021.html">Dec 15, 2021</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Nov302021.html">Nov 30, 2021</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Nov152021.html">Nov 15, 2021</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Oct312021.html">Oct 31, 2021</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Oct152021.html">Oct 15, 2021</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Sep302021.html">Sep 30, 2021</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Sep152021.html">Sep 15, 2021</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_August312021.html">August 31, 2021</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_August152021.html">August 15, 2021</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_July312021.html">Jul 31, 2021</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_July152021.html">July 15, 2021</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_June302021.html">Jun 30, 2021</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_June152021.html">Jun 15, 2021</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_May312021.html">May 31, 2021</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_May152021.html">May 15, 2021</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Apr302021.html">Apr 30, 2021</option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Apr152021.html">Apr 15, 2021 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Mar312021.html">Mar 31, 2021 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Mar152021.html">Mar 15, 2021 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Feb282021.html">Feb 28, 2021 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Feb152021.html">Feb 15, 2021 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Jan312021.html">Jan 31, 2021 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Jan152021.html">Jan 15, 2021 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Dec312020.html">Dec 31, 2020 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Dec152020.html">Dec 15, 2020 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Nov302020.html">Nov 30, 2020 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Nov152020.html">Nov 15, 2020 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Oct312020.html">Oct 31, 2020 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Oct152020.html">Oct 15, 2020 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Sep302020.html">Sep 30, 2020 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Sep152020.html">Sep 15, 2020 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_August312020.html">Aug 31, 2020 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_August152020.html">Aug 15, 2020 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_July312020.html">Jul 31, 2020 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_July152020.html">Jul 15, 2020 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_June302020.html">Jun 30, 2020 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_June152020.html">Jun 15, 2020 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_May312020.html">May 31, 2020 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSectorMay152020.html">May 15, 2020 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSectorApril302020.html">Apr 30, 2020 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_April152020.html">Apr 15, 2020 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_March312020.html">Mar 31, 2020 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_March152020.html">Mar 15, 2020 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_February292020.html">Feb 29, 2020 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_February152020.html">Feb 15, 2020 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_January312020.html">Jan 31, 2020 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_January152020.html">Jan 15, 2020 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_December312019.html">Dec 31, 2019 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_December152019.html">Dec 15, 2019 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_November302019.html">Nov 30, 2019 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_November152019.html">Nov 15, 2019 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_October312019.html">Oct 31, 2019 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_October152019.html">Oct 15, 2019 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_September302019.html">Sep 30, 2019 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_September152019.html">Sep 15, 2019 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_August312019.html">Aug 31, 2019 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_August152019.html">Aug 15, 2019 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_July312019.html">Jul 31, 2019 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_July152019.html">Jul 15, 2019 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_June302019.html">Jun 30, 2019 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_June152019.html">Jun 15, 2019 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_May312019.html">May 31, 2019 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_May152019.html">May 15, 2019 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_April302019.html">Apr 30, 2019 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_April152019.html">Apr 15, 2019 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_March312019.html">Mar 31, 2019 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_March152019.html">Mar 15, 2019 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_February282019.html">Feb 28, 2019 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_February152019.html">Feb 15, 2019 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_January312019.html">Jan 31, 2019 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_January152019.html">Jan 15, 2019 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_December312018.html">Dec 31, 2018 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_December152018.html">Dec 15, 2018 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_November302018.html">Nov 30, 2018 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_November152018.html">Nov 15, 2018 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_October312018.html">Oct 31, 2018 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_October152018.html">Oct 15, 2018 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_September302018.html">Sep 30, 2018 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_September152018.html">Sep 15, 2018 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_August312018.html">Aug 31, 2018 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_August152018.html">Aug 15, 2018 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_July312018.html">Jul 31, 2018 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_July152018.html">Jul 15, 2018 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_June302018.html">Jun 30, 2018 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_June152018.html">Jun 15, 2018 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_May312018.html">May 31, 2018 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_May152018.html">May 15, 2018 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Apr302018.html">April 30, 2018 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Apr152018.html">April 15, 2018 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Mar312018.html">March 31, 2018 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Mar152018.html">March 15, 2018 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Feb282018.html">February 28, 2018 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Feb152018.html">February 15, 2018 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Jan312018.html">January 31, 2018 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Jan152018.html">January 15, 2018 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Dec312017.html">December 31, 2017 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Dec152017.html">December 15, 2017 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Nov302017.html">November 30, 2017 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Nov152017.html">November 15, 2017 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Oct312017.html">October 31, 2017 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Oct152017.html">October 15, 2017 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Sep302017.html">September 30, 2017 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Sep152017.html">September 15, 2017 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Aug312017.html">August 31, 2017 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Aug152017.html">August 15, 2017 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_July312017.html">July 31, 2017 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_July152017.html">July 15, 2017 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_June302017.html">June 30, 2017 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_June152017.html">June 15, 2017 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_May312017.html">May 31, 2017 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_May152017.html">May 15, 2017 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Apr302017.html">April 30, 2017 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Apr152017.html">April 15, 2017 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Mar312017.html">March 31, 2017 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Mar152017.html">March 15, 2017 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Feb282017.html">February 28, 2017 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Feb152017.html">February 15, 2017 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Jan312017.html">January 31, 2017 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Jan152017.html">January 15, 2017 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Dec312016.html">December 31, 2016 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Dec152016.html">December 15, 2016 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Nov302016.html">November 30, 2016 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Nov152016.html">November 15, 2016 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Oct312016.html">October 31, 2016 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Oct152016.html">October 15, 2016 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Sep302016.html">September 30, 2016 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Sep152016.html">September 15, 2016 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Aug312016.html">August 31, 2016 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Aug152016.html">August 15, 2016 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_July312016.html">July 31, 2016 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_July152016.html">July 15, 2016 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_June302016.html">June 30, 2016 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_June152016.html">June 15, 2016 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_May312016.html">May 31, 2016 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_May152016.html">May 15, 2016 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Apr302016.html">April 30, 2016 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Apr152016.html">April 15, 2016 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Mar312016.html">March 31, 2016 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Mar152016.html">March 15, 2016 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Feb292016.html">February 29, 2016 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Feb152016.html">February 15, 2016 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Jan312016.html">January 31, 2016 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Jan152016.html">January 15, 2016 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Dec312015.html">December 31, 2015 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Dec152015.html">December 15, 2015 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Nov302015.html">November 30, 2015 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Nov152015.html">November 15, 2015 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Oct312015.html">October 31, 2015 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Oct152015.html">October 15, 2015 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Sep302015.html">September 30, 2015 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInestSector_Sep152015.html">September 15, 2015 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInestSector_August312015.html">August 31, 2015 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInestSector_August152015.html">August 15, 2015 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInestSector_July312015.html">July 31, 2015 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInestSector_July152015.html">July 15, 2015 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInestSector_June302015.html">June 30, 2015 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInestSector_June152015.html">June 15, 2015 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInestSector_May312015.html">May 31, 2015 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInestSector_May152015.html">May 15, 2015 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInestSector_April302015.html">April 30, 2015 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInestSector_April152015.html">April 15, 2015 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Mar312015.html">March 31, 2015 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Mar152015.html">March 15, 2015 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Feb282015.html">February 28, 2015 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Feb152015.htm">February 15, 2015 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Jan312015.html">January 31, 2015 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Jan152015.html">January 15, 2015 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Dec312014.html">December 31, 2014 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Dec152014.html">December 15, 2014 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Nov302014.htm">November 30, 2014 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Nov152014.htm">November 15, 2014 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Oct312014.htm">October 31, 2014 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInestSector_Oct15302014.htm">October 15, 2014 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInestSector_Sep302014.htm">September 30, 2014 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInestSector_Sep152014.htm">September 15, 2014 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInestSector_August312014.htm">August 31, 2014 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInestSector_August152014.htm">August 15, 2014 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInestSector_July312014.html">July 31, 2014 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInestSector_July152014.htm">July 15, 2014 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInestSector_June302014.html">June 30, 2014 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInestSector_June152014.html">June 15, 2014 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInestSector_May302014.html">May 31, 2014 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInestSector_May152014.html">May 15, 2014 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInestSector_April302014.html">April 30, 2014 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInestSector_April152014.html">April 15, 2014 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Mar312014.html">March 31, 2014 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Mar152014.html">March 15, 2014 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Feb282014.html">February 28, 2014 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Feb152014.html">February 15, 2014 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Jan302014.html">January 31, 2014 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Jan152014.html">January 15, 2014 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Dec312013.html">December 31, 2013 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Dec152013.html">December 15, 2013 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Nov302013.html">November 30, 2013 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Nov152013.html">November 15, 2013 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Oct302013.html">October 31, 2013 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Oct152013.html">October 15, 2013 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Sep302013.html">September 30, 2013 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Sep152013.html">September 15, 2013 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Aug312013.html">August 31, 2013 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Aug152013.html">August 15, 2013 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_July302013.html">July 31, 2013 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_July152013.html">July 15, 2013 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Jun302013.html">June 30, 2013 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_June152013.html">June 15, 2013 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_May312013.html">May 31, 2013 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_May152013.html">May 15, 2013 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Apr302013.html">April 30, 2013 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Apr152013.html">April 15, 2013 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Mar312013.html">March 31, 2013 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Mar152013.html">March 15, 2013 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Feb282013.html">February 28, 2013 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Feb152013.html">February 15, 2013 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Jan312013.html">January 31, 2013 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Jan152013.html">January 15, 2013 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Dec302012.html">December 30, 2012 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Dec152012.html">December 15, 2012 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Nov302012.html">November 30, 2012 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Nov152012.html">November 15, 2012 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Oct312012.html">October 31, 2012 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Oct152012.html">October 15, 2012 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Sep302012.html">September 30, 2012 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Sep152012.html">September 15, 2012 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Aug312012.html">August 31, 2012 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Aug152012.html">August 15, 2012 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_July312012.html">July 31, 2012 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_July152012.html">July 15, 2012 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_June302012.html">June 30, 2012 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_June152012.html">June 15, 2012 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_May312012.html">May 31, 2012 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_May152012.html">May 15, 2012 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Apr302012.html">April 30, 2012 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Apr152012.html">April 15, 2012 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Mar302012.html">March 30, 2012 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Mar152012.html">March 15, 2012 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Feb292012.html">February 29, 2012 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_Feb152012.html">February 15, 2012 </option>
+	<option value="~/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSecor_Jan312012.html">January 31, 2012 </option>
+
+</select>
+                                            <a id="btnds1" class="mL10 fL mT5" style="text-decoration: none; margin-top:10px;" href="javascript:__doPostBack(&#39;btnds1&#39;,&#39;&#39;)">
+                                                <div class="blu_left01"></div>
+                                                <div class="blu_center01 btn_Text">View Report</div>
+                                                <div class="blu_right01"></div>
+                                                <div class="clr"></div>
+                                            </a>
+                                        
+                                        </div>
+                                    </td>
+                              
+                    </tr>
+                </table>
+            </div>
+            
+<link href="../Css/footer.css" rel="stylesheet" />
+<script src="../Scripts/bootstrap.min.js"></script>
+<script type="text/javascript">
+    function ContactNote() {
+        var left = (screen.width / 2) - (600 / 2);
+        var top = (screen.height / 2) - (300 / 2);
+        popupWindow = window.open('/ContactUs.html', 'popUpWindow', 'height=400,width=600,top=' + top + ',left=' + left + ',titlebar=yes,resizable=no,scrollbars=no,toolbar=no,menubar=no,location=yes,directories=no,status=no');
+    }
+    function TermsAndConditionNote() {
+        var left = (screen.width / 2) - (600 / 2);
+        var top = (screen.height / 2) - (300 / 2);
+        popupWindow = window.open('/TermsAndCondition.html', 'popUpWindow', 'top=' + top + ',left=' + left + ',titlebar=yes,resizable=no,scrollbars=yes,toolbar=no,menubar=no,location=yes,directories=no,status=no');
+    }
+    function PrivacyPolicy() {
+        var left = (screen.width / 2) - (600 / 2);
+        var top = (screen.height / 2) - (300 / 2);
+        popupWindow = window.open('/PrivacyPolicy.html', 'popUpWindow', 'top=' + top + ',left=' + left + ',titlebar=yes,resizable=no,scrollbars=yes,toolbar=no,menubar=no,location=yes,directories=no,status=no');
+    }
+    function Feedback() {
+        var left = (screen.width / 2) - (900 / 2);
+        var top = (screen.height / 2) - (450 / 2);
+        popupWindow = window.open('/Feedback.aspx', 'popUpWindow', 'height=700,width=700,top=' + top + ',left=' + left + ',titlebar=yes,resizable=yes,scrollbars=yes,toolbar=yes,menubar=yes,location=yes,directories=no,status=no');//KETAN SHAH||15112022
+    }
+</script>
+<div class="main_footer">
+	
+		<div class="fR mR10 mT10">
+			
+
+            <div class="bottonlinks">
+              
+			    <a href="#" id="contactuslink" data-target="#modalcontactus" tabindex="19" onkeypress="" style="cursor: pointer;" data-toggle="modal" class="footlink">Contact Us:</a>
+				
+				
+				
+				
+                <a href="#" id="termsadncondition" tabindex="21" data-target="#modaltermscondition" style="cursor: pointer;" data-toggle="modal" class="footlink">Terms and Condition:</a>
+
+				  <a href="#" id="termsprivacylink" tabindex="22" data-target="#modalprivacypolicy" style="cursor: pointer;" data-toggle="modal" class="footlink">Privacy Policy:</a>
+                  
+
+                  
+			    
+				
+            <a href="#" tabindex="25" onclick="Feedback();" class="footlink">Feedback</a>
+			</div>
+
+
+			<div class="clr"></div>
+			<div class="s11 clraaa aR">
+			<label id="FooterControl_lblReleaseDate" name="lblReleaseDate">Website updated as on: 03 Jul 2026</label>&nbsp &nbsp &nbsp &nbsp	© Copyright 2014, National Securities Depository Ltd. (NSDL)
+			</div>
+		</div>
+
+     <div class="fL mL10 mT10" >
+            <div class="bottonlinks">
+               <a href="https://twitter.com/NSDL_Depository" target="_blank"> <img style="margin: 0px;border-radius: 15px;" alt="twitter" src="../Images/25X25PixTweet.jpg"></a>
+               <a href="https://www.linkedin.com/company/national-securities-depository-limited/" target="_blank"> <img style="border-radius: 15px;" alt="linkedin" src="../Images/25X25PixIn.jpg"></a>
+            <a href="https://www.facebook.com/NSDL-National-Securities-Depository-Limited-101492279013266" target="_blank"> <img style="border-radius: 15px;" alt="facebook" src="../Images/25X25PixFB.jpg"></a>     
+            <a href="https://www.youtube.com/c/NSDLNationalSecuritiesDepositoryLimited" target="_blank"> <img style="border-radius: 15px;" alt="youtube" src="../Images/25X25PixYt.jpg"></a>
+                
+                 <//div>
+            </div>
+
+      
+          <div class="modal fade" id="modalcontactus" role="dialog" data-backdrop="static" data-keyboard="false">
+            <div class="modal-dialog">
+
+                <!-- Modal content-->
+                <div class="modal-content">
+                    <div class="modal-header" style="background:#882017;color:white;">
+                                 <button type="button" class="close" data-dismiss="modal">X</button>
+                  
+
+                        <h3 style="margin-top:0px;margin-bottom:0px"><b>Contact Us</b></h3>
+                    </div>
+                    <div class="modal-header">
+                       
+                        <h4 style="margin-top:0px;margin-bottom:0px"><b>For any queries, you can contact NSDL at</b></h4>
+                    </div>
+                    <div class="modal-body" >
+
+                        
+                          <b>Address:</b><br />
+                          <!--Changed by Shivani on 26/08/2024-->
+                          National Securities Depository Limited<br />
+                          3rd Floor, Naman Chamber,<br />
+                          Plot C-32, G-Block,<br />
+                          Bandra Kurla Complex,<br />
+                          Bandra East, Mumbai - 400 013,<br />
+                          India.<br />
+                          Tel No: 91-22-6944-8400/ 8500<br />
+                          
+                          Email :<span style="color:blue;">fpiassist[at]nsdl[dot]com</span>
+                        
+                        
+                          
+                     
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+            
+
+            <div class="modal fade" id="modalprivacypolicy" role="dialog" data-backdrop="static" data-keyboard="false">
+            <div class="modal-dialog">
+
+                <!-- Modal content-->
+                <div class="modal-content">
+                    <div class="modal-header" style="background:#882017;color:white;">
+                       <button type="button" class="close" data-dismiss="modal">X</button>
+                        <h3><b>Privacy Policy</b></h3>
+                    </div>
+                    <div class="modal-header">
+                      
+                        <h4><b>Privacy Policy for the use of <strong>FPI</strong> services of NSDL by Shareholder.</b></h4>
+                    </div>
+                    <div class="modal-body" style="list-style: none;">
+
+                        <ul>
+                          <li>1.<strong>Definitions:</strong> In this document, the following words and phrases have the meaning set opposite them unless the context indicates otherwise:</li>
+                          <li style="margin-left: 2%;">A) <strong>NSDL:</strong> means National Securities Depository Limited, a company incorporated under the Companies Act, 1956 and registered under the Depositories Act, 1996 with Securities and Exchange Board of India.</li>
+                          <li style="margin-left: 2%;">B) <strong>FPI:</strong> means a process for recording votes by the members/shareholders using a computer based machine to display an electronic ballot and to record the vote and also the number of votes polled in favour or against such that the entire voting gets registered and counted in an electronic registry in a centralized server.</li>
+                          <li style="margin-left: 2%;">C) <strong>Internet:</strong> refers to a Global network of inter connected Computers network, each using Transmission Control Protocol / Internet Protocol or any combination thereof or such other standard network inter connection protocols as is used to transmit data that is directly or indirectly delivered to a Computer.</li>
+                          <li style="margin-left: 2%;">D) <strong>User:</strong> The User could be anyone from the following entities:-</li>
+                          <li style="margin-left: 3%;">i) Issuer who places its resolutions for voting on the <strong>FPI</strong> system of NSDL.</li>
+                          <li style="margin-left: 3%;">ii) Registrar &amp; Transfer Agent through which the Issuer has established electronic connectivity with NSDL and has been authorised by the Issuer for taking necessary actions on its behalf in respect of activities pertaining to <strong>FPI</strong> system of NSDL.</li>
+                          <li style="margin-left: 3%;">iii) Scrutinizer appointed by the Issuer to conduct the voting process in <strong>FPI</strong> system of NSDL.</li>
+                          <li style="margin-left: 3%;">iv) Shareholders who casts vote in the <strong>FPI</strong> system of NSDL.</li>
+                          <li>2.<strong>Disclosure of Personal Information:</strong> The User agrees that NSDL may hold and process its Personal Information on computer or otherwise in connection with <strong>FPI</strong> as well as for statistical analysis. The User also agrees that NSDL may disclose, in strict confidence, to other institutions, such Personal Information as may be reasonably necessary for reasons inclusive of but not limited to the following:</li>
+                          <li style="margin-left: 3%;">i) In compliance with a legal directive &amp; For fraud prevention purposes, etc.</li>
+                          <li>3.<strong>Proprietary Rights:</strong> The User acknowledges that the software underlying <strong>FPI</strong> is the legal property of NSDL. The permission given by NSDL to access&nbsp;&nbsp;&nbsp; <strong>FPI</strong> will not convey any proprietary or ownership rights in the above software. The User shall not attempt to modify, translate, disassemble, decompile or reverse engineer the software underlying <strong>FPI</strong> or create any derivative product based on that software.</li>
+                          <li>4.<strong>Safeguards:</strong></li>
+                          <li style="margin-left: 3%;">i) The User agrees to commit the password/PIN to memory and not record it in any form including written or electronic.</li>
+                             <li style="margin-left: 3%;">ii) The User agrees to keep the password/PIN confidential and to not reveal the same to any third party.</li>
+                             <li style="margin-left: 3%;">iii) The User agrees that he shall not let any unauthorised person to have access to computers or leave them unattended while accessing<strong>FPI</strong>.</li>
+                          <li>5.<strong>Voting in respect of Demat Accounts/folios held in joint name:</strong> User agrees that in respect of account/folios held in joint holding pattern, the vote casted using the User ID and password sent to first holder shall be recognized on behalf of all joint holders of that account/folio.</li>
+                          <li>6.<strong>Recognition of Vote:</strong> User agrees that by casting the vote through <strong>FPI</strong>, the same shall only be considered for voting, where any other means of voting is also undertaken by him.</li>
+                          <li>7.<strong>Change of Terms and Conditions:</strong> NSDL reserves the absolute discretion to amend or supplement any of the terms and conditions at any time and will endeavour to give prior notice of fifteen days wherever feasible for such changes. NSDL may introduce new services within <strong>FPI</strong> from time to time. The existence and availability of the new services will be notified to the Users as and when they become available. The changed terms and conditions applicable to the new features in <strong>FPI</strong> shall be communicated to the User. By using these new services, the User agrees to be bound by the revised terms and conditions as may be applicable. The availability / non-availability of a particular service shall be advised either through email, web page of NSDL or written communication.</li>
+                          <li>8.<strong>Non-Transferability:</strong> The right of use of <strong>FPI</strong> service of NSDL is not transferable by a User under any circumstance and shall be used by the concerned User only.</li>
+                          <li>9.<strong>Liability:</strong> NSDL shall not be liable to the User for any transactions executed on the <strong>FPI</strong> system and the User hereby fully indemnifies and hold NSDL harmless against any action, suit, proceeding initiated against it or any loss, cost or damage incurred by it as a result thereof. NSDL shall under no circumstance be liable to the User if the access is not available in the desired manner for reasons including but not limited to natural calamities, legal restraints, faults in the telecommunication network or network failure or any other reason beyond the control of NSDL. Under no circumstance shall NSDL be liable for damages whatsoever whether such damages are direct, indirect, incidental, consequential and irrespective whether any claim is based on loss of revenue, interruption of business, or any loss of any character or nature and whether sustained by the user or any other person. Illegal or improper use of <strong>FPI</strong> system of NSDL shall render the User liable for payment of financial charges as decided by NSDL and may result in suspension of the access to <strong>FPI</strong> system.</li>
+                          <li>10.<strong>Governing Law:</strong> These terms and conditions and / or the use of the services provided through <strong>FPI</strong> shall be governed by the laws of the Republic of India and no other nation. The User agrees to submit to the exclusive jurisdiction of the Courts located in Mumbai, India as regards any claims or matters arising under these terms and conditions. Any dispute or difference arising between the User shall be settled by mutual consultation / discussion, failing which the same shall be referred to arbitration. The Arbitration proceedings shall be governed and conducted in accordance with the Indian Arbitration and Conciliation Act, 1996 and that the Arbitration proceedings shall take place in Mumbai. NSDL accepts no liability whatsoever, direct or indirect, for non-compliance with the laws of any country other than the Republic of India. The mere fact that <strong>FPI</strong> can be accessed through Internet by a User in a country other than India shall not be interpreted to imply that the laws of the said country govern these terms and conditions.</li>
+                          <li><strong>Disclaimer:</strong></li>
+                          <li style="margin-left: 4%;">All information provided in <strong>FPI</strong> system of NSDL is obtained by NSDL from sources believed to be accurate and reliable. Access and use of <strong>FPI</strong> system of NSDL is a confirmation by the Users that they have understood and accepted the terms and conditions for using this service. All proprietary rights in the information received shall remain the property of NSDL. Reproduction, redistribution and transmission of any information contained on the website are strictly prohibited. The information provided in <strong>FPI</strong> system is without warranty of any kind and NSDL shall not be liable for any damages, losses (direct or indirect) whatsoever, due to disruption or non availability of any of services/facility(ies) due to maintenance/technical fault/error or any failure in telecommunication network or any error in any software or hardware systems. NSDL makes no representation and disclaims all express, implied and statutory warranties of any kind to the user and/or any third party including warranties as to accuracy, timeliness, completeness, merchantability or fitness of the information for any particular purpose.</li>
+                          </ul>                    
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+            
+            <div class="modal fade" id="modaltermscondition" role="dialog" data-backdrop="static" data-keyboard="false">
+            <div class="modal-dialog">
+
+                <!-- Modal content-->
+                <div class="modal-content">
+                    <div class="modal-header" style="background:#882017;color:white;">
+               <button type="button" class="close" data-dismiss="modal">X</button>
+                        <h3><b>Terms &amp; Conditions</b></h3>
+                    </div>
+                    <div class="modal-header">
+                      
+                        <h4><b>Terms and Conditions for the use of <strong>FPI</strong> services of NSDL by Shareholder.</b></h4>
+                    </div>
+                    <div class="modal-body" style="list-style: none;">
+
+                        <ul>
+                          <li>1.<strong>Definitions:</strong> In this document, the following words and phrases have the meaning set opposite them unless the context indicates otherwise:</li>
+                          <li style="margin-left: 2%;">A) <strong>NSDL:</strong> means National Securities Depository Limited, a company incorporated under the Companies Act, 1956 and registered under the Depositories Act, 1996 with Securities and Exchange Board of India.</li>
+                          <li style="margin-left: 2%;">B) <strong>FPI:</strong> means a process for recording votes by the members/shareholders using a computer based machine to display an electronic ballot and to record the vote and also the number of votes polled in favour or against such that the entire voting gets registered and counted in an electronic registry in a centralized server.</li>
+                          <li style="margin-left: 2%;">C) <strong>Internet:</strong> refers to a Global network of inter connected Computers network, each using Transmission Control Protocol / Internet Protocol or any combination thereof or such other standard network inter connection protocols as is used to transmit data that is directly or indirectly delivered to a Computer.</li>
+                          <li style="margin-left: 2%;">D) <strong>User:</strong> The User could be anyone from the following entities:-</li>
+                          <li style="margin-left: 3%;">i) Issuer who places its resolutions for voting on the <strong>FPI</strong> system of NSDL.</li>
+                          <li style="margin-left: 3%;">ii) Registrar &amp; Transfer Agent through which the Issuer has established electronic connectivity with NSDL and has been authorised by the Issuer for taking necessary actions on its behalf in respect of activities pertaining to <strong>FPI</strong> system of NSDL.</li>
+                          <li style="margin-left: 3%;">iii) Scrutinizer appointed by the Issuer to conduct the voting process in <strong>FPI</strong> system of NSDL.</li>
+                          <li style="margin-left: 3%;">iv) Shareholders who casts vote in the <strong>FPI</strong> system of NSDL.</li>
+                          <li>2.<strong>Disclosure of Personal Information:</strong> The User agrees that NSDL may hold and process its Personal Information on computer or otherwise in connection with <strong>FPI</strong> as well as for statistical analysis. The User also agrees that NSDL may disclose, in strict confidence, to other institutions, such Personal Information as may be reasonably necessary for reasons inclusive of but not limited to the following:</li>
+                          <li style="margin-left: 3%;">i) In compliance with a legal directive &amp; For fraud prevention purposes, etc.</li>
+                          <li>3.<strong>Proprietary Rights:</strong> The User acknowledges that the software underlying <strong>FPI</strong> is the legal property of NSDL. The permission given by NSDL to access&nbsp;&nbsp;&nbsp; <strong>FPI</strong> will not convey any proprietary or ownership rights in the above software. The User shall not attempt to modify, translate, disassemble, decompile or reverse engineer the software underlying <strong>FPI</strong> or create any derivative product based on that software.</li>
+                          <li>4.<strong>Safeguards:</strong></li>
+                          <li style="margin-left: 3%;">i) The User agrees to commit the password/PIN to memory and not record it in any form including written or electronic.</li>
+                             <li style="margin-left: 3%;">ii) The User agrees to keep the password/PIN confidential and to not reveal the same to any third party.</li>
+                             <li style="margin-left: 3%;">iii) The User agrees that he shall not let any unauthorised person to have access to computers or leave them unattended while accessing<strong>FPI</strong>.</li>
+                          <li>5.<strong>Voting in respect of Demat Accounts/folios held in joint name:</strong> User agrees that in respect of account/folios held in joint holding pattern, the vote casted using the User ID and password sent to first holder shall be recognized on behalf of all joint holders of that account/folio.</li>
+                          <li>6.<strong>Recognition of Vote:</strong> User agrees that by casting the vote through <strong>FPI</strong>, the same shall only be considered for voting, where any other means of voting is also undertaken by him.</li>
+                          <li>7.<strong>Change of Terms and Conditions:</strong> NSDL reserves the absolute discretion to amend or supplement any of the terms and conditions at any time and will endeavour to give prior notice of fifteen days wherever feasible for such changes. NSDL may introduce new services within <strong>FPI</strong> from time to time. The existence and availability of the new services will be notified to the Users as and when they become available. The changed terms and conditions applicable to the new features in <strong>FPI</strong> shall be communicated to the User. By using these new services, the User agrees to be bound by the revised terms and conditions as may be applicable. The availability / non-availability of a particular service shall be advised either through email, web page of NSDL or written communication.</li>
+                          <li>8.<strong>Non-Transferability:</strong> The right of use of <strong>FPI</strong> service of NSDL is not transferable by a User under any circumstance and shall be used by the concerned User only.</li>
+                          <li>9.<strong>Liability:</strong> NSDL shall not be liable to the User for any transactions executed on the <strong>FPI</strong> system and the User hereby fully indemnifies and hold NSDL harmless against any action, suit, proceeding initiated against it or any loss, cost or damage incurred by it as a result thereof. NSDL shall under no circumstance be liable to the User if the access is not available in the desired manner for reasons including but not limited to natural calamities, legal restraints, faults in the telecommunication network or network failure or any other reason beyond the control of NSDL. Under no circumstance shall NSDL be liable for damages whatsoever whether such damages are direct, indirect, incidental, consequential and irrespective whether any claim is based on loss of revenue, interruption of business, or any loss of any character or nature and whether sustained by the user or any other person. Illegal or improper use of <strong>FPI</strong> system of NSDL shall render the User liable for payment of financial charges as decided by NSDL and may result in suspension of the access to <strong>FPI</strong> system.</li>
+                          <li>10.<strong>Governing Law:</strong> These terms and conditions and / or the use of the services provided through <strong>FPI</strong> shall be governed by the laws of the Republic of India and no other nation. The User agrees to submit to the exclusive jurisdiction of the Courts located in Mumbai, India as regards any claims or matters arising under these terms and conditions. Any dispute or difference arising between the User shall be settled by mutual consultation / discussion, failing which the same shall be referred to arbitration. The Arbitration proceedings shall be governed and conducted in accordance with the Indian Arbitration and Conciliation Act, 1996 and that the Arbitration proceedings shall take place in Mumbai. NSDL accepts no liability whatsoever, direct or indirect, for non-compliance with the laws of any country other than the Republic of India. The mere fact that <strong>FPI</strong> can be accessed through Internet by a User in a country other than India shall not be interpreted to imply that the laws of the said country govern these terms and conditions.</li>
+                          <li><strong>Disclaimer:</strong></li>
+                          <li style="margin-left: 4%;">All information provided in <strong>FPI</strong> system of NSDL is obtained by NSDL from sources believed to be accurate and reliable. Access and use of <strong>FPI</strong> system of NSDL is a confirmation by the Users that they have understood and accepted the terms and conditions for using this service. All proprietary rights in the information received shall remain the property of NSDL. Reproduction, redistribution and transmission of any information contained on the website are strictly prohibited. The information provided in <strong>FPI</strong> system is without warranty of any kind and NSDL shall not be liable for any damages, losses (direct or indirect) whatsoever, due to disruption or non availability of any of services/facility(ies) due to maintenance/technical fault/error or any failure in telecommunication network or any error in any software or hardware systems. NSDL makes no representation and disclaims all express, implied and statutory warranties of any kind to the user and/or any third party including warranties as to accuracy, timeliness, completeness, merchantability or fitness of the information for any particular purpose.</li>
+                            </ul>                    
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+          <div class="modal fade" id="aboutus" role="dialog" data-backdrop="static" data-keyboard="false">
+            <div class="modal-dialog">
+
+                <!-- Modal content-->
+                <div class="modal-content">
+                    <div class="modal-header" style="background:#882017;color:white;">
+                       <button type="button" class="close" data-dismiss="modal"">X</button>
+                        <h3><b>About Us</b></h3>
+                    </div>
+                    <div class="modal-header">
+                      
+                        <h4><b>For any queries, you can contact NSDL at</b></h4>
+                    </div>
+                    
+                </div>
+
+            </div>
+        </div>
+
+            <div class="modal fade" id="help" role="dialog" data-backdrop="static" data-keyboard="false">
+            <div class="modal-dialog">
+
+                <!-- Modal content-->
+                <div class="modal-content">
+                    <div class="modal-header" style="background:#882017;color:white;">
+                        <button type="button" class="close" data-dismiss="modal" style="color:white;"><b>&times;</b></button>
+                        <h3><b>Help</b></h3>
+                    </div>
+                    <div class="modal-header">
+                      
+                        <h4><b>For any queries, you can contact NSDL at</b></h4>
+                    </div>
+                    
+                </div>
+
+            </div>
+        </div>
+</div>
+        </div>
+    </form>
+</body>
+</html>

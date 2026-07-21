@@ -36,6 +36,9 @@ MS_COLS = [
 FLIP_REPEAT_LOOKBACK = 3
 SETUP_COLS = ["date", "symbol", "sector", "setup_type", "setup_types", "bias",
               "trigger_strike", "invalidation_strike", "expected_behavior", "dealer_behavior"]
+POSITION_COLS = ["symbol", "sector", "setup_type", "bias", "direction",
+                  "trigger_date", "trigger_price", "sl_price", "target_price",
+                  "status", "resolved_date", "resolved_price"]
 CHANGE_COLS = ["date", "symbol", "icon", "type", "msg", "rank"]
 BREADTH_COLS = ["date", "bullish_pct", "bearish_pct", "compression_pct",
                 "expansion_pct", "transition_pct", "mean_rev_pct"]
@@ -258,6 +261,21 @@ def _context_blocks(con, data, sessions, ph):
             f"SELECT date, symbol FROM daily_ban WHERE date IN ({ph}) "
             "ORDER BY date, symbol", ["date", "symbol"], sessions)
         _ban_signal_rows(data, sessions)
+    if "daily_setup_positions" in tables:
+        # Currently-open positions regardless of how old trigger_date is
+        # (a position can stay open indefinitely), plus resolved positions
+        # whose resolved_date falls inside the exported session window — so
+        # HUD time-travel to an earlier date in that window still shows them
+        # as open, matching the point-in-time semantics drawSetups() applies
+        # client-side. Positions that both triggered and resolved entirely
+        # before the window are irrelevant to any date the HUD can display.
+        data["setup_positions"] = table(
+            con,
+            "SELECT symbol, sector, setup_type, bias, direction, trigger_date, "
+            "trigger_price, sl_price, target_price, status, resolved_date, "
+            "resolved_price FROM daily_setup_positions "
+            "WHERE status = 'OPEN' OR resolved_date >= ? ORDER BY trigger_date",
+            POSITION_COLS, (sessions[0],))
     if "daily_fii_dii" in tables:
         fd = table(con, "SELECT date, category, buy_cr, sell_cr, net_cr "
                         "FROM daily_fii_dii ORDER BY date DESC LIMIT ?",

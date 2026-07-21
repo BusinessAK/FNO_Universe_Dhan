@@ -191,41 +191,71 @@ def build_playbook(
     elif "REGIME_SHIFT" in setups:
         playbook = {"bias": "Regime Transition", "trigger_strike": float(gamma_flip_t), "invalidation_strike": float(gamma_flip_t * 0.99), "expected_behavior": "Volatility Stabilization", "dealer_behavior": "Hedging Crossover Transition"}
     elif "VOLATILITY_COIL" in setups:
-        playbook = {"bias": "Volatility Expansion", "trigger_strike": float(gamma_flip_t), "invalidation_strike": float(spot_t * 0.985), "expected_behavior": "Coil Breakout Watch", "dealer_behavior": "Inventory Compression Coil"}
+        # invalidation_strike (spot-based) and trigger_strike (gamma_flip-based)
+        # come from unrelated bases with no ordering guarantee — clamp so
+        # invalidation never lands above/at the trigger.
+        cw_invalid = float(spot_t * 0.985)
+        if cw_invalid >= float(gamma_flip_t * 0.99):
+            cw_invalid = float(gamma_flip_t * 0.98)
+        playbook = {"bias": "Volatility Expansion", "trigger_strike": float(gamma_flip_t), "invalidation_strike": cw_invalid, "expected_behavior": "Coil Breakout Watch", "dealer_behavior": "Inventory Compression Coil"}
     elif "DEALER_DEFENSE" in setups:
-        playbook = {"bias": "Mean Reversion", "trigger_strike": float(gamma_flip_t), "invalidation_strike": float(gamma_flip_t * 0.98), "expected_behavior": "Institutional Pin Target", "dealer_behavior": "Straddle Pin Defense"}
+        # gamma_regime=="LONG_GAMMA" (this setup's own precondition) means
+        # gamma_flip_t <= spot_t by definition, so a trigger AT gamma_flip_t is
+        # met the instant the row is created. Offset it 1% above the pin so
+        # "held the pin" is a real, not-yet-satisfied condition.
+        playbook = {"bias": "Mean Reversion", "trigger_strike": float(gamma_flip_t * 1.01), "invalidation_strike": float(gamma_flip_t * 0.98), "expected_behavior": "Institutional Pin Target", "dealer_behavior": "Straddle Pin Defense"}
     elif "FLOOR_BOUNCE" in setups:
         playbook = {"bias": "Bullish Mean Reversion", "trigger_strike": float(put_wall_t), "invalidation_strike": float(put_wall_t * 0.985), "expected_behavior": "Key Support Bounce", "dealer_behavior": "Put Wall Support Hedging"}
     elif "PINCH_ZONE" in setups:
         # All walls converged — breakout direction determined by spot price relative to the pinch wall (gamma_flip_t)
         is_bullish = (spot_t >= gamma_flip_t) if spot_t > 0 and gamma_flip_t > 0 else (ifs_final >= 0)
+        # Direction is read off spot vs gamma_flip_t, so a trigger AT
+        # gamma_flip_t is tautologically already met on whichever side spot
+        # sits — every PINCH_ZONE setup showed TRIGGERED at creation. The
+        # trigger must sit beyond the pin, not on it, and invalidation must
+        # stay clamped on the correct side of that trigger.
         if is_bullish:
             pz_bias = "Compression — Bullish Breakout Watch"
             pz_behavior = "Bullish Breakout Watch"
+            trig_val = float(gamma_flip_t * 1.015)
             invalid_val = float(spot_t * 0.985)
+            if invalid_val >= trig_val * 0.99:
+                invalid_val = float(trig_val * 0.98)
         else:
             pz_bias = "Compression — Bearish Breakdown Watch"
             pz_behavior = "Bearish Breakdown Watch"
+            trig_val = float(gamma_flip_t * 0.985)
             invalid_val = float(spot_t * 1.015)
+            if invalid_val <= trig_val * 1.01:
+                invalid_val = float(trig_val * 1.02)
         playbook = {
             "bias": pz_bias,
-            "trigger_strike": float(gamma_flip_t),
+            "trigger_strike": trig_val,
             "invalidation_strike": invalid_val,
             "expected_behavior": pz_behavior,
             "dealer_behavior": "Long Gamma Pin Defense"
         }
     elif "IV_SPIKE" in setups:
+        # trigger_strike used to be spot_t itself — the exact price that
+        # generated the row, so it was always already met. Offset 1% on the
+        # confirming side (same side as invalidation is far), matching the
+        # up/down shape invalidation already implies.
+        if ifs_final < 0:
+            trig_val, invalid_val = float(spot_t * 0.99), float(spot_t * 1.05)
+        else:
+            trig_val, invalid_val = float(spot_t * 1.01), float(spot_t * 0.95)
         playbook = {
             "bias": "Volatility Mean Reversion",
-            "trigger_strike": float(spot_t),
-            "invalidation_strike": float(spot_t * 1.05) if ifs_final < 0 else float(spot_t * 0.95),
+            "trigger_strike": trig_val,
+            "invalidation_strike": invalid_val,
             "expected_behavior": "IV Contraction Reversion",
             "dealer_behavior": "Premium Rich Straddle Selling"
         }
     elif "IV_CRUSH" in setups:
+        # Same tautology as IV_SPIKE — trigger_strike was spot_t exactly.
         playbook = {
             "bias": "Volatility Stable Range",
-            "trigger_strike": float(spot_t),
+            "trigger_strike": float(spot_t * 0.99),
             "invalidation_strike": float(spot_t * 1.03),
             "expected_behavior": "IV Collapse Flatline",
             "dealer_behavior": "Post Event Unwinding"
@@ -270,30 +300,13 @@ def build_playbook(
     s_strat = base_strategy
     p_bias = playbook.get("bias", "Neutral")
 
+    # Precedence mirrors the playbook-construction elif chain above (GAMMA_SQUEEZE
+    # > INVENTORY_MIGRATION > REGIME_SHIFT > VOLATILITY_COIL > DEALER_DEFENSE >
+    # FLOOR_BOUNCE > PINCH_ZONE > IV_SPIKE > IV_CRUSH > IV_SKEW_ACCUMULATION), so
+    # the two blocks can never pick different setups if `setups` ever carries more
+    # than the single primary_setup element the current call site passes in.
     if "GAMMA_SQUEEZE" in setups:
         s_strat = "ATM Option Buying (Call)"
-    elif "IV_SPIKE" in setups:
-        s_strat = "Bear Call Spread (Credit)" if ifs_final < 0 else "Bull Put Spread (Credit)"
-    elif "IV_CRUSH" in setups:
-        s_strat = "Iron Condor / Short Straddle"
-    elif "VOLATILITY_COIL" in setups:
-        s_strat = "Long Straddle (Breakout Watch)"
-    elif "FLOOR_BOUNCE" in setups:
-        # Selling this floor is only justified if someone else wrote it. When the
-        # wall's OI was bought instead, dealers are short those puts and hedge
-        # into a decline rather than cushioning it, so there is no floor to sell.
-        if "Buying" in pe_interp:
-            s_strat = "Wait for Setup"
-        else:
-            s_strat = "Bull Put Spread (Credit)"
-    elif "DEALER_DEFENSE" in setups:
-        s_strat = "Iron Condor / Short Straddle"
-    elif "PINCH_ZONE" in setups:
-        is_pz_bullish = (spot_t >= gamma_flip_t) if spot_t > 0 and gamma_flip_t > 0 else (ifs_final >= 0)
-        if is_pz_bullish:
-            s_strat = "Bull Call Spread (Debit)"
-        else:
-            s_strat = "Bear Put Spread (Debit)"
     elif "INVENTORY_MIGRATION" in setups:
         if p_bias == "Strong Bullish Momentum" or p_bias == "Bullish Breakout":
             s_strat = "Bull Call Spread (Debit)"
@@ -305,6 +318,33 @@ def build_playbook(
             s_strat = "Bear Put Spread (Debit)"
         else:
             s_strat = "Wait for Setup"
+    elif "REGIME_SHIFT" in setups:
+        if p_bias == "Regime Transition" and ifs_final >= 0:
+            s_strat = "Bull Put Spread (Credit)"
+        elif p_bias == "Regime Transition" and ifs_final < 0:
+            s_strat = "Bear Call Spread (Credit)"
+    elif "VOLATILITY_COIL" in setups:
+        s_strat = "Long Straddle (Breakout Watch)"
+    elif "DEALER_DEFENSE" in setups:
+        s_strat = "Iron Condor / Short Straddle"
+    elif "FLOOR_BOUNCE" in setups:
+        # Selling this floor is only justified if someone else wrote it. When the
+        # wall's OI was bought instead, dealers are short those puts and hedge
+        # into a decline rather than cushioning it, so there is no floor to sell.
+        if "Buying" in pe_interp:
+            s_strat = "Wait for Setup"
+        else:
+            s_strat = "Bull Put Spread (Credit)"
+    elif "PINCH_ZONE" in setups:
+        is_pz_bullish = (spot_t >= gamma_flip_t) if spot_t > 0 and gamma_flip_t > 0 else (ifs_final >= 0)
+        if is_pz_bullish:
+            s_strat = "Bull Call Spread (Debit)"
+        else:
+            s_strat = "Bear Put Spread (Debit)"
+    elif "IV_SPIKE" in setups:
+        s_strat = "Bear Call Spread (Credit)" if ifs_final < 0 else "Bull Put Spread (Credit)"
+    elif "IV_CRUSH" in setups:
+        s_strat = "Iron Condor / Short Straddle"
     elif "IV_SKEW_ACCUMULATION" in setups:
         # Bias direction takes precedence; gamma_regime is a secondary tie-breaker
         # for neutral/transition cases where direction is unclear.
@@ -317,11 +357,6 @@ def build_playbook(
         else:
             # Neutral / Regime Transition — defer to gamma_regime
             s_strat = "Bull Call Spread (Debit)" if gamma_regime == "LONG_GAMMA" else "Bear Put Spread (Debit)"
-    elif "REGIME_SHIFT" in setups:
-        if p_bias == "Regime Transition" and ifs_final >= 0:
-            s_strat = "Bull Put Spread (Credit)"
-        elif p_bias == "Regime Transition" and ifs_final < 0:
-            s_strat = "Bear Call Spread (Credit)"
     elif ifs_final > 15:
         s_strat = "Bull Put Spread (Credit)"
     elif ifs_final < -15:

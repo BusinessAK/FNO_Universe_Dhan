@@ -76,6 +76,23 @@ class TestScreenerRules(unittest.TestCase):
                  net_bull_inv_shift=20000.0)                     # > required
         self.assertNotIn("FLOOR_BOUNCE", screen(i))
 
+    def test_floor_blocked_when_puts_were_bought(self):
+        i = base(gamma_regime="LONG_GAMMA", put_wall_t=980.0,
+                 net_bull_inv_shift=20001.0,
+                 pe_interp="Put Buying (Long Build-up)")
+        self.assertNotIn("FLOOR_BOUNCE", screen(i))
+
+    def test_floor_arms_when_puts_were_written(self):
+        i = base(gamma_regime="LONG_GAMMA", put_wall_t=980.0,
+                 net_bull_inv_shift=20001.0,
+                 pe_interp="Put Writing (Short Build-up)")
+        self.assertIn("FLOOR_BOUNCE", screen(i))
+
+    def test_floor_arms_when_flow_unknown(self):
+        i = base(gamma_regime="LONG_GAMMA", put_wall_t=980.0,
+                 net_bull_inv_shift=20001.0, pe_interp="")
+        self.assertIn("FLOOR_BOUNCE", screen(i))
+
     # ── DEALER_DEFENSE (GEX_INTENSITY_PIN_THRESHOLD = 25) ────────────────
     def test_pin_arm(self):
         i = base(gamma_regime="LONG_GAMMA", gex_intensity=25.1,
@@ -96,6 +113,16 @@ class TestScreenerRules(unittest.TestCase):
     def test_regime_hover_arm_no_shift_needed(self):
         i = base(spot_t=1000.0, gamma_flip_t=1005.0)             # 0.5% < 0.8%
         self.assertIn("REGIME_SHIFT", screen(i))
+
+    def test_regime_cross_down_arm(self):
+        i = base(spot_t=1040.0, gamma_flip_t=1050.0, spot_tm1=1060.0,
+                 gamma_flip_tm1=1055.0, net_bull_inv_shift=-1.0)
+        self.assertIn("REGIME_SHIFT", screen(i))
+
+    def test_regime_cross_down_needs_bear_shift(self):
+        i = base(spot_t=1040.0, gamma_flip_t=1050.0, spot_tm1=1060.0,
+                 gamma_flip_tm1=1055.0, net_bull_inv_shift=0.0)
+        self.assertNotIn("REGIME_SHIFT", screen(i))
 
     # ── INVENTORY_MIGRATION (MIN_WALL_MIGRATION_PCT = 2.0) ───────────────
     def test_migration_arm_call_side(self):

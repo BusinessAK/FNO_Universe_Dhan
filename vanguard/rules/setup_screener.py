@@ -55,6 +55,7 @@ class SetupInputs:
     iv_shift: float
     iv_rank: float
     skew_slope: float
+    pe_interp: str = ""
 
 
 def skew_state(spot_t: float, call_wall_t: float, put_wall_t: float,
@@ -88,9 +89,16 @@ def volatility_coil(i: SetupInputs) -> bool:
 
 
 def floor_bounce(i: SetupInputs) -> bool:
+    """A put wall only acts as a dealer-defended floor if the OI sitting there
+    was written, not bought (see intelligence.classify_oi_flow / playbook.py's
+    same "Buying" check on the strategy side) — a wall built from bought puts
+    means dealers are short those puts and hedge into a decline rather than
+    cushioning it, so there is no floor to sell. pe_interp="" (unknown) leaves
+    this unblocked, matching playbook.py's flow-blind default."""
     return (i.gamma_regime == "LONG_GAMMA" and i.spot_t > 0 and i.put_wall_t > 0
             and abs(i.spot_t - i.put_wall_t) / i.spot_t <= FLOOR_WALL_PROX
-            and i.net_bull_inv_shift > FLOOR_MIN_INV_SHIFT)
+            and i.net_bull_inv_shift > FLOOR_MIN_INV_SHIFT
+            and "Buying" not in i.pe_interp)
 
 
 def dealer_defense(i: SetupInputs) -> bool:
@@ -101,11 +109,19 @@ def dealer_defense(i: SetupInputs) -> bool:
 
 
 def regime_shift(i: SetupInputs) -> bool:
-    crossed = (i.spot_t > i.gamma_flip_t > 0 and 0 < i.spot_tm1 <= i.gamma_flip_tm1
-               and i.net_bull_inv_shift > 0)
+    crossed_up = (i.spot_t > i.gamma_flip_t > 0 and 0 < i.spot_tm1 <= i.gamma_flip_tm1
+                  and i.net_bull_inv_shift > 0)
+    # Mirror of crossed_up: SHORT_GAMMA transition (spot fell through the
+    # flip from at-or-above it) confirmed by bearish OI shift. Without this,
+    # a real bearish regime change could only ever be caught by `hovering`
+    # (bare proximity, no crossing or flow confirmation) — an asymmetry the
+    # downstream strategy override doesn't expect, since it branches on both
+    # ifs_final signs for REGIME_SHIFT as if both were equally confirmed.
+    crossed_down = (0 < i.spot_t < i.gamma_flip_t and i.spot_tm1 >= i.gamma_flip_tm1 > 0
+                     and i.net_bull_inv_shift < 0)
     hovering = (i.gamma_flip_t > 0
                 and abs(i.spot_t - i.gamma_flip_t) / i.spot_t <= REGIME_FLIP_PROX)
-    return crossed or hovering
+    return crossed_up or crossed_down or hovering
 
 
 def inventory_migration(i: SetupInputs) -> bool:

@@ -6,10 +6,11 @@ Purpose
 Quick Commands
 - **Install deps:** `python3 -m pip install -r requirements.txt` ([requirements.txt](requirements.txt))
 - **Run tests:** `python3 run_tests.py` ([run_tests.py](run_tests.py))
-- **Start demos/pipelines:** `./start.sh <mode>` — common modes: `eod`, `live`, `dash` ([start.sh](start.sh#L1-L40))
+- **Full nightly chain (tests → EOD pipeline → HUD parity):** `./start.sh full` ([start.sh](start.sh#L1-L40))
+- **Start demos/pipelines:** `./start.sh <mode>` — common modes: `eod`, `full`, `live`, `dash` ([start.sh](start.sh#L1-L40))
 
 Important Files & Directories
-- **Entry scripts:** [daily_compiler.py](daily_compiler.py#L1-L40), [main.py](main.py#L1-L40), [dashboard.py](dashboard.py)
+- **Entry scripts:** [daily_compiler.py](daily_compiler.py#L1-L40), [poll_eod.py](poll_eod.py#L1-L40), [dashboard.py](dashboard.py)
 - **Core code:** [vanguard/](vanguard/) — engines, data fetchers, ML, services
 - **Compiled data:** [data/compiled/](data/compiled/) and `vanguard.duckdb` (authoritative compiled dataset)
 - **Processed intermediates:** [data/processed/](data/processed/)

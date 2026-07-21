@@ -190,3 +190,70 @@ class TestApiDatasets(unittest.TestCase):
         from vanguard.pipeline.context.api_datasets import parse_fii_dii, ApiShapeDrift
         with self.assertRaises(ApiShapeDrift):
             parse_fii_dii(b'[{"category":"FII"}]')
+
+
+class TestFpiSectorFlow(unittest.TestCase):
+    def test_latest_report_discovery(self):
+        from vanguard.pipeline.context.fpi_sector_flow import latest_report
+
+        class Client:
+            def get_bytes(self, url):
+                return fx("fpi_fortnightly_selection.html")
+
+        label, url = latest_report(Client())
+        self.assertEqual(label, "JUL 15, 2026")
+        self.assertTrue(url.endswith("FIIInvestSector_Jul152026.html"))
+        self.assertTrue(url.startswith("https://www.fpi.nsdl.co.in/"))
+
+    def test_parse_golden(self):
+        import pandas as pd
+        from vanguard.pipeline.context.fpi_sector_flow import parse_sector_flow
+
+        df = parse_sector_flow(fx("FIIInvestSector_Jul152026.html"),
+                                pd.Timestamp("2026-07-15"))
+        self.assertEqual(len(df), 24)                          # 24 sectors, Grand Total dropped
+        self.assertNotIn("Grand Total", set(df.sector))
+        metals = df[df.sector == "Metals & Mining"].iloc[0]
+        self.assertAlmostEqual(metals.equity_net_inv_cr, 5993.0)
+        self.assertTrue((df.fortnight_end == pd.Timestamp("2026-07-15")).all())
+
+    def test_parse_drift_on_missing_table(self):
+        from vanguard.pipeline.context.fpi_sector_flow import parse_sector_flow, ApiShapeDrift
+        import pandas as pd
+        with self.assertRaises(ApiShapeDrift):
+            parse_sector_flow(b"<html><body>no tables here</body></html>",
+                              pd.Timestamp("2026-07-15"))
+
+    def test_ingest_idempotent(self):
+        from vanguard.pipeline.context.fpi_sector_flow import ingest_fpi_sector_flow
+
+        class Client:
+            calls = 0
+
+            def get_bytes(self, url):
+                self.calls += 1
+                if "Selection" in url:
+                    return fx("fpi_fortnightly_selection.html")
+                return fx("FIIInvestSector_Jul152026.html")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            with patch("vanguard.pipeline.context.fpi_sector_flow.RAW_DIR", Path(tmp) / "raw"):
+                con = duckdb.connect(str(Path(tmp) / "t.duckdb"))
+                try:
+                    client = Client()
+                    s1 = ingest_fpi_sector_flow(client, con)
+                    n_after_first = con.execute(
+                        "SELECT COUNT(*) FROM fpi_sector_flow").fetchone()[0]
+                    calls_after_first = client.calls
+                    s2 = ingest_fpi_sector_flow(client, con)     # idempotence: same fortnight
+                    n_after_second = con.execute(
+                        "SELECT COUNT(*) FROM fpi_sector_flow").fetchone()[0]
+                finally:
+                    con.close()
+        self.assertEqual(s1, "ok:24")
+        self.assertEqual(n_after_first, 24)
+        self.assertEqual(n_after_second, 24)                    # no duplicate rows
+        self.assertEqual(s2, "ok:0 (up to date)")
+        # second run still re-fetches the selection page to check what's
+        # latest, but must not re-fetch the already-cached report itself
+        self.assertEqual(client.calls, calls_after_first + 1)

@@ -21,6 +21,7 @@ from vanguard.core.longitudinal import LongitudinalEngine
 from vanguard.core.playbook import build_playbook
 from vanguard.core.config import SETUP_PRIORITY
 from vanguard.rules.setup_screener import screen, SetupInputs
+from vanguard.rules.setup_positions import derive_positions
 from vanguard.core.classifier import StructureClassifier
 from vanguard.core.breadth import MarketBreadthEngine
 from vanguard.core.cash_market_breadth import CashMarketBreadthEngine
@@ -263,6 +264,7 @@ def main():
                     gamma_regime=gamma_regime, gex_intensity=gex_intensity,
                     net_bull_inv_shift=net_bull_inv_shift,
                     iv_shift=iv_shift, iv_rank=iv_rank, skew_slope=skew_slope,
+                    pe_interp=row.get('PE_INTERP', ''),
                 ))
                 
                 # Ratios for conviction circle
@@ -583,6 +585,19 @@ def main():
     # Convert to DataFrames
     df_structure = pd.DataFrame(structure_rows)
     df_setups = pd.DataFrame(setups_rows)
+
+    # Position lifecycle (trigger -> SL/target resolution) — a pure re-
+    # derivation from session_history on every run, same as daily_setups
+    # itself; see vanguard/rules/setup_positions.py for why this can't be a
+    # stateful incremental job in this pipeline.
+    position_rows = derive_positions(session_history)
+    for row in position_rows:
+        row["sector"] = get_sector(row["symbol"])
+    df_positions = pd.DataFrame(position_rows) if position_rows else pd.DataFrame(columns=[
+        "symbol", "sector", "setup_type", "bias", "direction", "trigger_date",
+        "trigger_price", "sl_price", "target_price", "status",
+        "resolved_date", "resolved_price"])
+
     df_inventory = pd.DataFrame(inventory_rows)
     df_breadth = pd.DataFrame(breadth_rows)
     df_changes = pd.DataFrame(changes_rows) if changes_rows else pd.DataFrame(columns=["date", "symbol", "icon", "type", "msg", "rank"])
@@ -611,6 +626,7 @@ def main():
     print("\n[*] Exporting compressed Parquet files to disk...")
     df_structure.to_parquet(os.path.join(output_dir, "daily_market_structure.parquet"), index=False)
     df_setups.to_parquet(os.path.join(output_dir, "daily_setups.parquet"), index=False)
+    df_positions.to_parquet(os.path.join(output_dir, "daily_setup_positions.parquet"), index=False)
     df_inventory.to_parquet(os.path.join(output_dir, "daily_inventory.parquet"), index=False)
     df_breadth.to_parquet(os.path.join(output_dir, "daily_market_breadth.parquet"), index=False)
     df_changes.to_parquet(os.path.join(output_dir, "daily_changes.parquet"), index=False)
@@ -624,6 +640,7 @@ def main():
     conn = duckdb.connect(db_path)
     conn.execute("CREATE TABLE daily_market_structure AS SELECT * FROM df_structure")
     conn.execute("CREATE TABLE daily_setups AS SELECT * FROM df_setups")
+    conn.execute("CREATE TABLE daily_setup_positions AS SELECT * FROM df_positions")
     conn.execute("CREATE TABLE daily_inventory AS SELECT * FROM df_inventory")
     conn.execute("CREATE TABLE daily_market_breadth AS SELECT * FROM df_breadth")
     conn.execute("CREATE TABLE daily_changes AS SELECT * FROM df_changes")

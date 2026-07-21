@@ -86,16 +86,24 @@ try:
                 print(f"[!] CM download failed (non-fatal): {cm_err}")
         # ─────────────────────────────────────────────────────────────────────
 
-        # Run EOD DuckDB compiler pipeline FIRST — establishes authoritative
-        # EOD settlement prices in session_history.json before greeks.csv is written.
-        # This ensures the UI always reads the correct spot from compiled data.
+        # Run EOD DuckDB compiler pipeline — establishes authoritative EOD
+        # settlement prices in session_history.json and, via InstitutionalIntelligence
+        # .analyze_market_structure(), writes greeks.csv/signals.csv with the same
+        # T vs T-1 pairing used everywhere else. (The old standalone main.py pipeline
+        # this used to hand off to was deleted in 23b60a1 as orphaned pre-DuckDB code.)
         print("[*] Running daily_compiler.py...")
         subprocess.run(["python3", "daily_compiler.py"], check=True)
 
-        # Run main signal generation pipeline AFTER compiler — greeks.csv is now
-        # written with the same T vs T-1 pairing the compiler used.
-        print("[*] Running main.py pipeline...")
-        subprocess.run(["python3", "main.py"], check=True)
+        # Run NSE context layer (C1): participant OI, VIX, delivery %, ban list,
+        # FII/DII flows, corporate events. Failure-isolated per dataset inside
+        # poll_context.py itself and best-effort here (check=False) — per
+        # docs/PRD_TRD_nse_context_layer_v1.md, a missing context dataset must
+        # never delay the bhav compile. Runs AFTER the compiler (context tables
+        # are additive, not required for compile) and BEFORE build_hud/briefing
+        # (both join context data into their output).
+        context_date = f"{date_str[0:4]}-{date_str[4:6]}-{date_str[6:8]}"
+        print(f"[*] Running NSE context-layer poller for {context_date}...")
+        subprocess.run(["python3", "scripts/poll_context.py", "--date", context_date], check=False)
 
         # Generate Tomorrow's Watchlist briefing (best-effort — never blocks pipeline)
         print("[*] Generating Tomorrow's Watchlist briefing...")

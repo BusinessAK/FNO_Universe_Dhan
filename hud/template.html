@@ -450,6 +450,7 @@ const NF   = unpack(VG.nifty || {cols: [], rows: []});
 const NF_BY_DATE = Object.fromEntries(NF.map(r => [r.date, r.spot_close]));
 const POS  = VG.positioning ? unpack(VG.positioning) : [];
 const VIXH = VG.vix ? unpack(VG.vix) : [];
+const SPOS = VG.setup_positions ? unpack(VG.setup_positions) : [];  // trigger->SL/target position lifecycle
 const DLV_BY_DATE = {};
 (VG.delivery ? unpack(VG.delivery) : []).forEach(r => { (DLV_BY_DATE[r.date] ??= {})[r.symbol] = r; });
 const FIIDII = VG.fii_dii ? unpack(VG.fii_dii) : [];
@@ -655,17 +656,24 @@ function lineChart(host,series,dates,{h=190,ymin,ymax,unit="%",markDate,shadow}=
   const iw=W-ml-mr,ih=H-mt-mb;
   const all=series.flatMap(s=>s.v).filter(v=>v!=null);
   const y0=ymin??Math.min(...all),y1=ymax??Math.max(...all);
-  const X=i=>ml+i/(dates.length-1)*iw, Y=v=>mt+ih-(v-y0)/(y1-y0||1)*ih;
+  /* dates.length-1===0 (a single-session series, e.g. day one of a freshly
+     wired dataset) would otherwise divide by zero — park the lone point
+     mid-axis instead of NaN-ing the whole plot */
+  const X=i=>ml+(dates.length>1?i/(dates.length-1):0.5)*iw, Y=v=>mt+ih-(v-y0)/(y1-y0||1)*ih;
   const NS="http://www.w3.org/2000/svg";
   const svg=document.createElementNS(NS,"svg");
   svg.setAttribute("viewBox",`0 0 ${W} ${H}`);svg.setAttribute("width","100%");svg.style.display="block";
   const add=(tag,at,parent=svg)=>{const n=document.createElementNS(NS,tag);for(const k in at)n.setAttribute(k,at[k]);parent.appendChild(n);return n};
-  /* recessive grid: 4 y-lines + labels */
-  for(let g=0;g<=3;g++){const v=y0+(y1-y0)*g/3,y=Y(v);
+  /* recessive grid: 4 y-lines + labels (a flat/single-point series collapses
+     y0===y1 — draw just the one line instead of 4 duplicates stacked at
+     the same spot) */
+  const gSteps=y1===y0?[0]:[0,1,2,3];
+  gSteps.forEach(g=>{const v=y0+(y1-y0)*g/3,y=Y(v);
     add("line",{x1:ml,x2:ml+iw,y1:y,y2:y,class:"grid-l"});
-    add("text",{x:ml-6,y:y+3,"text-anchor":"end",class:"axis-t"}).textContent=Math.round(v)+unit;}
-  /* x labels: 4 */
-  [0,Math.floor(dates.length/3),Math.floor(dates.length*2/3),dates.length-1].forEach(i=>{
+    add("text",{x:ml-6,y:y+3,"text-anchor":"end",class:"axis-t"}).textContent=Math.round(v)+unit;});
+  /* x labels: up to 4, deduped — a short series (e.g. day one of a new
+     dataset) would otherwise repeat the same index/date and stack labels */
+  [...new Set([0,Math.floor(dates.length/3),Math.floor(dates.length*2/3),dates.length-1])].forEach(i=>{
     add("text",{x:X(i),y:H-6,"text-anchor":i===0?"start":i===dates.length-1?"end":"middle",class:"axis-t"}).textContent=fdate(dates[i]);});
   /* shadow overlay: a reference series on its OWN min-max scale (shape only,
      no y-axis claim — units differ from the main series). Drawn first so the
@@ -831,11 +839,15 @@ function drawInternals(){
      zero then read correctly as weak momentum on an absolute scale. */
   const mc=CM.slice(-TREND_WINDOW);const el=$("#mcc-chart");el.innerHTML="";
   const W=el.clientWidth||300,H=86,mt=4,mb=4,ih=H-mt-mb;
+  // Bars span only cw (not the full W) so the session marker's "◷" glyph has
+  // room on the right instead of landing on/past the SVG edge — the common
+  // case, since the marker sits on the LATEST bar by default.
+  const mr=12,cw=W-mr;
   const mx=Math.max(28,...mc.map(r=>Math.abs(r.cm_mcclellan_osc||0)));
   const Y0=mt+ih/2,NS="http://www.w3.org/2000/svg";
   const svg=document.createElementNS(NS,"svg");
   svg.setAttribute("viewBox",`0 0 ${W} ${H}`);svg.setAttribute("width","100%");svg.style.display="block";
-  const bw=Math.max(2,W/mc.length-2);
+  const bw=Math.max(2,cw/mc.length-2);
   const zl=document.createElementNS(NS,"line");
   zl.setAttribute("x1",0);zl.setAttribute("x2",W);zl.setAttribute("y1",Y0);zl.setAttribute("y2",Y0);
   zl.setAttribute("class","grid-l");svg.appendChild(zl);
@@ -847,20 +859,44 @@ function drawInternals(){
     bl.setAttribute("stroke","rgba(124,140,160,.28)");bl.setAttribute("stroke-width",1);bl.setAttribute("stroke-dasharray","2 4");
     svg.appendChild(bl);
   });
+  /* hover crosshair — same treatment as lineChart()/drawBreadth(), just
+     missing here before: a moving vertical line while hovering, distinct
+     from the static "◷" session marker below. A per-bar mousemove listener
+     (the old approach) only fires while literally over that bar's rect —
+     near the zero line bars can be a couple pixels tall, so most of the
+     chart's vertical space never triggered anything. One full-height hot
+     rect + nearest-index lookup (same pattern as the A/D chart below) makes
+     hover work anywhere in the chart, not just exactly on a bar. */
+  const cross=document.createElementNS(NS,"line");
+  cross.setAttribute("y1",mt);cross.setAttribute("y2",mt+ih);
+  cross.setAttribute("stroke","rgba(83,221,242,.4)");cross.setAttribute("stroke-width",1);
+  cross.setAttribute("visibility","hidden");
   const mcSel=selIdx-(CM.length-mc.length);
   mc.forEach((r,i)=>{
     const v=r.cm_mcclellan_osc||0,bh=Math.max(1,Math.abs(v)/mx*(ih/2));
+    const bx=i*(cw/mc.length)+1;
     const rc=document.createElementNS(NS,"rect");
-    rc.setAttribute("x",(i*(W/mc.length)+1).toFixed(1));rc.setAttribute("width",bw.toFixed(1));
+    rc.setAttribute("x",bx.toFixed(1));rc.setAttribute("width",bw.toFixed(1));
     rc.setAttribute("y",v>=0?Y0-bh:Y0);rc.setAttribute("height",bh);
     rc.setAttribute("rx",2);rc.setAttribute("fill",v>=0?C.bull:C.bear);
-    rc.addEventListener("mousemove",e=>showTip(`<div class="t">${fdate(r.date)}</div><div class="r"><span>McClellan</span><b>${v.toFixed(1)}</b></div>`,e.clientX,e.clientY));
-    rc.addEventListener("mouseleave",hideTip);
     svg.appendChild(rc);
   });
+  svg.appendChild(cross);
   /* selected-session marker — shared treatment, see addSessionMarker */
   if(mcSel>=0&&mcSel<mc.length)
-    addSessionMarker(svg,NS,mcSel*(W/mc.length)+bw/2+1,mt,mt+ih);
+    addSessionMarker(svg,NS,mcSel*(cw/mc.length)+bw/2+1,mt,mt+ih);
+  const mcHot=document.createElementNS(NS,"rect");
+  mcHot.setAttribute("x",0);mcHot.setAttribute("y",0);mcHot.setAttribute("width",W);mcHot.setAttribute("height",H);
+  mcHot.setAttribute("fill","transparent");
+  mcHot.addEventListener("mousemove",e=>{
+    const r=svg.getBoundingClientRect();
+    const i=Math.max(0,Math.min(mc.length-1,Math.round((e.clientX-r.left)/r.width*W/(cw/mc.length))));
+    const bx=i*(cw/mc.length)+1;
+    cross.setAttribute("x1",bx+bw/2);cross.setAttribute("x2",bx+bw/2);cross.setAttribute("visibility","visible");
+    showTip(`<div class="t">${fdate(mc[i].date)}</div><div class="r"><span>McClellan</span><b>${(mc[i].cm_mcclellan_osc||0).toFixed(1)}</b></div>`,e.clientX,e.clientY);
+  });
+  mcHot.addEventListener("mouseleave",()=>{cross.setAttribute("visibility","hidden");hideTip()});
+  svg.appendChild(mcHot);
   el.appendChild(svg);
   /* signed value readout for the selected session */
   const mval=last.cm_mcclellan_osc;
@@ -872,13 +908,18 @@ function drawInternals(){
      pixel band, no y-axes — divergence between the two is the signal) */
   const ad=CM.slice(-TREND_WINDOW);const el2=$("#adl-chart");el2.innerHTML="";
   const W2=el2.clientWidth||300,H2=86;
+  // Points span only (W2-mr2) so the session marker's "◷" glyph has room on
+  // the right instead of landing on/past the SVG edge — same fix as the
+  // McClellan chart above, for the same reason (marker sits on the LATEST
+  // point by default).
+  const mr2=12;
   const vs=ad.map(r=>r.cm_ad_line),lo=Math.min(...vs),hi2=Math.max(...vs);
-  const X=i=>i/(ad.length-1)*W2, Y=v=>6+(H2-12)-(v-lo)/(hi2-lo||1)*(H2-12);
+  const X=i=>i/(ad.length-1)*(W2-mr2), Y=v=>6+(H2-12)-(v-lo)/(hi2-lo||1)*(H2-12);
   const svg2=document.createElementNS(NS,"svg");
   svg2.setAttribute("viewBox",`0 0 ${W2} ${H2}`);svg2.setAttribute("width","100%");svg2.style.display="block";
   const line=vs.map((v,i)=>(i?"L":"M")+X(i).toFixed(1)+" "+Y(v).toFixed(1)).join("");
   const area=document.createElementNS(NS,"path");
-  area.setAttribute("d",line+`L${W2} ${H2}L0 ${H2}Z`);area.setAttribute("fill","rgba(0,160,190,.14)");svg2.appendChild(area);
+  area.setAttribute("d",line+`L${X(vs.length-1).toFixed(1)} ${H2}L0 ${H2}Z`);area.setAttribute("fill","rgba(0,160,190,.14)");svg2.appendChild(area);
   const pl=document.createElementNS(NS,"path");
   pl.setAttribute("d",line);pl.setAttribute("fill","none");pl.setAttribute("stroke",C.cyan);pl.setAttribute("stroke-width",2);svg2.appendChild(pl);
   /* NIFTY overlay — joined by date (gaps break the path), indexed to the band */
@@ -900,15 +941,23 @@ function drawInternals(){
   const adSel=selIdx-(CM.length-ad.length);
   if(adSel>=0&&adSel<ad.length)
     addSessionMarker(svg2,NS,X(adSel),4,H2-4);
+  /* hover crosshair — same treatment as lineChart()/drawBreadth(), just
+     missing here before: a moving vertical line while hovering, distinct
+     from the static "◷" session marker above. */
+  const cross2=document.createElementNS(NS,"line");
+  cross2.setAttribute("y1",4);cross2.setAttribute("y2",H2-4);
+  cross2.setAttribute("stroke","rgba(83,221,242,.4)");cross2.setAttribute("stroke-width",1);
+  cross2.setAttribute("visibility","hidden");svg2.appendChild(cross2);
   const hot=document.createElementNS(NS,"rect");
   hot.setAttribute("x",0);hot.setAttribute("y",0);hot.setAttribute("width",W2);hot.setAttribute("height",H2);hot.setAttribute("fill","transparent");
   hot.addEventListener("mousemove",e=>{
     const r=svg2.getBoundingClientRect();
     const i=Math.max(0,Math.min(ad.length-1,Math.round((e.clientX-r.left)/r.width*(ad.length-1))));
+    cross2.setAttribute("x1",X(i));cross2.setAttribute("x2",X(i));cross2.setAttribute("visibility","visible");
     const nfTip=nfv[i]!=null?`<div class="r"><span><i style="background:${C.amber}"></i>NIFTY</span><b>${fmtPr(nfv[i])}</b></div>`:"";
     showTip(`<div class="t">${fdate(ad[i].date)}</div><div class="r"><span><i style="background:${C.cyan}"></i>A/D line</span><b>${Math.round(ad[i].cm_ad_line).toLocaleString("en-IN")}</b></div>`+nfTip,e.clientX,e.clientY);
   });
-  hot.addEventListener("mouseleave",hideTip);
+  hot.addEventListener("mouseleave",()=>{cross2.setAttribute("visibility","hidden");hideTip()});
   svg2.appendChild(hot);
   el2.appendChild(svg2);
   $("#adl-legend").innerHTML=
@@ -962,7 +1011,8 @@ function drawSectors(){
       <div class="rail"><i style="width:${(r.bull/r.n*100).toFixed(0)}%;background:${col}"></i></div>
     </div>`}).join("");
   document.querySelectorAll(".sec-tile").forEach(t=>{
-    const go=()=>{sectorFilter=t.dataset.sec;$("#scan-q").value="";renderScan();
+    const go=()=>{sectorFilter=t.dataset.sec;$("#scan-q").value="";
+      renderScan();drawSetups();drawFlips();drawSignals();
       $("#scan-clear").hidden=false;$("#scan-clear").textContent="clear "+sectorFilter+" ✕";
       $("#p-scanner").scrollIntoView({behavior:"smooth"})};
     t.addEventListener("click",go);
@@ -985,14 +1035,17 @@ const SIGMETA={
   ban_enter:["⛔","BAN ENTER","dn"],ban_exit:["✅","BAN EXIT","up"]};
 let sigFilter=null;
 function drawSignals(){
-  const counts={};SIG.forEach(s=>counts[s.type]=(counts[s.type]||0)+1);
-  CHK.signals={n:SIG.length,by_type:{...counts}};
-  $("#sig-count").textContent=SIG.length+" structure events · "+fdate(SDATE);
+  // changes/SIG rows carry no sector column of their own — cross-referenced
+  // via bySym (built from market_structure, which does).
+  const base=SIG.filter(s=>!sectorFilter||bySym[s.symbol]?.sector===sectorFilter);
+  const counts={};base.forEach(s=>counts[s.type]=(counts[s.type]||0)+1);
+  CHK.signals={n:base.length,by_type:{...counts}};
+  $("#sig-count").textContent=base.length+" structure events · "+fdate(SDATE)+(sectorFilter?" · "+sectorFilter:"");
   $("#sig-chips").innerHTML=Object.entries(counts).sort((a,b)=>b[1]-a[1]).map(([t,n])=>
     `<button class="chip" data-t="${t}" aria-pressed="${sigFilter===t}">${(SIGMETA[t]||["·",t])[1]} <span class="n">${n}</span></button>`).join("");
   document.querySelectorAll("#sig-chips .chip").forEach(c=>c.addEventListener("click",()=>{
     sigFilter=sigFilter===c.dataset.t?null:c.dataset.t;drawSignals()}));
-  const list=SIG.filter(s=>!sigFilter||s.type===sigFilter);
+  const list=base.filter(s=>!sigFilter||s.type===sigFilter);
   $("#sig-list").innerHTML=list.map(s=>{
     const m=SIGMETA[s.type]||["·",s.type,""];
     return`<div class="sig ${m[2]}" data-sym="${esc(s.symbol)}"><span class="ic">${m[0]}</span>
@@ -1003,27 +1056,51 @@ function drawSignals(){
 
 /* ── setup queue ─────────────────────────────────────────────────────── */
 let setupFilter=null;
+/* Setup Queue now tracks position lifecycle (vanguard/rules/setup_positions.py),
+   not raw daily_setups rows — "active" means a setup actually triggered
+   (price crossed the trigger level) and hasn't yet resolved, tracked from
+   its original trigger date rather than re-listed fresh every day. A
+   position stays visible through the exact session it resolves on (shown
+   with a TARGET/SL/REVERSED badge that day), then drops out the next
+   session — resolved history lives in daily_setup_positions for later
+   querying, not in this live queue. STALE positions (symbol stopped
+   appearing in the data — delisted, dropped from F&O eligibility, a
+   corporate-action ticker change) are excluded entirely, same as any other
+   resolved status. */
 function drawSetups(){
-  const counts={};SET.forEach(s=>counts[s.setup_type]=(counts[s.setup_type]||0)+1);
-  CHK.setups={n:SET.length};
-  $("#setup-count").textContent=SET.length+" active · "+fdate(SDATE);
+  const open=SPOS.filter(s=>s.trigger_date<=SDATE&&(!s.resolved_date||s.resolved_date>=SDATE)
+    &&(!sectorFilter||s.sector===sectorFilter));
+  const counts={};open.forEach(s=>counts[s.setup_type]=(counts[s.setup_type]||0)+1);
+  CHK.setups={n:open.length};
+  $("#setup-count").textContent=open.length+" active · "+fdate(SDATE)+(sectorFilter?" · "+sectorFilter:"");
   $("#setup-chips").innerHTML=Object.entries(counts).sort((a,b)=>b[1]-a[1]).map(([t,n])=>
     `<button class="chip" data-t="${t}" aria-pressed="${setupFilter===t}">${t.replace(/_/g," ")} <span class="n">${n}</span></button>`).join("");
   document.querySelectorAll("#setup-chips .chip").forEach(c=>c.addEventListener("click",()=>{
     setupFilter=setupFilter===c.dataset.t?null:c.dataset.t;drawSetups()}));
-  const list=SET.filter(s=>!setupFilter||s.setup_type===setupFilter)
+  const list=open.filter(s=>!setupFilter||s.setup_type===setupFilter)
     .sort((a,b)=>(bySym[b.symbol]?.priority_score||0)-(bySym[a.symbol]?.priority_score||0)).slice(0,60);
   $("#setup-cards").innerHTML=list.map(s=>{
     const k=biasKind(s.bias);
+    // Calendar days, not trading-session index: trigger_date can predate the
+    // exported session window (positions can stay open far longer than the
+    // HUD's session lookback), so a SESSIONS.indexOf() lookup would silently
+    // break for older positions. A day or two of weekend slop in the count
+    // is an acceptable trade for never breaking.
+    const daysHeld=Math.max(0,Math.round((new Date(SDATE)-new Date(s.trigger_date))/86400000));
+    const resolvedToday=s.status!=="OPEN"&&s.resolved_date===SDATE;
+    const badge=!resolvedToday?'<span class="bias neut" title="still open, tracking toward SL/target">🟢 OPEN</span>'
+      :s.status==="TARGET_HIT"?'<span class="bias bull" title="closed — hit target">🎯 TARGET</span>'
+      :s.status==="SL_HIT"?'<span class="bias bear" title="closed — hit stop-loss">🛑 SL</span>'
+      :'<span class="bias neut" title="closed — an opposite-direction setup triggered">↩ REVERSED</span>';
     return`<div class="sc ${k}" tabindex="0" role="button" data-sym="${esc(s.symbol)}">
       <div class="top"><span class="sym">${esc(s.symbol)}${bySym[s.symbol]?._ban?' <span title="F&O ban — setup NOT armed live" style="color:var(--bear-hi);font-size:11px">⛔ BAN</span>':""}${(EVENTS_BY_SYM[s.symbol]||[]).some(e=>e.event_type==="RESULTS"&&e.event_date>=SDATE)?' <span title="results inside the event window — this is an event bet" style="color:#E8B45C;font-size:10px">📅</span>':""}</span><span class="typ">${esc(s.setup_type.replace(/_/g," "))}</span></div>
       <span class="bias ${k}">${esc(s.bias)}</span>
       <div class="strikes">
-        <span><span class="k">Trigger</span>${fmtPr(s.trigger_strike)}</span>
-        <span><span class="k">Invalidation</span>${fmtPr(s.invalidation_strike)}</span>
-        ${s.trigger_strike>0&&s.trigger_strike===s.invalidation_strike?'<span class="bias neut" title="trigger equals invalidation — walls converged, size accordingly">0-WIDTH</span>':""}
+        <span><span class="k">SL</span>${fmtPr(s.sl_price)}</span>
+        <span><span class="k">Target</span>${fmtPr(s.target_price)}</span>
+        ${badge}
       </div>
-      <div class="beh">${esc(s.expected_behavior||"")}</div>
+      <div class="beh">Entered ${fdate(s.trigger_date)} @ ${fmtPr(s.trigger_price)} · ${daysHeld}d held</div>
     </div>`}).join("");
   document.querySelectorAll(".sc").forEach(el=>{
     el.addEventListener("click",()=>openDossier(el.dataset.sym));
@@ -1124,7 +1201,8 @@ let flipStrFilter="ALL",flipHideWhip=false;
 function drawFlips(){
   const sIdx=SESSIONS.indexOf(SDATE);
   const prevDate=sIdx>0?SESSIONS[sIdx-1]:null;
-  const flipsAll=MS.filter(r=>r.structure_flip&&r.structure_flip!=="NONE")
+  const flipsAll=MS.filter(r=>r.structure_flip&&r.structure_flip!=="NONE"
+      &&(!sectorFilter||r.sector===sectorFilter))
     .map(r=>{
       const hist=msBySymbol[r.symbol]||[];
       const prevRow=prevDate?hist.find(h=>h.date===prevDate):null;
@@ -1135,7 +1213,7 @@ function drawFlips(){
   const nStrong=flipsAll.filter(r=>r.flip_strength==="STRONG").length;
   const nWhip=flipsAll.filter(r=>r._whip).length;
   CHK.flips={n:flipsAll.length,strong:nStrong,repeat:nWhip};
-  $("#flip-count").textContent=`${flipsAll.length} flips · ${nStrong} strong · ${nWhip} repeat · ${fdate(SDATE)}`;
+  $("#flip-count").textContent=`${flipsAll.length} flips · ${nStrong} strong · ${nWhip} repeat · ${fdate(SDATE)}`+(sectorFilter?` · ${sectorFilter}`:"");
   $("#flip-chips").innerHTML=
     ["ALL","STRONG","MODERATE","WEAK"].map(s=>
       `<button class="chip" data-str="${s}" aria-pressed="${flipStrFilter===s}">${s.toLowerCase()}</button>`).join("")+
@@ -1230,7 +1308,8 @@ function renderScan(){
     tr.addEventListener("click",()=>openDossier(tr.dataset.sym)));
 }
 $("#scan-q").addEventListener("input",renderScan);
-$("#scan-clear").addEventListener("click",()=>{sectorFilter=null;$("#scan-clear").hidden=true;renderScan()});
+$("#scan-clear").addEventListener("click",()=>{sectorFilter=null;$("#scan-clear").hidden=true;
+  renderScan();drawSetups();drawFlips();drawSignals();});
 
 /* ── dossier ─────────────────────────────────────────────────────────── */
 function ladder(r){
@@ -1284,7 +1363,10 @@ function wallTrail(sym){
   const el=$("#dss-trail");el.innerHTML="";
   const hist=(msBySymbol[sym]||[]).filter(r=>r.spot_close>0);
   if(hist.length<2){el.innerHTML='<span class="dim" style="font-size:11px">insufficient history</span>';return}
-  const W=230,H=150,ml=4,mr=4,mt=8,mb=16,NS="http://www.w3.org/2000/svg";
+  // mr=12 (was 4) — room for addSessionMarker()'s "◷" glyph, same fix as the
+  // Cash Internals charts; the plain dashed line this used to draw fit fine
+  // at mr=4, but the shared glyph treatment needs more margin.
+  const W=230,H=150,ml=4,mr=12,mt=8,mb=16,NS="http://www.w3.org/2000/svg";
   const iw=W-ml-mr,ih=H-mt-mb;
   const vals=hist.flatMap(r=>[r.spot_close,r.call_wall,r.put_wall,r.gamma_flip]).filter(v=>v>0);
   const lo=Math.min(...vals),hi=Math.max(...vals),pad=(hi-lo||lo*.02)*.08;
@@ -1294,7 +1376,10 @@ function wallTrail(sym){
   svg.setAttribute("viewBox",`0 0 ${W} ${H}`);svg.setAttribute("width","100%");svg.style.display="block";
   const add=(tag,at)=>{const n=document.createElementNS(NS,tag);for(const k in at)n.setAttribute(k,at[k]);svg.appendChild(n);return n};
   const mi=hist.findIndex(r=>r.date===SDATE);
-  if(mi>=0)add("line",{x1:X(mi),x2:X(mi),y1:mt,y2:mt+ih,stroke:"rgba(232,180,92,.5)","stroke-width":1,"stroke-dasharray":"3 3"});
+  // Static session marker — was a bespoke dashed line here; switched to the
+  // shared addSessionMarker() helper every other chart in this app uses, for
+  // real visual consistency (same glyph, same color, same treatment).
+  if(mi>=0)addSessionMarker(svg,NS,X(mi),mt,mt+ih);
   const path=(key,col,dash,w)=>{
     let d="",pen=false;
     hist.forEach((r,i)=>{const v=r[key];
@@ -1310,10 +1395,15 @@ function wallTrail(sym){
   ["SPOT","#DCE7F2","CW",C.bear,"PW",C.bull,"FLIP",C.violet].reduce((x,v,i,a)=>{
     if(i%2===0){const t=add("text",{x,y:H-3,fill:a[i+1],style:"font-size:8px;letter-spacing:.1em"});t.textContent=v;
       return x+(v.length*6+14)}return x},ml);
+  /* hover crosshair — same treatment as lineChart()/drawBreadth()/Cash
+     Internals, just missing here before: a moving vertical line while
+     hovering, distinct from the static "◷" session marker above. */
+  const cross=add("line",{y1:mt,y2:mt+ih,stroke:"rgba(83,221,242,.4)","stroke-width":1,visibility:"hidden"});
   const hot=add("rect",{x:0,y:0,width:W,height:H,fill:"transparent"});
   hot.addEventListener("mousemove",e=>{
     const rc=svg.getBoundingClientRect();
     const i=Math.max(0,Math.min(hist.length-1,Math.round((e.clientX-rc.left)/rc.width*(hist.length-1))));
+    cross.setAttribute("x1",X(i));cross.setAttribute("x2",X(i));cross.setAttribute("visibility","visible");
     const r=hist[i];
     showTip(`<div class="t">${fdate(r.date)}</div>
       <div class="r"><span>spot</span><b>${fmtPr(r.spot_close)}</b></div>
@@ -1321,25 +1411,32 @@ function wallTrail(sym){
       <div class="r"><span><i style="background:${C.bull}"></i>put wall</span><b>${fmtPr(r.put_wall)}</b></div>
       <div class="r"><span><i style="background:${C.violet}"></i>flip</span><b>${fmtPr(r.gamma_flip)}</b></div>`,e.clientX,e.clientY);
   });
-  hot.addEventListener("mouseleave",hideTip);
+  hot.addEventListener("mouseleave",()=>{cross.setAttribute("visibility","hidden");hideTip()});
   el.appendChild(svg);
 }
-/* Setup status vs current spot — mirrors the dashboard's status logic */
+/* Setup status vs current spot — mirrors the dashboard's status logic.
+   Direction comes from bias text when it says Bullish/Bearish; biases that
+   don't (Regime Transition, Mean Reversion, Volatility Stable Range, ...)
+   fall back to inferring shape from trigger vs invalidation — same rule
+   vanguard/live/trigger_engine.py's _direction() uses — instead of sitting
+   permanently in MONITORING despite having real trigger/invalidation levels. */
 function setupStatus(spot,bias,trig,inv){
   if(!(spot>0))return["⇅ MONITORING","#38bdf8"];
   const b=String(bias||"");
   const isVol=b==="Volatility Expansion";
-  if(/Bullish/.test(b)||isVol){
+  let up;
+  if(/Bullish/.test(b)||isVol)up=true;
+  else if(/Bearish/.test(b))up=false;
+  else if(trig>0&&inv>0&&trig!==inv)up=trig>inv;
+  else return["⇅ MONITORING","#38bdf8"];
+  if(up){
     if(trig>0&&spot>=trig)return["🟢 TRIGGERED",C.bull];
     if(inv>0&&spot<=inv)return["🔴 INVALIDATED",C.bear];
     return[isVol?"🌀 COILING":"⏳ WAITING","#E8B45C"];
   }
-  if(/Bearish/.test(b)){
-    if(trig>0&&spot<=trig)return["🟢 TRIGGERED",C.bull];
-    if(inv>0&&spot>=inv)return["🔴 INVALIDATED",C.bear];
-    return["⏳ WAITING","#E8B45C"];
-  }
-  return["⇅ MONITORING","#38bdf8"];
+  if(trig>0&&spot<=trig)return["🟢 TRIGGERED",C.bull];
+  if(inv>0&&spot>=inv)return["🔴 INVALIDATED",C.bear];
+  return["⏳ WAITING","#E8B45C"];
 }
 /* Interp polarity: side-aware (put writing is bullish, put short-covering bearish) */
 function interpCol(side,txt){

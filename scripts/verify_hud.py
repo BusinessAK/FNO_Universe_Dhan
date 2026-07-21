@@ -171,8 +171,15 @@ class Oracle:
                 by_type["ban_exit"] = len(p - c)
         exp["signals"] = {"n": sum(by_type.values()), "by_type": by_type}
 
+        # Setup Queue now tracks position lifecycle (vanguard/rules/
+        # setup_positions.py), not raw daily_setups rows: "active" means
+        # triggered and not yet resolved as of sdate, tracked from its
+        # original trigger date. Mirrors the point-in-time filter
+        # drawSetups() applies client-side in hud/template.html.
         exp["setups"] = {"n": self._one(
-            "SELECT COUNT(*) FROM daily_setups WHERE date=?", [sdate])[0]}
+            "SELECT COUNT(*) FROM daily_setup_positions "
+            "WHERE trigger_date <= ? AND (resolved_date IS NULL OR resolved_date >= ?)",
+            [sdate, sdate])[0]}
         exp["scan"] = self.scan(sdate, "1D")
         return exp
 

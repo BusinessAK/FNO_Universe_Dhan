@@ -23,6 +23,7 @@ from vanguard.pipeline.context.client import NseClient          # noqa: E402
 from vanguard.pipeline.context.datasets import DATASETS         # noqa: E402
 from vanguard.pipeline.context.ingest import ingest_date        # noqa: E402
 from vanguard.pipeline.context.api_datasets import ingest_api_datasets  # noqa: E402
+from vanguard.pipeline.context.fpi_sector_flow import ingest_fpi_sector_flow  # noqa: E402
 
 
 def main() -> int:
@@ -51,6 +52,16 @@ def main() -> int:
             con.close()
         print("[context] api " + " · ".join(f"{k}={v}" for k, v in api_status.items()), flush=True)
         if any(v.startswith("error") for v in api_status.values()):
+            worst = 1
+        con = duckdb.connect(str(DB))
+        try:
+            fpi_status = ingest_fpi_sector_flow(client, con)
+        except Exception as e:                                # noqa: BLE001 — isolation, matches api_datasets
+            fpi_status = f"error:{e}"
+        finally:
+            con.close()
+        print(f"[context] fpi_sector_flow {fpi_status}", flush=True)
+        if fpi_status.startswith("error"):
             worst = 1
     for d in days:
         if d.weekday() >= 5:
