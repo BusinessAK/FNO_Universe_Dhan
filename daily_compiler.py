@@ -633,19 +633,24 @@ def main():
 
     print("[*] Creating institutional DuckDB database (vanguard.duckdb)...")
     db_path = os.path.join(output_dir, "vanguard.duckdb")
-    if os.path.exists(db_path):
-        os.remove(db_path)
-        
+    # Additive connect, never delete the file: this DB is shared with
+    # vanguard/pipeline/context/ (delivery, participant OI, VIX, ban,
+    # FII/DII, corporate events) and equity_compiler.py's daily_equity_*
+    # tables, none of which this script knows about or should touch.
+    # CREATE OR REPLACE TABLE fully replaces each of daily_compiler.py's OWN
+    # named tables (same effect as the old drop-and-recreate for them)
+    # while leaving every other table in the file untouched — matches the
+    # additive pattern equity_compiler.py already uses on this same file.
     import duckdb
     conn = duckdb.connect(db_path)
-    conn.execute("CREATE TABLE daily_market_structure AS SELECT * FROM df_structure")
-    conn.execute("CREATE TABLE daily_setups AS SELECT * FROM df_setups")
-    conn.execute("CREATE TABLE daily_setup_positions AS SELECT * FROM df_positions")
-    conn.execute("CREATE TABLE daily_inventory AS SELECT * FROM df_inventory")
-    conn.execute("CREATE TABLE daily_market_breadth AS SELECT * FROM df_breadth")
-    conn.execute("CREATE TABLE daily_changes AS SELECT * FROM df_changes")
+    conn.execute("CREATE OR REPLACE TABLE daily_market_structure AS SELECT * FROM df_structure")
+    conn.execute("CREATE OR REPLACE TABLE daily_setups AS SELECT * FROM df_setups")
+    conn.execute("CREATE OR REPLACE TABLE daily_setup_positions AS SELECT * FROM df_positions")
+    conn.execute("CREATE OR REPLACE TABLE daily_inventory AS SELECT * FROM df_inventory")
+    conn.execute("CREATE OR REPLACE TABLE daily_market_breadth AS SELECT * FROM df_breadth")
+    conn.execute("CREATE OR REPLACE TABLE daily_changes AS SELECT * FROM df_changes")
     if not df_cm_breadth.empty:
-        conn.execute("CREATE TABLE daily_cm_breadth AS SELECT * FROM df_cm_breadth")
+        conn.execute("CREATE OR REPLACE TABLE daily_cm_breadth AS SELECT * FROM df_cm_breadth")
     conn.close()
 
     # Backwards compatibility JSON dump
