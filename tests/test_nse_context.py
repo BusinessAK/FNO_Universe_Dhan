@@ -257,3 +257,95 @@ class TestFpiSectorFlow(unittest.TestCase):
         # second run still re-fetches the selection page to check what's
         # latest, but must not re-fetch the already-cached report itself
         self.assertEqual(client.calls, calls_after_first + 1)
+
+
+class TestIndustryMap(unittest.TestCase):
+    """E6: NSE Nifty 500 Industry classification -> equity_industry_map."""
+
+    def test_parse_golden(self):
+        from vanguard.pipeline.context.industry_map import parse_industry_map
+
+        df = parse_industry_map(fx("ind_nifty500list_sample.csv"), date(2026, 7, 21))
+        self.assertEqual(len(df), 5)
+        self.assertTrue((df.as_of_date == date(2026, 7, 21)).all())
+        reliance = df[df.symbol == "RELIANCE"].iloc[0]
+        self.assertEqual(reliance.company_name, "Reliance Industries Ltd.")
+        self.assertEqual(reliance["isin"], "INE002A01018")   # .isin is a Series method, use subscript
+
+    def test_normalizes_comma_variant_industry_names(self):
+        """The only two spots NSE's own Industry column differs from
+        fpi_sector_flow's NSDL sector spelling (verified 2026-07-21: 18/20
+        categories are identical strings) -- normalized so a plain join
+        needs no separate mapping table."""
+        from vanguard.pipeline.context.industry_map import parse_industry_map
+
+        df = parse_industry_map(fx("ind_nifty500list_sample.csv"), date(2026, 7, 21))
+        self.assertEqual(df[df.symbol == "RELIANCE"].iloc[0].industry,
+                         "Oil, Gas & Consumable Fuels")
+        self.assertEqual(df[df.symbol == "ZEEL"].iloc[0].industry,
+                         "Media, Entertainment & Publication")
+        # Already-identical names pass through unchanged
+        self.assertEqual(df[df.symbol == "360ONE"].iloc[0].industry, "Financial Services")
+
+    def test_parse_drift_on_missing_columns(self):
+        from vanguard.pipeline.context.industry_map import parse_industry_map, ApiShapeDrift
+
+        with self.assertRaises(ApiShapeDrift):
+            parse_industry_map(b"Company,Symbol\nFoo,FOO\n", date(2026, 7, 21))
+
+    def test_ingest_idempotent_per_day(self):
+        from vanguard.pipeline.context.industry_map import ingest_industry_map
+
+        class Client:
+            calls = 0
+
+            def get_bytes(self, url):
+                self.calls += 1
+                return fx("ind_nifty500list_sample.csv")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            with patch("vanguard.pipeline.context.industry_map.RAW_DIR", Path(tmp) / "raw"):
+                con = duckdb.connect(str(Path(tmp) / "t.duckdb"))
+                try:
+                    client = Client()
+                    s1 = ingest_industry_map(client, con, today=date(2026, 7, 21))
+                    n1 = con.execute("SELECT COUNT(*) FROM equity_industry_map").fetchone()[0]
+                    s2 = ingest_industry_map(client, con, today=date(2026, 7, 21))
+                    n2 = con.execute("SELECT COUNT(*) FROM equity_industry_map").fetchone()[0]
+                finally:
+                    con.close()
+        self.assertEqual(s1, "ok:5")
+        self.assertEqual(n1, 5)
+        self.assertEqual(n2, 5)                                 # no duplicate rows
+        self.assertEqual(s2, "ok:0 (up to date)")
+        self.assertEqual(client.calls, 1)                       # second call served from cache
+
+    def test_latest_symbol_industry_map(self):
+        from vanguard.pipeline.context.industry_map import (
+            ingest_industry_map, latest_symbol_industry_map)
+
+        class Client:
+            def get_bytes(self, url):
+                return fx("ind_nifty500list_sample.csv")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            with patch("vanguard.pipeline.context.industry_map.RAW_DIR", Path(tmp) / "raw"):
+                con = duckdb.connect(str(Path(tmp) / "t.duckdb"))
+                try:
+                    ingest_industry_map(Client(), con, today=date(2026, 7, 21))
+                    m = latest_symbol_industry_map(con)
+                finally:
+                    con.close()
+        self.assertEqual(m["RELIANCE"], "Oil, Gas & Consumable Fuels")
+        self.assertEqual(m["ABB"], "Capital Goods")
+        self.assertNotIn("NOT_A_SYMBOL", m)
+
+    def test_latest_symbol_industry_map_empty_when_table_missing(self):
+        from vanguard.pipeline.context.industry_map import latest_symbol_industry_map
+
+        with tempfile.TemporaryDirectory() as tmp:
+            con = duckdb.connect(str(Path(tmp) / "empty.duckdb"))
+            try:
+                self.assertEqual(latest_symbol_industry_map(con), {})
+            finally:
+                con.close()

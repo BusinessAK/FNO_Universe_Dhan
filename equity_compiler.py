@@ -23,6 +23,7 @@ import pandas as pd
 
 from vanguard.config.paths import DB
 from vanguard.engines.equity_technicals import build_equity_technicals
+from vanguard.pipeline.context.industry_map import latest_symbol_industry_map
 from vanguard.pipeline.equity_setups_pipeline import build_equity_setups_and_positions
 
 CM_PARQUET = os.path.join("data", "compiled", "cash_market_prices.parquet")
@@ -95,8 +96,12 @@ def main() -> int:
 
         print("[*] Screening setups (E3 — screener output only, NOT backtested/trusted; that's E4)...")
         df_setups, position_rows = build_equity_setups_and_positions(df, breadth)
+        industry_by_symbol = latest_symbol_industry_map(con)   # E6: symbol -> NSE Industry
+        if not industry_by_symbol:
+            print("[!] equity_industry_map not found/empty — sector will be null this run "
+                  "(run scripts/poll_context.py to populate it).")
         for row in position_rows:
-            row.setdefault("sector", None)   # industry tagging is E6, not built yet
+            row["sector"] = industry_by_symbol.get(row["symbol"])
         df_positions = pd.DataFrame(position_rows, columns=_POSITIONS_COLS) if position_rows \
             else pd.DataFrame(columns=_POSITIONS_COLS)
 

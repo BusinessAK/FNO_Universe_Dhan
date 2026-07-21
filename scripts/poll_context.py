@@ -24,6 +24,7 @@ from vanguard.pipeline.context.datasets import DATASETS         # noqa: E402
 from vanguard.pipeline.context.ingest import ingest_date        # noqa: E402
 from vanguard.pipeline.context.api_datasets import ingest_api_datasets  # noqa: E402
 from vanguard.pipeline.context.fpi_sector_flow import ingest_fpi_sector_flow  # noqa: E402
+from vanguard.pipeline.context.industry_map import ingest_industry_map        # noqa: E402
 
 
 def main() -> int:
@@ -62,6 +63,16 @@ def main() -> int:
             con.close()
         print(f"[context] fpi_sector_flow {fpi_status}", flush=True)
         if fpi_status.startswith("error"):
+            worst = 1
+        con = duckdb.connect(str(DB))
+        try:
+            industry_status = ingest_industry_map(client, con)
+        except Exception as e:                                # noqa: BLE001 — isolation, matches fpi_sector_flow
+            industry_status = f"error:{e}"
+        finally:
+            con.close()
+        print(f"[context] industry_map {industry_status}", flush=True)
+        if industry_status.startswith("error"):
             worst = 1
     for d in days:
         if d.weekday() >= 5:
