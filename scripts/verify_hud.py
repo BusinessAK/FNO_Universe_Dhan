@@ -69,6 +69,23 @@ class Oracle:
         r = self.con.execute(sql, params).fetchone()
         return r if r else None
 
+    def track_record_n(self) -> int:
+        """Not time-travel dependent (aggregates over ALL resolved history,
+        same as vanguard/research/position_stats.summarize_by_group), so
+        checked once, outside the per-session loop. Independently re-derived
+        via COUNT(DISTINCT setup_type) rather than importing summarize_by_
+        group itself — catches a bug in that shared function too, not just
+        in the export/render layers."""
+        tables = {r[0] for r in self.con.execute("SHOW TABLES").fetchall()}
+        total = 0
+        for tbl in ("daily_setup_positions", "daily_equity_setup_positions"):
+            if tbl not in tables:
+                continue
+            total += self._one(
+                f"SELECT COUNT(DISTINCT setup_type) FROM {tbl} "
+                "WHERE resolved_price IS NOT NULL", [])[0]
+        return total
+
     def expected(self, sdate: str) -> dict:
         con, S = self.con, self.sessions
         cur = self.ms[self.ms.date == sdate]
@@ -322,6 +339,11 @@ def main() -> int:
 
         # 1) latest session, default state
         assert_session(latest, "latest")
+
+        # Track Record panel — default "both" track filter, not session-
+        # dependent (aggregates over all resolved history).
+        check("trackRecord", {"n": ref.track_record_n(), "track": "both"},
+              registry().get("trackRecord"), failures)
 
         # DOM sanity: the numbers made it to screen
         exp = ref.expected(latest)

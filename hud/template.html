@@ -229,6 +229,16 @@ figure figcaption{font-size:10px;color:var(--muted);letter-spacing:.06em;margin-
 #scan tbody tr.wall-break-bull{border-left:2px solid var(--bull-hi);background:rgba(49,168,120,.06)}
 #scan tbody tr.wall-break-bear{border-left:2px solid var(--bear-hi);background:rgba(232,84,111,.06)}
 .pos{color:var(--bull-hi)}.neg{color:var(--bear-hi)}.dim{color:var(--muted)}
+
+/* ── Track Record table (no sticky header/sort — short, static list) ─── */
+#tr-wrap{overflow-x:auto}
+#tr-table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+#tr-table th{text-align:right;font-size:9.5px;letter-spacing:.12em;color:var(--muted);
+  text-transform:uppercase;padding:8px 10px;border-bottom:1px solid var(--edge)}
+#tr-table th:first-child,#tr-table th:nth-child(2){text-align:left}
+#tr-table td{padding:7px 10px;text-align:right;font-size:12px;border-bottom:1px solid rgba(124,140,160,.07)}
+#tr-table td:first-child{text-align:left;font-weight:600;letter-spacing:.03em}
+#tr-table td:nth-child(2){text-align:left}
 .meter{display:inline-block;width:54px;height:5px;border-radius:3px;background:rgba(124,140,160,.15);vertical-align:1px;margin-left:6px;overflow:hidden}
 .meter i{display:block;height:100%;background:var(--cyan-mark)}
 
@@ -372,13 +382,22 @@ figure figcaption{font-size:10px;color:var(--muted);letter-spacing:.06em;margin-
     </div>
   </section>
 
-  <section class="panel" style="--i:6" id="p-setups">
+  <section class="panel" style="--i:6" id="p-track-record" hidden>
+    <div class="ph"><h2>Track Record</h2><span class="sub" id="tr-sub"></span>
+      <span class="spacer"></span><div style="display:flex;gap:6px" id="tr-chips"></div></div>
+    <div id="tr-wrap"><table id="tr-table" aria-label="Setup track record by type">
+      <thead><tr><th>Setup</th><th>Track</th><th>N</th><th>Win %</th><th>Avg R</th><th>Total R</th><th>Verdict</th></tr></thead>
+      <tbody></tbody>
+    </table></div>
+  </section>
+
+  <section class="panel" style="--i:7" id="p-setups">
     <div class="ph"><h2>Setup Queue</h2><span class="sub" id="setup-count"></span>
       <span class="spacer"></span><div style="display:flex;gap:6px;flex-wrap:wrap" id="setup-chips"></div></div>
     <div id="setup-cards"></div>
   </section>
 
-  <section class="panel" style="--i:7" id="p-scanner">
+  <section class="panel" style="--i:8" id="p-scanner">
     <div class="ph"><h2>Symbol Scanner</h2><span class="sub" id="scan-count"></span></div>
     <div id="scan-ctl">
       <input id="scan-q" type="search" placeholder="/ symbol · sector · strategy" aria-label="Filter scanner">
@@ -451,6 +470,7 @@ const NF_BY_DATE = Object.fromEntries(NF.map(r => [r.date, r.spot_close]));
 const POS  = VG.positioning ? unpack(VG.positioning) : [];
 const VIXH = VG.vix ? unpack(VG.vix) : [];
 const SPOS = VG.setup_positions ? unpack(VG.setup_positions) : [];  // trigger->SL/target position lifecycle
+const TRACK_RECORD = VG.track_record ? unpack(VG.track_record) : [];  // win rate/avg R/total R per setup type, both tracks (U3 will add EQ_SPOS for the Setup Queue toggle)
 const DLV_BY_DATE = {};
 (VG.delivery ? unpack(VG.delivery) : []).forEach(r => { (DLV_BY_DATE[r.date] ??= {})[r.symbol] = r; });
 const FIIDII = VG.fii_dii ? unpack(VG.fii_dii) : [];
@@ -1067,6 +1087,44 @@ let setupFilter=null;
    appearing in the data — delisted, dropped from F&O eligibility, a
    corporate-action ticker change) are excluded entirely, same as any other
    resolved status. */
+/* Track Record — win rate/avg R/total R per setup type, both tracks. Verdict
+   thresholds mirror vanguard/research/equity_setups_backtest.py's _verdict()
+   exactly (MIN_N=30; total_r<=0 -> NO-GO; win_rate>50 -> PASS; else PASS
+   (asymmetric payoff)) so the HUD never disagrees with the .md report. */
+const TR_MIN_N = 30;
+let trTrack = "both";           // 'both' | 'fno' | 'equity'
+function trVerdict(r){
+  if(r.n < TR_MIN_N) return {label:"INCONCLUSIVE", k:"neut"};
+  if(r.total_r <= 0) return {label:"NO-GO", k:"bear"};
+  if(r.win_rate > 50) return {label:"PASS", k:"bull"};
+  return {label:"PASS (asym)", k:"bull"};
+}
+function drawTrackRecord(){
+  const p=$("#p-track-record");if(!p)return;
+  if(!TRACK_RECORD.length){p.hidden=true;return}
+  p.hidden=false;
+  const rows=TRACK_RECORD.filter(r=>trTrack==="both"||r.track===trTrack)
+    .sort((a,b)=>b.total_r-a.total_r);
+  CHK.trackRecord={n:rows.length,track:trTrack};
+  $("#tr-sub").textContent=rows.length+" setup type"+(rows.length===1?"":"s")+" · resolved positions only";
+  $("#tr-chips").innerHTML=["both","fno","equity"].map(t=>
+    `<button class="chip" data-t="${t}" aria-pressed="${trTrack===t}">${t==="both"?"ALL":t.toUpperCase()}</button>`).join("");
+  document.querySelectorAll("#tr-chips .chip").forEach(c=>c.addEventListener("click",()=>{
+    trTrack=c.dataset.t;drawTrackRecord();}));
+  $("#tr-table tbody").innerHTML=rows.map(r=>{
+    const v=trVerdict(r);
+    return `<tr>
+      <td>${esc(r.setup_type.replace(/_/g," "))}</td>
+      <td class="dim">${r.track==="fno"?"F&amp;O":"Equity"}</td>
+      <td>${r.n}</td>
+      <td class="${r.win_rate>50?"pos":"neg"}">${r.win_rate.toFixed(1)}%</td>
+      <td class="${r.avg_r>=0?"pos":"neg"}">${r.avg_r>=0?"+":""}${r.avg_r.toFixed(3)}R</td>
+      <td class="${r.total_r>=0?"pos":"neg"}">${r.total_r>=0?"+":""}${r.total_r.toFixed(2)}R</td>
+      <td><span class="bias ${v.k}">${v.label}</span></td>
+    </tr>`;
+  }).join("");
+}
+
 function drawSetups(){
   const open=SPOS.filter(s=>s.trigger_date<=SDATE&&(!s.resolved_date||s.resolved_date>=SDATE)
     &&(!sectorFilter||s.sector===sectorFilter));
@@ -1590,7 +1648,7 @@ document.addEventListener("keydown",e=>{
 document.body.classList.add("boot");
 function renderSession(){
   drawCmdbar();drawRegime();drawVix();drawPositioning();drawFlips();drawSectors();drawSignals();
-  drawSetups();renderScan();drawBreadth();drawInternals();
+  drawTrackRecord();drawSetups();renderScan();drawBreadth();drawInternals();
   if(!$("#dossier").hidden)$("#dossier").hidden=true;
 }
 renderSession();
