@@ -83,7 +83,8 @@ class TestContextDegradation(unittest.TestCase):
                 con.execute(f"CREATE TABLE {t} AS SELECT * FROM prod.{t}")
             con.close()
             p = build_payload(db_path=db2, sessions=2)
-        for k in ("positioning", "vix", "delivery", "setup_positions"):
+        for k in ("positioning", "vix", "delivery", "setup_positions",
+                  "equity_setup_positions", "track_record"):
             self.assertNotIn(k, p)
         self.assertIn("market_structure", p)
 
@@ -126,3 +127,42 @@ class TestContextDegradation(unittest.TestCase):
                 self.assertIsNone(r[ci["resolved_price"]])
             else:
                 self.assertIsNotNone(r[ci["resolved_price"]])
+
+    def test_equity_setup_positions_present_and_point_in_time_consistent(self):
+        """Track B mirror of the setup_positions test above — same column
+        shape and point-in-time filter contract, separate DB table/block
+        (see export_service.py's _context_blocks comment on why)."""
+        p = build_payload(sessions=2)
+        self.assertIn("equity_setup_positions", p)
+        cols = p["equity_setup_positions"]["cols"]
+        ci = {c: i for i, c in enumerate(cols)}
+        for c in ("symbol", "sector", "setup_type", "bias", "direction",
+                  "trigger_date", "trigger_price", "sl_price", "target_price",
+                  "status", "resolved_date", "resolved_price"):
+            self.assertIn(c, cols)
+        sessions = p["meta"]["sessions"]
+        for r in p["equity_setup_positions"]["rows"]:
+            status, resolved_date = r[ci["status"]], r[ci["resolved_date"]]
+            self.assertTrue(status == "OPEN" or resolved_date >= sessions[0])
+            if status == "OPEN":
+                self.assertIsNone(r[ci["resolved_price"]])
+            else:
+                self.assertIsNotNone(r[ci["resolved_price"]])
+
+    def test_track_record_present_both_tracks_resolved_only(self):
+        p = build_payload(sessions=2)
+        self.assertIn("track_record", p)
+        cols = p["track_record"]["cols"]
+        self.assertEqual(cols, ["track", "setup_type", "n", "win_rate", "avg_r", "total_r"])
+        ci = {c: i for i, c in enumerate(cols)}
+        tracks = {r[ci["track"]] for r in p["track_record"]["rows"]}
+        # Both tracks have resolved positions in the real compiled DB.
+        self.assertEqual(tracks, {"fno", "equity"})
+        for r in p["track_record"]["rows"]:
+            self.assertGreater(r[ci["n"]], 0)          # summarize_by_group drops empty groups
+            self.assertIsInstance(r[ci["win_rate"]], (int, float))
+            self.assertIsInstance(r[ci["avg_r"]], (int, float))
+            self.assertIsInstance(r[ci["total_r"]], (int, float))
+        # A known-PASS Track B setup type should show up with a real win rate.
+        eq_types = {r[ci["setup_type"]] for r in p["track_record"]["rows"] if r[ci["track"]] == "equity"}
+        self.assertIn("MOMENTUM_BUILDUP", eq_types)

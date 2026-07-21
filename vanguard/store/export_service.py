@@ -15,10 +15,12 @@ import math
 import re
 
 import duckdb
+import pandas as pd
 
 from vanguard.config.paths import DB, COMPILED
 from vanguard.config.sectors import get_sector
 from vanguard.config.eod import TREND_WINDOW_SESSIONS
+from vanguard.research.position_stats import summarize_by_group
 
 MS_COLS = [
     "date", "symbol", "sector", "spot_close", "spot_change_pct", "pcr", "iv", "iv_shift",
@@ -39,6 +41,7 @@ SETUP_COLS = ["date", "symbol", "sector", "setup_type", "setup_types", "bias",
 POSITION_COLS = ["symbol", "sector", "setup_type", "bias", "direction",
                   "trigger_date", "trigger_price", "sl_price", "target_price",
                   "status", "resolved_date", "resolved_price"]
+TRACK_RECORD_COLS = ["track", "setup_type", "n", "win_rate", "avg_r", "total_r"]
 CHANGE_COLS = ["date", "symbol", "icon", "type", "msg", "rank"]
 BREADTH_COLS = ["date", "bullish_pct", "bearish_pct", "compression_pct",
                 "expansion_pct", "transition_pct", "mean_rev_pct"]
@@ -104,6 +107,42 @@ def add_flip_repeat(con, tbl, sessions):
             and any((r[yi], i - k) in flipped for k in range(1, FLIP_REPEAT_LOOKBACK + 1))
         )
         r.append(repeat)
+
+
+def _track_record_block(con, tables) -> dict | None:
+    """Win rate / avg R / total R per setup type, both tracks tagged and
+    concatenated into one block (not two separate ones) so the client can
+    group/toggle without a second fetch. Reuses vanguard.research.
+    position_stats.summarize_by_group() — the same function equity_setups_
+    backtest.py's E4 gate already uses — rather than recomputing this math a
+    third time (PRD §6.4: "one function, two callers, no drift").
+
+    Resolved positions only (summarize_by_group drops OPEN rows itself,
+    R is undefined until a position resolves). Returns None if neither
+    track's position table exists/has resolved rows yet, matching this
+    module's "absent table = absent key" degradation contract."""
+    frames = []
+    for track, tbl_name in (("fno", "daily_setup_positions"),
+                            ("equity", "daily_equity_setup_positions")):
+        if tbl_name not in tables:
+            continue
+        df = con.execute(f"SELECT * FROM {tbl_name}").fetchdf()
+        if df.empty:
+            continue
+        g = summarize_by_group(df)
+        if g.empty:
+            continue
+        g = g.reset_index()
+        g.insert(0, "track", track)
+        frames.append(g)
+    if not frames:
+        return None
+    combined = pd.concat(frames, ignore_index=True)
+    return {
+        "cols": list(TRACK_RECORD_COLS),
+        "rows": [[clean(row[c]) for c in TRACK_RECORD_COLS]
+                for _, row in combined.iterrows()],
+    }
 
 
 def remap_sector(tbl):
@@ -276,6 +315,23 @@ def _context_blocks(con, data, sessions, ph):
             "resolved_price FROM daily_setup_positions "
             "WHERE status = 'OPEN' OR resolved_date >= ? ORDER BY trigger_date",
             POSITION_COLS, (sessions[0],))
+    if "daily_equity_setup_positions" in tables:
+        # Track B (equity) — identical point-in-time semantics and column
+        # shape to setup_positions above (daily_equity_setup_positions was
+        # built to match daily_setup_positions's shape exactly, PRD §5), a
+        # separate block rather than a shared one with an asset_class flag
+        # so Track A and Track B stats can never accidentally blend on the
+        # client either (same reasoning as keeping their DB tables separate).
+        data["equity_setup_positions"] = table(
+            con,
+            "SELECT symbol, sector, setup_type, bias, direction, trigger_date, "
+            "trigger_price, sl_price, target_price, status, resolved_date, "
+            "resolved_price FROM daily_equity_setup_positions "
+            "WHERE status = 'OPEN' OR resolved_date >= ? ORDER BY trigger_date",
+            POSITION_COLS, (sessions[0],))
+    track_record = _track_record_block(con, tables)
+    if track_record is not None:
+        data["track_record"] = track_record
     if "daily_fii_dii" in tables:
         fd = table(con, "SELECT date, category, buy_cr, sell_cr, net_cr "
                         "FROM daily_fii_dii ORDER BY date DESC LIMIT ?",
