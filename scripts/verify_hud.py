@@ -86,6 +86,23 @@ class Oracle:
                 "WHERE resolved_price IS NOT NULL", [])[0]
         return total
 
+    def setups_n(self, sdate: str, track: str) -> int:
+        """Setup Queue's position count for a given track filter ('fno' /
+        'equity' / 'both') -- mirrors drawSetups()'s inWindow() filter
+        exactly (trigger_date <= sdate, not yet resolved before sdate)."""
+        def one(tbl):
+            r = self._one(
+                f"SELECT COUNT(*) FROM {tbl} WHERE trigger_date <= ? "
+                "AND (resolved_date IS NULL OR resolved_date >= ?)", [sdate, sdate])
+            return r[0] if r else 0
+        tables = {r[0] for r in self.con.execute("SHOW TABLES").fetchall()}
+        n = 0
+        if track in ("fno", "both") and "daily_setup_positions" in tables:
+            n += one("daily_setup_positions")
+        if track in ("equity", "both") and "daily_equity_setup_positions" in tables:
+            n += one("daily_equity_setup_positions")
+        return n
+
     def expected(self, sdate: str) -> dict:
         con, S = self.con, self.sessions
         cur = self.ms[self.ms.date == sdate]
@@ -193,10 +210,10 @@ class Oracle:
         # triggered and not yet resolved as of sdate, tracked from its
         # original trigger date. Mirrors the point-in-time filter
         # drawSetups() applies client-side in hud/template.html.
-        exp["setups"] = {"n": self._one(
-            "SELECT COUNT(*) FROM daily_setup_positions "
-            "WHERE trigger_date <= ? AND (resolved_date IS NULL OR resolved_date >= ?)",
-            [sdate, sdate])[0]}
+        # queueTrack defaults to "fno" client-side (U3, pre-toggle behavior
+        # unchanged), so the default expectation stays F&O-only here too;
+        # the equity/both toggle states are checked separately in main().
+        exp["setups"] = {"n": self.setups_n(sdate, "fno"), "track": "fno"}
         exp["scan"] = self.scan(sdate, "1D")
         return exp
 
@@ -344,6 +361,17 @@ def main() -> int:
         # dependent (aggregates over all resolved history).
         check("trackRecord", {"n": ref.track_record_n(), "track": "both"},
               registry().get("trackRecord"), failures)
+
+        # Setup Queue's track toggle (U3) — default state already covered by
+        # assert_session() above (queueTrack defaults to "fno"); exercise the
+        # other two states here.
+        for t in ("equity", "both"):
+            page.click(f'#queue-track-chips .chip[data-t="{t}"]')
+            page.wait_for_function("t => window.__VG_CHECK__.setups.track===t", arg=t)
+            check(f"setups[{t}]", {"n": ref.setups_n(latest, t), "track": t},
+                  registry()["setups"], failures)
+        page.click('#queue-track-chips .chip[data-t="fno"]')
+        page.wait_for_function("window.__VG_CHECK__.setups.track==='fno'")
 
         # DOM sanity: the numbers made it to screen
         exp = ref.expected(latest)

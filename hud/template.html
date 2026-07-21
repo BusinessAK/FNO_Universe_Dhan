@@ -393,7 +393,8 @@ figure figcaption{font-size:10px;color:var(--muted);letter-spacing:.06em;margin-
 
   <section class="panel" style="--i:7" id="p-setups">
     <div class="ph"><h2>Setup Queue</h2><span class="sub" id="setup-count"></span>
-      <span class="spacer"></span><div style="display:flex;gap:6px;flex-wrap:wrap" id="setup-chips"></div></div>
+      <span class="spacer"></span><div style="display:flex;gap:6px" id="queue-track-chips"></div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap" id="setup-chips"></div></div>
     <div id="setup-cards"></div>
   </section>
 
@@ -470,7 +471,8 @@ const NF_BY_DATE = Object.fromEntries(NF.map(r => [r.date, r.spot_close]));
 const POS  = VG.positioning ? unpack(VG.positioning) : [];
 const VIXH = VG.vix ? unpack(VG.vix) : [];
 const SPOS = VG.setup_positions ? unpack(VG.setup_positions) : [];  // trigger->SL/target position lifecycle
-const TRACK_RECORD = VG.track_record ? unpack(VG.track_record) : [];  // win rate/avg R/total R per setup type, both tracks (U3 will add EQ_SPOS for the Setup Queue toggle)
+const TRACK_RECORD = VG.track_record ? unpack(VG.track_record) : [];  // win rate/avg R/total R per setup type, both tracks
+const EQ_SPOS = VG.equity_setup_positions ? unpack(VG.equity_setup_positions) : [];  // Track B mirror of SPOS
 const DLV_BY_DATE = {};
 (VG.delivery ? unpack(VG.delivery) : []).forEach(r => { (DLV_BY_DATE[r.date] ??= {})[r.symbol] = r; });
 const FIIDII = VG.fii_dii ? unpack(VG.fii_dii) : [];
@@ -1125,18 +1127,36 @@ function drawTrackRecord(){
   }).join("");
 }
 
+let queueTrack="fno";   // 'fno' | 'equity' | 'both' -- defaults to fno (pre-U3 behavior unchanged by default)
 function drawSetups(){
-  const open=SPOS.filter(s=>s.trigger_date<=SDATE&&(!s.resolved_date||s.resolved_date>=SDATE)
-    &&(!sectorFilter||s.sector===sectorFilter));
+  const inWindow=s=>s.trigger_date<=SDATE&&(!s.resolved_date||s.resolved_date>=SDATE);
+  const fnoOpen=SPOS.filter(s=>inWindow(s)&&(!sectorFilter||s.sector===sectorFilter))
+    .map(s=>({...s,_track:"fno"}));
+  // Equity's `sector` column holds NSE's Industry classification (E6), a
+  // different taxonomy than F&O's sectorFilter (static sectoral-index
+  // mapping, vanguard/config/sectors.py) -- never apply one track's sector
+  // filter to the other track's rows.
+  const eqOpen=EQ_SPOS.filter(inWindow).map(s=>({...s,_track:"equity"}));
+  const open=queueTrack==="fno"?fnoOpen:queueTrack==="equity"?eqOpen:fnoOpen.concat(eqOpen);
   const counts={};open.forEach(s=>counts[s.setup_type]=(counts[s.setup_type]||0)+1);
-  CHK.setups={n:open.length};
-  $("#setup-count").textContent=open.length+" active · "+fdate(SDATE)+(sectorFilter?" · "+sectorFilter:"");
+  CHK.setups={n:open.length,track:queueTrack};
+  $("#setup-count").textContent=open.length+" active · "+fdate(SDATE)
+    +(sectorFilter&&queueTrack!=="equity"?" · "+sectorFilter:"");
+  $("#queue-track-chips").innerHTML=["fno","equity","both"].map(t=>
+    `<button class="chip" data-t="${t}" aria-pressed="${queueTrack===t}">${t==="both"?"ALL":t.toUpperCase()}</button>`).join("");
+  document.querySelectorAll("#queue-track-chips .chip").forEach(c=>c.addEventListener("click",()=>{
+    queueTrack=c.dataset.t;drawSetups()}));
   $("#setup-chips").innerHTML=Object.entries(counts).sort((a,b)=>b[1]-a[1]).map(([t,n])=>
     `<button class="chip" data-t="${t}" aria-pressed="${setupFilter===t}">${t.replace(/_/g," ")} <span class="n">${n}</span></button>`).join("");
   document.querySelectorAll("#setup-chips .chip").forEach(c=>c.addEventListener("click",()=>{
     setupFilter=setupFilter===c.dataset.t?null:c.dataset.t;drawSetups()}));
+  // priority_score only exists for the F&O universe (bySym, from daily_
+  // market_structure) -- Equity rows all tie at 0, so trigger_date breaks
+  // the tie (most recently triggered first) instead of falling back to an
+  // arbitrary stable-sort order.
   const list=open.filter(s=>!setupFilter||s.setup_type===setupFilter)
-    .sort((a,b)=>(bySym[b.symbol]?.priority_score||0)-(bySym[a.symbol]?.priority_score||0)).slice(0,60);
+    .sort((a,b)=>((bySym[b.symbol]?.priority_score||0)-(bySym[a.symbol]?.priority_score||0))
+      ||(a.trigger_date<b.trigger_date?1:-1)).slice(0,60);
   $("#setup-cards").innerHTML=list.map(s=>{
     const k=biasKind(s.bias);
     // Calendar days, not trading-session index: trigger_date can predate the
@@ -1150,8 +1170,11 @@ function drawSetups(){
       :s.status==="TARGET_HIT"?'<span class="bias bull" title="closed — hit target">🎯 TARGET</span>'
       :s.status==="SL_HIT"?'<span class="bias bear" title="closed — hit stop-loss">🛑 SL</span>'
       :'<span class="bias neut" title="closed — an opposite-direction setup triggered">↩ REVERSED</span>';
-    return`<div class="sc ${k}" tabindex="0" role="button" data-sym="${esc(s.symbol)}">
-      <div class="top"><span class="sym">${esc(s.symbol)}${bySym[s.symbol]?._ban?' <span title="F&O ban — setup NOT armed live" style="color:var(--bear-hi);font-size:11px">⛔ BAN</span>':""}${(EVENTS_BY_SYM[s.symbol]||[]).some(e=>e.event_type==="RESULTS"&&e.event_date>=SDATE)?' <span title="results inside the event window — this is an event bet" style="color:#E8B45C;font-size:10px">📅</span>':""}</span><span class="typ">${esc(s.setup_type.replace(/_/g," "))}</span></div>
+    const hasDossier=!!bySym[s.symbol];   // F&O-only dossier (bySym is daily_market_structure)
+    const trackTag=queueTrack==="both"
+      ?`<span class="dim" style="font-size:9px;letter-spacing:.08em">${s._track==="equity"?"EQ":"F&amp;O"}</span> `:"";
+    return`<div class="sc ${k}" ${hasDossier?'tabindex="0" role="button"':""} data-sym="${esc(s.symbol)}">
+      <div class="top"><span class="sym">${trackTag}${esc(s.symbol)}${bySym[s.symbol]?._ban?' <span title="F&O ban — setup NOT armed live" style="color:var(--bear-hi);font-size:11px">⛔ BAN</span>':""}${(EVENTS_BY_SYM[s.symbol]||[]).some(e=>e.event_type==="RESULTS"&&e.event_date>=SDATE)?' <span title="results inside the event window — this is an event bet" style="color:#E8B45C;font-size:10px">📅</span>':""}</span><span class="typ">${esc(s.setup_type.replace(/_/g," "))}</span></div>
       <span class="bias ${k}">${esc(s.bias)}</span>
       <div class="strikes">
         <span><span class="k">SL</span>${fmtPr(s.sl_price)}</span>
@@ -1161,6 +1184,7 @@ function drawSetups(){
       <div class="beh">Entered ${fdate(s.trigger_date)} @ ${fmtPr(s.trigger_price)} · ${daysHeld}d held</div>
     </div>`}).join("");
   document.querySelectorAll(".sc").forEach(el=>{
+    if(!bySym[el.dataset.sym])return;   // no F&O dossier data for equity-only symbols
     el.addEventListener("click",()=>openDossier(el.dataset.sym));
     el.addEventListener("keydown",e=>{if(e.key==="Enter"){openDossier(el.dataset.sym)}});
   });
