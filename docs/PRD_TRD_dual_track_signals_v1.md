@@ -1,8 +1,8 @@
 # PRD + TRD — Dual-Track Signal Architecture v1 ("derivatives flow" + "cash breadth/technicals")
 
-**Status:** Draft, pre-implementation — nothing in this document is built yet
+**Status:** E1–E4 implemented and backtested (2026-07-21). E5 (UI) still gated on a separately-agreed UI plan; E6 (sector/industry context) in progress. See §11 for what actually happened vs. what this doc originally proposed — several findings changed the design mid-flight.
 **Owner:** Aniket · **Doc type:** combined PRD + TRD + test/backtest plan
-**Governing principle:** no code lands without per-phase approval, same discipline as `PRD_TRD_nse_context_layer_v1.md`. Every new signal must clear a backtest gate before it is trusted, same discipline as the FLOOR_BOUNCE/REGIME_SHIFT fixes and the `ifs_verified_flow_backtest.py` precedent.
+**Governing principle:** no code lands without per-phase approval, same discipline as `PRD_TRD_nse_context_layer_v1.md`. Every new signal must clear a backtest gate before it is trusted, same discipline as the FLOOR_BOUNCE/REGIME_SHIFT fixes and the `ifs_verified_flow_backtest.py` precedent. Held to throughout implementation: every "sounds right" fix (the E4 root-causes in §11) was re-verified against a real backtest run before being trusted, not shipped on reasoning alone.
 
 ---
 
@@ -70,16 +70,16 @@ advances/declines, A/D ratio, cumulative A/D line, McClellan oscillator, % of th
 
 ### 3.3 Candidate setup types (proposed — for the same line-by-line review the 10 F&O setups got, not final)
 
-| Candidate | Composed from | Story |
-|---|---|---|
-| `MOMENTUM_BUILDUP` | S1 (above rising DMA20/50) + S2 (ROC rising, RSI 50–70) + S4 (volume ratio >1.2) | Trend continuation, not yet overbought |
-| `IMBALANCE_CONSOLIDATION` | S6 fired within last N sessions + S7 currently true | Direct technical analogue of VOLATILITY_COIL — "watch for the resolution of a post-move compression," direction undetermined until it breaks |
-| `DMA_RECLAIM` | Price crosses back above DMA50/DMA200 after being below + S4/S3 confirmation | Classic reclaim-of-trend setup, volume/money-flow gated so it isn't a low-conviction wiggle |
-| `BREADTH_DIVERGENCE_REVERSAL` | S2 oversold (RSI<30) while S8 says the broader tape is *not* oversold | An individual dislocation inside an otherwise healthy market — "buy the dip in a strong tape," not "catch every falling knife" |
-| `FIFTYTWO_WEEK_BREAKOUT` | Close ≥ 52w high + S4 + S5 (`deliverable_vol_ratio_20d`, not just the percentage) both confirming | Breakout gated by volume *and* delivery, so a low-conviction new-high on thin turnover doesn't qualify |
-| `RSI_EXTREME_REBOUND` | S2 (RSI14 < 25) + S4 (volume_ratio_20d > 1.5×) + S8 (breadth healthy — e.g. >40% of the 500-name universe above their own 50DMA) | Oversold dip *inside* a strong tape, not a falling-knife catch — the breadth cross-reference is what separates this from just "RSI is low" |
+| Candidate | Composed from | Story | **E4 verdict (2026-07-21)** |
+|---|---|---|---|
+| `MOMENTUM_BUILDUP` | S1 (above rising DMA20/50) + S2 (ROC rising, RSI 50–70) + S4 (volume ratio >1.2) | Trend continuation, not yet overbought | **PASS** — N=4,115, WR=62.5%, total_r=+86.61R |
+| `IMBALANCE_CONSOLIDATION` | S6 fired within last N sessions + S7 currently true | Direct technical analogue of VOLATILITY_COIL — "watch for the resolution of a post-move compression," direction undetermined until it breaks | **PASS** — N=199, WR=61.3%, total_r=+84.02R, after two rounds of fixes (§11.2–11.4) |
+| `DMA_RECLAIM` | Price crosses back above DMA50/DMA200 after being below + S4/S3 confirmation | Classic reclaim-of-trend setup, volume/money-flow gated so it isn't a low-conviction wiggle | **DROPPED** — NO-GO at first backtest (−206.66R), entry-quality tightening made it *worse* (−219.21R); the underlying thesis doesn't hold in this data. Deleted, not disabled (§11.1) |
+| `BREADTH_DIVERGENCE_REVERSAL` | S2 oversold (RSI<30) while S8 says the broader tape is *not* oversold | An individual dislocation inside an otherwise healthy market — "buy the dip in a strong tape," not "catch every falling knife" | **Leaning NO-GO** — every trigger depth tested that preserves genuine "up" direction comes back net negative and gets *worse* with more N (N=6,998 → −961.9R). Left in place at its original tiny-N settings, not dropped, pending a decision (§11.5) |
+| `FIFTYTWO_WEEK_BREAKOUT` | Close ≥ 52w high + S4 + S5 (`deliverable_vol_ratio_20d`, not just the percentage) both confirming | Breakout gated by volume *and* delivery, so a low-conviction new-high on thin turnover doesn't qualify | **PASS** — N=2,087, WR=56.8%, total_r=+316.25R, the strongest of the five |
+| `RSI_EXTREME_REBOUND` | S2 (RSI14 < 25) + S4 (volume_ratio_20d > 1.5×) + S8 (breadth healthy — e.g. >40% of the 500-name universe above their own 50DMA) | Oversold dip *inside* a strong tape, not a falling-knife catch — the breadth cross-reference is what separates this from just "RSI is low" | **Leaning NO-GO** — same failure mode as BREADTH_DIVERGENCE_REVERSAL: widening the trigger while keeping direction="up" only makes total_r more negative (§11.5) |
 
-Six candidates now, all still placeholders for the review conversation, not a finalized spec — exactly how the F&O side started before `setup_screener.py` was written. None of the threshold numbers anywhere in this table are backtested yet.
+Started as six placeholder candidates; after E4, three PASS, one was dropped (DMA_RECLAIM), two are left in place but data now suggests they don't have a genuine bullish edge as designed. See §11 for the full history of what was tried on each and why.
 
 ---
 
@@ -119,8 +119,19 @@ daily_equity_technicals(
     deliverable_qty, deliverable_vol_ratio_20d,
     dma20, dma50, dma200, rsi14, roc_5d, roc_20d, roc_63d, natr14,
     money_flow_20d, high_52w, low_52w, pct_from_52w_high, pct_from_52w_low,
-    volume_ratio_20d
+    volume_ratio_20d, range_high_10d
 )                                    -- one row per (symbol, date), full 500-name universe.
+                                     -- range_high_10d (added post-E4, see §11.3): trailing
+                                     -- IMBALANCE_LOOKBACK_SESSIONS rolling max of adj_high,
+                                     -- feeds IMBALANCE_CONSOLIDATION's re-anchored trigger.
+                                     -- IMPORTANT (§11.2): every downstream consumer
+                                     -- (equity_setups_pipeline.py) reads adj_close, NOT the
+                                     -- raw close column, as "today's spot" — dma20/dma50/
+                                     -- natr14/high_52w/range_high_10d are all computed on the
+                                     -- CA-adjusted series, and 143/2751 symbols had a real
+                                     -- corporate action in the observed window where raw and
+                                     -- adjusted close diverge by up to ~17x. The raw close
+                                     -- column stays for reference/display only.
                                      -- Deliberately NO imbalance_flag/consolidation_flag
                                      -- columns here (reviewed 2026-07-21) — S6/S7's thresholds
                                      -- are explicitly unlocked, subject to E4 tuning, and this
@@ -204,14 +215,14 @@ Reuses the exact methodology already precedented in this codebase (`vanguard/res
 
 ## 9. Rollout phases (each lands only after approval of its diff)
 
-| Phase | Content | Gate |
-|---|---|---|
-| **E1** | Promote `_dma_cache` (DMA/RSI/52w) to persisted `daily_equity_technicals`; add ROC, volume ratio, delivery ratio (trivial — data already present) | Unit tests green; spot-check 5 symbols' persisted values against a manual calculation |
-| **E2** | Add money-flow (CMF), ATR, imbalance/consolidation flags (S3, S6, S7) | Unit tests green; thresholds reviewed with you before locking (mirrors how `MIN_WALL_MIGRATION_PCT` etc. were chosen) |
-| **E3** | `equity_screener.py` + `equity_playbook.py` for the candidate setups (§3.3), reviewed line-by-line like the F&O screener was | Screener unit tests green; **setups exist in the DB but are not presented as trustworthy yet** |
-| **E4** | Backtest gate (§8.2) run on every candidate setup type | Each setup type individually passes or is dropped/redesigned; documented report per setup, same as the IFS validation precedent |
-| **E5** | Equity Track Record + Setup Queue UI section, **only for setups that passed E4** | Still gated by the standing "BAU until UI plan agreed" constraint — this phase doesn't start until that's separately signed off |
-| **E6** (later, optional) | Wire `fpi_sector_flow` + `industry` tagging as sector-rotation context on the Equity section | Depends on E5 shipping first |
+| Phase | Content | Gate | **Status** |
+|---|---|---|---|
+| **E1** | Promote `_dma_cache` (DMA/RSI/52w) to persisted `daily_equity_technicals`; add ROC, volume ratio, delivery ratio (trivial — data already present) | Unit tests green; spot-check 5 symbols' persisted values against a manual calculation | **Done** |
+| **E2** | Add money-flow (CMF), ATR, imbalance/consolidation flags (S3, S6, S7) | Unit tests green; thresholds reviewed with you before locking (mirrors how `MIN_WALL_MIGRATION_PCT` etc. were chosen) | **Done** |
+| **E3** | `equity_screener.py` + `equity_playbook.py` for the candidate setups (§3.3), reviewed line-by-line like the F&O screener was | Screener unit tests green; **setups exist in the DB but are not presented as trustworthy yet** | **Done** — two external code reviews caught a schema mismatch and a threshold-location issue, both verified against real code before fixing |
+| **E4** | Backtest gate (§8.2) run on every candidate setup type | Each setup type individually passes or is dropped/redesigned; documented report per setup, same as the IFS validation precedent | **Done** — see §3.3's verdict column and §11 for the full history (risk-inflation root cause, CA-adjustment bug, direction-inversion bug, all found and fixed via this gate) |
+| **E5** | Equity Track Record + Setup Queue UI section, **only for setups that passed E4** | Still gated by the standing "BAU until UI plan agreed" constraint — this phase doesn't start until that's separately signed off | **Not started** — UI plan being drafted separately |
+| **E6** (later, optional) | Wire `fpi_sector_flow` + `industry` tagging as sector-rotation context on the Equity section | Depends on E5 shipping first | **In progress** — starting now, ahead of E5 per updated sequencing; `fpi_sector_flow` already live, `industry` tagging validated (241/249 F&O + 500/500 overall coverage) but not yet built into a persisted table |
 
 Estimated effort: E1 ≈ 1 day (mostly exposure, not new math) · E2 ≈ 1–2 days · E3 ≈ 2 days · E4 ≈ 1–2 days (mostly compute + your review of results) · E5 ≈ TBD with UI plan · E6 ≈ 1 day.
 
@@ -220,8 +231,42 @@ Estimated effort: E1 ≈ 1 day (mostly exposure, not new math) · E2 ≈ 1–2 d
 ## 10. Open questions
 
 1. ~~Separate tables vs. a shared table with an `asset_class` discriminator~~ — **resolved: separate** (§5), matching "keep NSDL separate." No dissent on review.
-2. **Imbalance/consolidation thresholds (S6/S7)** — candidate starting numbers now logged in §3.2 (`|ROC_5d|≥5%` + `volume_ratio≥1.8×` for S6; NATR14 bottom-20th-percentile + `volume_ratio≤0.8×` for S7). **Explicitly not backtested, not locked** — same E4 gate as every other setup parameter, chosen the same collaborative way `MIN_WALL_MIGRATION_PCT = 2.0` was for Track A.
-3. **Candidate setup list (§3.3)** — now six (`RSI_EXTREME_REBOUND` added on review), still almost certainly incomplete or wrong in places. Same "one by one" review the F&O setups got, before E3 starts.
+2. ~~Imbalance/consolidation thresholds (S6/S7)~~ — **resolved, still unlocked**: current live values are `MOMENTUM_MIN_VOLUME_RATIO=1.2`, `MOMENTUM_RSI_LOW/HIGH=55/70`, `MOMENTUM_MIN_ROC_5D=3.0`, `CONSOLIDATION_NATR_PERCENTILE=20`, `CONSOLIDATION_MAX_VOLUME_RATIO=0.8` (`vanguard/config/equity.py`), all retuned once against real winner/loser diagnostics per §11. Explicitly still in-sample only, no out-of-sample/train-test split has been run.
+3. ~~Candidate setup list (§3.3)~~ — **resolved via E4**: DMA_RECLAIM dropped, two setups leaning NO-GO, three PASS. See §3.3's verdict column and §11.
 4. ~~Does Track B need its own event-window gate~~ — **resolved: yes**, reusing `corporate_events`, deferred to E5 alongside the UI work.
 5. ~~Money-flow indicator choice~~ — **resolved: Chaikin Money Flow (CMF)**, kept as originally proposed. Worth noting the case for CMF over MFI (less distorted by low-volume noise, since it weights by the H/L range rather than classifying whole days as up/down) is reasonable but itself unproven here — if E4's backtest shows CMF isn't pulling weight in a setup, MFI is the fallback to try, not a re-litigation from scratch.
-6. **(New, from lifecycle review) Pipeline wiring for `equity_compiler.py`** — must land in `poll_eod.py`'s chain strictly after `daily_compiler.py`, in the same additive slot as `poll_context.py` (§4). This is now a hard architectural requirement, not a phase-E1 detail — flagging it here so it isn't lost before E1 implementation starts.
+6. ~~Pipeline wiring for `equity_compiler.py`~~ — **resolved: built as specified**, `_ordering_guard()` in `equity_compiler.py` refuses to run if `daily_market_structure`'s latest date is behind cash data's latest date, satisfying E-X7.
+7. **(New) Should BREADTH_DIVERGENCE_REVERSAL / RSI_EXTREME_REBOUND be dropped, left as documented dead-ends, or reworked as short-side setups?** — open, see §11.5. Not decided yet; both are currently left in place at their original (very low N, likely non-viable) settings rather than either dropped or fixed.
+8. **(New) IMBALANCE_CONSOLIDATION's entry/exit parameters (`trigger_mult=0.05`, `sl_mult=0.25`) are the result of an in-sample parameter sweep** (§11.4), not an out-of-sample-validated result. A train/test split was proposed and not yet done — worth doing before this setup is trusted with real capital, even though it's already cleared the E4 gate.
+9. **(New) E6 sequencing changed** — originally scoped as strictly after E5 (§9), now starting before E5 since the UI plan isn't ready yet but the sector/industry data work can proceed independently.
+
+---
+
+## 11. E4 findings — what actually happened (post-implementation, 2026-07-21)
+
+This section exists because several things this PRD assumed turned out to be wrong or incomplete once real backtests ran against real data. Kept as a permanent record — same spirit as `data/research/ifs_verified_flow_validation.md` — so nobody re-discovers these the hard way.
+
+### 11.1 DMA_RECLAIM — dropped, not fixed
+First backtest: NO-GO at −206.66R. The same winner/loser diagnostic that successfully retuned MOMENTUM_BUILDUP's thresholds was applied here too — tightening entry quality (volume ratio, a ROC_20d trend-context floor) made it *worse* (−219.21R), the opposite of every other setup's response to the same treatment. Read as a real signal, not noise: the underlying thesis (DMA50 reclaims predict continuation) doesn't hold in this data — classic bull-trap-at-the-average behavior. Function, config constants, and tests fully deleted rather than left disabled.
+
+### 11.2 The risk-inflation bug (root cause of MOMENTUM_BUILDUP's first NO-GO)
+`derive_positions()` sizes `target_price`/`sl_price` off the **nominal** trigger/invalidation *levels* computed by the playbook, but records `trigger_price` as the **actual spot** on the day the position opens — and there is no "pending order" state (a snapshot from an earlier day is never reconsidered; a position only opens on a day the screening condition is true again AND that same day's close already clears that same day's trigger). When a trigger anchor lags price (a moving average during a fast move), the actual entry can overshoot the nominal trigger substantially, inflating realized risk far beyond what the reward:risk ratio was sized for. Quantified directly: F&O's structural anchors (walls, gamma flip) overshoot only 0.2–1.5% median; Track B's original DMA-based anchors overshot 5–80%+ on exactly the fast-moving days these setups screen for.
+
+**Fix:** size `trigger_strike`/`invalidation_strike` offsets as multiples of each stock's own NATR14 (`NATR_TRIGGER_MULT`/`NATR_SL_MULT` in `vanguard/config/equity.py`) instead of a fixed percentage, so a volatile stock's band widens with it. This alone flipped MOMENTUM_BUILDUP from NO-GO to PASS. It narrowed but did not eliminate overshoot for the other setups (see 11.3).
+
+### 11.3 IMBALANCE_CONSOLIDATION — two more rounds after the NATR fix
+Even after 11.2's fix, IMBALANCE_CONSOLIDATION's dma50-anchored trigger left a median ~10% entry overshoot — 79% of its "TARGET_HIT" rows had *already* overshot the nominal target on the day of entry, because dma50 is the slowest of the five anchors and this setup specifically screens for a fast break away from a quiet range. Dropping `DMA_RECLAIM` from `EQUITY_SETUP_PRIORITY` (11.1) then flipped IMBALANCE_CONSOLIDATION from PASS to NO-GO purely via priority reassignment — previously-contested symbol/days that DMA_RECLAIM used to win as primary flowed to IMBALANCE_CONSOLIDATION once DMA_RECLAIM was removed, exposing that the five (now four) setups' backtest stats are entangled by priority-based mutual exclusivity, not independently measured.
+
+Root fix: re-anchored **both** trigger and invalidation to `range_high_10d_prev` (yesterday's trailing 10-session high — the actual consolidation range ceiling), instead of dma50. First attempt anchored only the trigger this way, leaving invalidation on dma50 — that silently flipped ~2/3 of positions to direction="down" (a bullish-labeled setup quietly becoming an inferred short), because `_direction()` reads direction purely from trigger-vs-invalidation ordering and the two independent anchors broke that ordering on a majority of days. Reverted to a single shared anchor (same pattern every other setup already used) once this was caught. Result: PASS, N=291, total_r=+32.02R.
+
+A second, unrelated bug was found in the SAME re-anchor work: `equity_setups_pipeline.py` fed `row["close"]` (raw, unadjusted) into `EquitySetupInputs`/`derive_positions()` as "today's spot," while every anchor (dma20/dma50/natr14/high_52w/range_high_10d) is computed on the CA-adjusted series. For any symbol with a real corporate action in the observed window (143/2,751 symbols), this produced up to ~17x scale mismatches between the recorded entry price and the anchors it was being compared against — the actual cause of a batch of >500%-overshoot IMBALANCE_CONSOLIDATION positions that had looked like "illiquid microcap noise" until traced to a specific symbol (RNBDENIMS) and its raw-vs-adjusted close ratio. Fixed by switching to `adj_close` throughout the pipeline. This improved *every* setup, not just IMBALANCE_CONSOLIDATION (MOMENTUM_BUILDUP +78.47R→+86.61R, FIFTYTWO_WEEK_BREAKOUT +257.59R→+316.25R).
+
+### 11.4 IMBALANCE_CONSOLIDATION entry/exit retune (in-sample, not yet out-of-sample validated)
+Post-fix, swept the `range_high_10d` lookback window (5/10/15/20/30 sessions) — 10 (the original default) is near-optimal for per-trade quality; shorter trades more often for similar quality, longer decays. A "narrow range" filter on top of the existing NATR-percentile check was tested and explicitly rejected: total_r fell monotonically as the range was forced tighter, turning net negative below ~15% width — documented in `vanguard/config/equity.py` so it isn't retried without new evidence.
+
+Swept `NATR_TRIGGER_MULT`/`NATR_SL_MULT` jointly (~20 combinations): `sl_mult=0.25` is a genuine local optimum confirmed from both directions (tighter whipsaws, looser decays). `trigger_mult=0.0` (bare "close ≥ range high") scored marginally higher than `0.05` but only once, at the exact edge of the tested range — the signature of an in-sample fluke rather than a real optimum — so `trigger_mult=0.05` was chosen instead: independently rediscovered as the best point in two separate sweep passes, and it preserves the NATR-scaled-confirmation design principle that `0.0` abandons. **Neither value has been validated out-of-sample** — this is flagged explicitly in the config and open question #8 above.
+
+### 11.5 BREADTH_DIVERGENCE_REVERSAL / RSI_EXTREME_REBOUND — likely no genuine bullish edge
+Both setups fire their screening condition thousands of times (BREADTH_DIVERGENCE_REVERSAL: 19,308 primary-fired symbol-days) but produced almost no tracked positions (12) — not because the setups are rare, but because the trigger sat far closer to the anchor (dma20) than the screening condition ever leaves price. Median distance on a firing day is ~8.9% below dma20 for BREADTH_DIVERGENCE_REVERSAL, while the trigger only reached ~1% below it — a near-impossible same-day round trip given `derive_positions()` has no multi-day "pending order" state.
+
+Widening the trigger alone (without widening the SL to match) hit the exact direction-inversion bug from §11.3 again — trigger ended up below invalidation, flipping direction to "down." When corrected (widening trigger and SL together, confirmed direction="up" on every row), the result was unambiguous: total_r gets **monotonically worse** as N grows, from −11.6R (N=11) to −961.9R (N=6,998) for BREADTH_DIVERGENCE_REVERSAL, and similarly for RSI_EXTREME_REBOUND. This isn't a data-starvation problem — "buy the bounce" on a stock that's deeply oversold and still actively declining does not work in this dataset at any tested trigger depth. Both are left in place at their original, near-untriggerable settings rather than dropped, pending a decision (open question #7). Note: the *inverted* (accidentally short) version of BREADTH_DIVERGENCE_REVERSAL looked strong (+1,177R) — a short-side "oversold continuation" thesis may have real edge, but that's an unvalidated, differently-scoped idea (bearish labeling, its own screening logic, its own review), not a fix to this setup.
