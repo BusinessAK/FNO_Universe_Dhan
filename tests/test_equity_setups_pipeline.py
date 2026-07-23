@@ -47,15 +47,13 @@ class TestScreenerToPositionsChain(unittest.TestCase):
         trigger sits BELOW the anchor for this setup, see
         vanguard/config/equity.py's NATR_TRIGGER_MULT) is cleared same-day,
         a realistic V-shaped one-day reversal. invalidation =
-        dma20*(1-0.75*0.03) = 92.8625; risk/target are still sized off the
-        nominal LEVELS (trigger_strike, invalidation_strike), not the actual
-        entry price — that gap is exactly the E4 finding, NATR scaling
-        narrows it but doesn't eliminate it. risk = 93.575-92.8625 = 0.7125;
-        target = 93.575 + 2*0.7125 = 95.0."""
+        dma20*(1-0.75*0.03) = 92.8625. risk/target are sized off the ACTUAL
+        entry price (100.0). risk = 100.0 - 92.8625 = 7.1375;
+        target = 100.0 + 2 * 7.1375 = 114.275."""
         rows = [
             _row("2026-01-01", "XXX", 90.0, dma20=100.0),
             _row("2026-01-02", "XXX", 100.0, dma20=95.0, rsi14=20.0, volume_ratio_20d=1.6),  # fires + clears same day
-            _row("2026-01-03", "XXX", 110.0, dma20=97.0),   # clears the 95.0 target
+            _row("2026-01-03", "XXX", 120.0, dma20=97.0),   # clears the 114.275 target
         ]
         technicals = pd.DataFrame(rows, columns=_COLS)
         breadth = pd.DataFrame([

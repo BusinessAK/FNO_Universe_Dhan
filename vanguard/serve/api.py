@@ -25,6 +25,32 @@ HUD_FILE = HUD / "vanguard_hud.html"
 _payload_lock = threading.Lock()
 _payload_cache: dict = {"mtime": None, "body": None}
 
+_greeks_lock = threading.Lock()
+_greeks_cache: dict = {"mtime": None, "df": None}
+
+def get_chain_json(symbol: str) -> bytes | None:
+    import pandas as pd
+    greeks_path = Path("data/processed/greeks.csv")
+    try:
+        mtime = greeks_path.stat().st_mtime
+    except OSError:
+        return None
+    with _greeks_lock:
+        if _greeks_cache["mtime"] != mtime:
+            try:
+                _greeks_cache["df"] = pd.read_csv(greeks_path)
+            except Exception:
+                return None
+            _greeks_cache["mtime"] = mtime
+        df = _greeks_cache["df"]
+    if df is None or df.empty:
+        return b'[]'
+    sdf = df[df["SYMBOL"] == symbol]
+    if sdf.empty:
+        return b'[]'
+    return sdf.to_json(orient="records").encode("utf-8")
+
+
 
 def session_payload_bytes() -> bytes | None:
     """Compact-JSON payload for /session/latest, rebuilt only when the DB
@@ -69,6 +95,13 @@ class _Handler(BaseHTTPRequestHandler):
             body = session_payload_bytes()
             if body is None:
                 self._send(503, b'{"error":"no compiled database"}', "application/json")
+            else:
+                self._send(200, body, "application/json")
+        elif path.startswith("/api/chain/"):
+            symbol = path.split("/")[-1]
+            body = get_chain_json(symbol)
+            if body is None:
+                self._send(503, b'{"error":"no greeks data"}', "application/json")
             else:
                 self._send(200, body, "application/json")
         else:

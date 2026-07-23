@@ -45,18 +45,18 @@ class StructureClassifier:
 
         # 3. Support Building / Weakening (bullish vs bearish flow at the floor)
         if spot > 0 and pw > 0 and abs(spot - pw) / spot <= 0.02:
-            if "FLOOR_BOUNCE" in setups or net_inv > 20000:
+            if "FLOOR_BOUNCE" in setups or ifs > 10:
                 return "Support Building"
-            if net_inv < -20000:
+            if ifs < -10:
                 return "Support Weakening"
         elif "FLOOR_BOUNCE" in setups:
             return "Support Building"
 
         # 4. Resistance Weakening / Building (bullish vs bearish flow at the ceiling)
         if spot > 0 and cw > 0 and abs(spot - cw) / spot <= 0.02:
-            if net_inv > 50000:
+            if ifs > 15:
                 return "Resistance Weakening"
-            if net_inv < -50000:
+            if ifs < -15:
                 return "Resistance Building"
 
         # 5. Flip Zone transition

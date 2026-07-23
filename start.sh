@@ -25,14 +25,14 @@ case "$MODE" in
     else
       python3 poll_eod.py
     fi
-    # Check if port 8501 is already occupied by a running Streamlit instance
-    if lsof -Pi :8501 -sTCP:LISTEN -t >/dev/null ; then
-      echo "⚡ Streamlit dashboard is already active on port 8501!"
+    # Check if port 8502 is already occupied by a running Streamlit instance
+    if lsof -Pi :8502 -sTCP:LISTEN -t >/dev/null ; then
+      echo "⚡ Streamlit dashboard is already active on port 8502!"
       echo "🚀 The database update has successfully triggered a dynamic hot-reload in your browser."
-      echo "🔗 Open http://localhost:8501 to view the compiled data instantly!"
+      echo "🔗 Open http://localhost:8502 to view the compiled data instantly!"
     else
       echo "[2/2] Launching Streamlit dashboard..."
-      streamlit run dashboard.py --server.port 8501
+      streamlit run dashboard.py --server.port 8502
     fi
     ;;
 
@@ -77,7 +77,7 @@ case "$MODE" in
     echo ""
     echo "[*] Launching Streamlit dashboard (toggle AUTO REFRESH ON)..."
     trap "echo '[*] Stopping live bridge...'; kill $BRIDGE_PID 2>/dev/null" EXIT
-    streamlit run dashboard.py --server.port 8501
+    streamlit run dashboard.py --server.port 8502
     ;;
 
   # ── Brief Mode: Generate Tomorrow's Watchlist for a given date ─────────────
@@ -97,7 +97,7 @@ case "$MODE" in
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     echo "  VANGUARD DASHBOARD — Using existing processed data"
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    streamlit run dashboard.py --server.port 8501
+    streamlit run dashboard.py --server.port 8502
     ;;
 
   *)

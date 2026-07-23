@@ -234,16 +234,22 @@ if view_mode == "⚡ VANGUARD SCREENER TERMINAL":
         """, unsafe_allow_html=True)
     # ──────────────────────────────────────────────────────────────────────────
 
-    # Section A - flagships matrix
-    st.markdown('<p class="term-header">SECTION A — INSTITUTIONAL INVENTORY MATRIX</p>', unsafe_allow_html=True)
-    render_inventory_matrix(all_symbols, session_history, latest_date, trading_dates, selected_sectors)
-
+    tab_setups, tab_matrix = st.tabs(["🚀 HIGH CONVICTION SETUPS", "📊 FULL INVENTORY MATRIX"])
     
-    # Section B - setups scanner loading direct from DatabaseService
-    setups_df = db_service.get_setups(latest_date)
-    categorized_setups = categorize_and_sort(setups_df, session_history, latest_date)
-
-    render_setups_grid(categorized_setups, select_stock, selected_symbol, selected_sectors, active_date=latest_date, session_history=session_history)
+    with tab_setups:
+        st.markdown('<p class="term-header">CONFLUENCE-FILTERED ACTIONABLE SIGNALS</p>', unsafe_allow_html=True)
+        # Load filtered setups scanner loading direct from DatabaseService
+        setups_df = db_service.get_setups(latest_date)
+        
+        if setups_df.empty:
+            st.info("No high-conviction setups found for today that pass the strict confluence filter (Momentum + Breadth + GEX Alignment).")
+        else:
+            categorized_setups = categorize_and_sort(setups_df, session_history, latest_date)
+            render_setups_grid(categorized_setups, select_stock, selected_symbol, selected_sectors, active_date=latest_date, session_history=session_history)
+            
+    with tab_matrix:
+        st.markdown('<p class="term-header">INSTITUTIONAL INVENTORY MATRIX (F&O UNIVERSE)</p>', unsafe_allow_html=True)
+        render_inventory_matrix(all_symbols, session_history, latest_date, trading_dates, selected_sectors)
 
 
 # ─────────────────────────────────────────────────────────────────────────────

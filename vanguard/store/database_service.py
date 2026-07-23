@@ -123,9 +123,14 @@ class DatabaseService:
         return df.to_dict(orient="records") if not df.empty else []
 
     def get_setups(self, date: str) -> pd.DataFrame:
-        """Loads and filters EOD registered setups for a session date."""
+        """Loads and filters EOD registered setups for a session date using the strict confluence filter."""
+        # Use daily_confluence_setups instead of raw daily_setups, and map the unified setup_type
         return self._query(
-            "SELECT * FROM daily_setups WHERE date = ? AND setup_type != 'NONE'", [date]
+            """
+            SELECT *, COALESCE(fno_setup, equity_setup) as setup_type
+            FROM daily_confluence_setups 
+            WHERE date = ? AND (fno_setup != 'NONE' OR equity_setup != 'NONE')
+            """, [date]
         )
 
     def get_matrix_data(self, search_query: str = "", start_date: str = None) -> pd.DataFrame:

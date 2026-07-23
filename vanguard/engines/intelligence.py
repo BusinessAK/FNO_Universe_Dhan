@@ -203,14 +203,14 @@ class InstitutionalIntelligence:
             if abs(spot - gamma_flip) / spot <= 0.008:
                 return "TRANSITION_REGIME"
             return "LONG_GAMMA" if spot > gamma_flip else "SHORT_GAMMA"
-        # Fallback when no flip strike exists: legacy GEX thresholds
-        if gex_total > 200000:
+        # Fallback when no flip strike exists: polarity of total GEX
+        if gex_total > 0:
             return "LONG_GAMMA"
-        if gex_total < -10000:
+        if gex_total < 0:
             return "SHORT_GAMMA"
         return "TRANSITION_REGIME"
 
-    def analyze_market_structure(self, file_t, file_t_minus_1):
+    def analyze_market_structure(self, file_t, file_t_minus_1, export_path="data/processed"):
         print(f"[*] Deep Dive Analysis: {os.path.basename(file_t)} vs {os.path.basename(file_t_minus_1)}")
         
         # 1. Get Base Data
@@ -321,6 +321,7 @@ class InstitutionalIntelligence:
         final = pd.merge(metrics_t, metrics_tm1, on='SYMBOL', suffixes=('_T', '_TM1'))
         
         # Add Spot Price Info
+        # Add Spot Price Info
         final['SPOT_T'] = final.index.map(spots_t)
         final['SPOT_TM1'] = final.index.map(spots_tm1)
         final['SPOT_CHG_PCT'] = ((final['SPOT_T'] - final['SPOT_TM1']) / final['SPOT_TM1']) * 100
@@ -403,17 +404,22 @@ class InstitutionalIntelligence:
 
         final['SUGGESTED_STRATEGY'] = final.apply(suggest_strategy, axis=1)
 
+        # Expose LOT_SIZE so downstream compilers can scale contracts to shares
+        # Expose LOT_SIZE so downstream compilers can scale contracts to shares
+        final['LOT_SIZE'] = final['SYMBOL'].map(lambda x: lots.get(x, 1.0))
+
         # --- EXPORT RAW GREEKS FOR DASHBOARD ---
-        os.makedirs("data/processed", exist_ok=True)
-        # We also need the lot sizes and spots inside the greeks file so Streamlit can calculate GEX
-        greeks_t['LOT_SIZE'] = greeks_t['SYMBOL'].map(lambda x: lots.get(x, 1))
-        greeks_t['SPOT'] = greeks_t['SYMBOL'].map(spots_t)
-        
-        # Pre-calculate GEX for the dashboard (saves streamlit from having to do it)
-        greeks_t['MULTIPLIER'] = greeks_t['OPTION_TYP'].apply(lambda x: 1 if x == 'CE' else -1)
-        greeks_t['GEX'] = greeks_t['GAMMA'] * greeks_t['OPEN_INT'] * greeks_t['SPOT'] * 0.01 * greeks_t['MULTIPLIER']
-        
-        greeks_t.to_csv("data/processed/greeks.csv", index=False)
+        if export_path:
+            os.makedirs(export_path, exist_ok=True)
+            # We also need the lot sizes and spots inside the greeks file so Streamlit can calculate GEX
+            greeks_t['LOT_SIZE'] = greeks_t['SYMBOL'].map(lambda x: lots.get(x, 1))
+            greeks_t['SPOT'] = greeks_t['SYMBOL'].map(spots_t)
+            
+            # Pre-calculate GEX for the dashboard (saves streamlit from having to do it)
+            greeks_t['MULTIPLIER'] = greeks_t['OPTION_TYP'].apply(lambda x: 1 if x == 'CE' else -1)
+            greeks_t['GEX'] = greeks_t['GAMMA'] * greeks_t['OPEN_INT'] * greeks_t['SPOT'] * 0.01 * greeks_t['MULTIPLIER']
+            
+            greeks_t.to_csv(os.path.join(export_path, "greeks.csv"), index=False)
         
         # --- OVERRIDE WALLS WITH GEX WALLS ---
         # Instead of pure OI (which includes dead deep OTM strikes), we calculate
@@ -451,3 +457,4 @@ if __name__ == "__main__":
     print(results[['SYMBOL', 'SPOT_CHG_PCT', 'CE_INTERP', 'PE_INTERP', 'GEX_INTENSITY', 'SUGGESTED_STRATEGY']].head(20))
     
     results.to_csv("data/processed/trade_intelligence.csv", index=False)
+

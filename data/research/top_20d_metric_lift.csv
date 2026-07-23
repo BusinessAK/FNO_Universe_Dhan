@@ -1,0 +1,66 @@
+metric,value,samples,avg_fwd_20d_pct,median_fwd_20d_pct,top_gainer_rate_pct,win_rate_pct
+ml_bucket,ml_gt_60,2765,3.683,3.451,23.725,65.389
+ml_bucket,ml_0_30,31,-0.319,-2.305,19.355,41.935
+sector,NIFTY METAL,2016,2.806,2.947,17.411,64.633
+sector,NIFTY MEDIA & COMM,672,2.241,1.12,16.369,56.845
+ret20_bucket,ret_lt_-5,10662,2.116,1.521,16.198,57.456
+gamma_regime,SHORT_GAMMA,1551,2.483,2.341,15.925,63.121
+sector,NIFTY INFRA,3999,1.552,0.824,14.879,53.563
+setup_flag,gamma_squeeze,354,2.044,2.031,14.689,61.582
+rs20_bucket,rs_gt_10,4370,0.391,0.147,14.027,50.549
+sector,NIFTY AUTO,3123,0.883,0.794,13.673,54.371
+ml_bucket,ml_50_60,13419,0.362,0.253,12.259,51.204
+sector,NIFTY SERVICES,1379,0.064,-0.622,12.11,46.918
+sector,NIFTY ENERGY,3110,0.304,-0.908,12.058,44.598
+ret20_bucket,ret_gt_10,4804,-0.349,-0.377,11.678,48.043
+structural_bias,Expansion,22436,0.163,-0.106,11.544,49.474
+rs20_bucket,rs_lt_-5,8673,0.535,-0.08,11.484,49.475
+sector,NIFTY FIN SERVICE,7257,-0.808,-0.588,11.368,46.328
+rs20_bucket,rs_5_10,6117,0.045,0.151,11.117,50.809
+sector,NIFTY PSU BANK,1568,1.573,1.804,10.969,60.14
+setup_flag,inventory_migration,20476,0.015,-0.172,10.905,49.087
+gex_shift_bucket,gex_q3,9438,-0.337,-0.615,10.712,46.747
+ifs_bucket,ifs_lt_-30,5605,0.162,-0.323,10.669,48.029
+ifs_bucket,ifs_gt_60,3493,-0.003,-0.208,10.65,48.669
+gex_shift_bucket,gex_q2,9438,-0.175,-0.251,10.648,48.644
+net_inv_bucket,inv_q1,9438,0.142,-0.309,10.595,48.061
+gamma_regime,TRANSITION_REGIME,31055,-0.141,-0.336,10.594,48.237
+sector,NIFTY REALTY,1568,-1.332,-1.842,10.523,41.199
+ifs_bucket,ifs_30_60,2263,-0.242,-0.44,10.429,47.901
+net_inv_bucket,inv_q5,9438,-0.233,-0.368,10.309,48.05
+gex_shift_bucket,gex_q1,9438,0.206,-0.015,10.299,49.82
+ifs_bucket,ifs_0_15,11133,-0.137,-0.339,10.285,48.388
+sector,NIFTY PVT BANK,2464,0.043,0.541,10.187,52.8
+net_inv_bucket,inv_q4,9438,-0.242,-0.35,9.939,48.315
+sector,NIFTY CONS DURABLES,2236,-1.09,-1.448,9.928,43.202
+ifs_bucket,ifs_15_30,2871,-0.488,-0.619,9.927,46.917
+rs20_bucket,rs_-5_0,12407,0.327,0.204,9.769,51.237
+net_inv_bucket,inv_q3,9438,-0.426,-0.558,9.684,46.959
+structural_bias,Dealer Controlled,5463,-0.311,-0.559,9.628,47.025
+rs20_bucket,rs_0_5,11113,-0.253,-0.201,9.52,48.853
+structural_bias,Resistance Weakening,526,-0.878,-1.043,9.506,44.677
+net_inv_bucket,inv_q2,9438,-0.258,-0.38,9.472,47.796
+ret20_bucket,ret_-5_0,11386,0.042,-0.07,9.31,49.526
+ifs_bucket,ifs_-30_0,18057,-0.445,-0.489,9.254,47.261
+gex_shift_bucket,gex_q5,9438,-0.234,-0.51,9.176,47.097
+gex_shift_bucket,gex_q4,9438,-0.477,-0.552,9.165,46.874
+setup_flag,pinch_zone,7502,-0.237,-0.393,9.144,47.881
+setup_flag,volatility_coil,7884,-0.413,-0.407,9.12,47.755
+structural_bias,Compression,5589,-0.372,-0.407,9.107,47.898
+structural_bias,Support Building,2419,-0.127,-0.446,9.053,47.54
+setup_flag,iv_skew_accumulation,15927,-0.337,-0.427,8.677,47.711
+setup_flag,regime_shift,18131,-0.651,-0.614,8.543,46.252
+structural_bias,Support Weakening,3550,-0.455,-0.769,8.282,44.761
+gamma_regime,LONG_GAMMA,14584,-0.623,-0.747,8.105,45.358
+ml_bucket,ml_40_50,26883,-0.69,-0.74,8.02,45.676
+ret20_bucket,ret_5_10,5975,-0.992,-0.808,7.883,45.49
+ret20_bucket,ret_0_5,10077,-0.803,-0.608,7.433,46.432
+structural_bias,Flip Zone,7207,-0.986,-0.755,7.368,45.151
+sector,NIFTY PHARMA,3584,1.051,0.646,7.366,53.153
+setup_flag,floor_bounce,4529,-0.588,-0.651,7.286,46.103
+sector,Other,2829,-1.974,-2.24,7.176,36.409
+sector,NIFTY FMCG,4610,-1.352,-1.208,6.399,42.408
+ml_bucket,ml_30_40,4092,-1.484,-1.486,6.256,39.174
+sector,NIFTY OIL & GAS,2016,-0.775,-0.362,6.002,46.677
+sector,NIFTY IT,2743,-2.107,-1.391,4.703,42.727
+sector,NIFTY COMMODITIES,2016,-1.761,-1.387,2.331,39.385

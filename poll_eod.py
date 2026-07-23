@@ -91,8 +91,8 @@ try:
         # .analyze_market_structure(), writes greeks.csv/signals.csv with the same
         # T vs T-1 pairing used everywhere else. (The old standalone main.py pipeline
         # this used to hand off to was deleted in 23b60a1 as orphaned pre-DuckDB code.)
-        print("[*] Running daily_compiler.py...")
-        subprocess.run(["python3", "daily_compiler.py"], check=True)
+        print("[*] Running vanguard/pipeline/orchestrator.py...")
+        subprocess.run(["python3", "vanguard/pipeline/orchestrator.py"], check=True)
 
         # Run NSE context layer (C1): participant OI, VIX, delivery %, ban list,
         # FII/DII flows, corporate events. Failure-isolated per dataset inside

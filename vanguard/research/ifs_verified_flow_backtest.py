@@ -75,7 +75,7 @@ def recompute_new_ifs(raw_dir: str) -> pd.DataFrame:
         date_str = re.search(r"_(\d{8})_", f_t).group(1)
         date = f"{date_str[:4]}-{date_str[4:6]}-{date_str[6:]}"
         try:
-            final = intel.analyze_market_structure(f_t, f_tm1)
+            final = intel.analyze_market_structure(f_t, f_tm1, export_path=None)
         except Exception as e:
             print(f"[!] skip {date}: {e}", file=sys.stderr)
             continue

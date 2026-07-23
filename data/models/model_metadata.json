@@ -1,0 +1,14 @@
+{
+    "training_window": "Jun 2025 - Feb 2026",
+    "validation_window": "Mar 2026 - Apr 2026",
+    "true_blind_test_window": "May 2026 - Jun 2026",
+    "best_params": {
+        "max_iter": 100,
+        "max_depth": 5,
+        "learning_rate": 0.03,
+        "l2_regularization": 0.0
+    },
+    "blind_pr_auc": 0.243805225384935,
+    "blind_roc_auc": 0.5942957508899988,
+    "export_date": "2026-06-24T21:44:19.147197"
+}

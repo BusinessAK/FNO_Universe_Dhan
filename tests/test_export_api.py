@@ -73,7 +73,7 @@ class TestContextDegradation(unittest.TestCase):
         still build a full payload — context keys absent, nothing raises."""
         import tempfile, duckdb
         from pathlib import Path
-        core = ["daily_market_structure", "daily_setups", "daily_changes",
+        core = ["daily_market_structure", "daily_confluence_setups", "daily_changes",
                 "daily_market_breadth", "daily_cm_breadth"]
         with tempfile.TemporaryDirectory() as tmp:
             db2 = Path(tmp) / "no_context.duckdb"

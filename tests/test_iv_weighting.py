@@ -69,7 +69,7 @@ class TestIvWeighting:
         _build_bhavcopy(f_t)
         _build_bhavcopy(f_tm1)
 
-        result = InstitutionalIntelligence().analyze_market_structure(str(f_t), str(f_tm1))
+        result = InstitutionalIntelligence().analyze_market_structure(str(f_t), str(f_tm1), export_path=None)
         row = result[result.SYMBOL == SYMBOL].iloc[0]
 
         # The dust strikes (8 per side, price < 0.05) all fall back to IV=0.20,

@@ -19,9 +19,9 @@ from __future__ import annotations
 
 from vanguard.live.trigger_engine import _direction
 
-# target = trigger +/- RISK_MULTIPLE * (trigger - invalidation): a 1:2 R:R off
-# the frozen trigger/SL, applied uniformly across every setup type since the
-# trig/invalidation ordering now reliably encodes direction for all of them.
+# target = spot +/- RISK_MULTIPLE * abs(spot - invalidation): a 1:2 R:R based on
+# the ACTUAL entry price (spot), not the nominal trigger, to preserve the math
+# even if the entry occurs far past the trigger level.
 RISK_MULTIPLE = 2.0
 
 
@@ -138,9 +138,9 @@ def derive_positions(session_history: dict, stale_after_sessions: int = 10) -> l
                 open_pos = None
 
             if open_pos is None:
-                risk = abs(snap["trigger"] - snap["invalidation"])
-                target = (snap["trigger"] + RISK_MULTIPLE * risk if new_up
-                          else snap["trigger"] - RISK_MULTIPLE * risk)
+                risk = abs(spot - snap["invalidation"])
+                target = (spot + RISK_MULTIPLE * risk if new_up
+                          else spot - RISK_MULTIPLE * risk)
                 open_pos = {
                     "symbol": symbol,
                     "setup_type": snap["setup_type"],

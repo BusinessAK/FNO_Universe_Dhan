@@ -26,7 +26,7 @@ MS_COLS = [
     "date", "symbol", "sector", "spot_close", "spot_change_pct", "pcr", "iv", "iv_shift",
     "gex_intensity", "gex_shift", "gamma_regime", "structural_bias",
     "conviction_score", "priority_score", "ifs_score", "smart_money_persistence",
-    "futures_oi", "futures_oi_chg", "net_inv_shift", "delta_ce_oi", "delta_pe_oi",
+    "futures_oi", "futures_oi_chg", "net_inv_shift", "delta_volume", "delta_ce_oi", "delta_pe_oi",
     "call_wall", "put_wall", "gamma_flip", "ce_interp", "pe_interp", "suggested_strategy",
     "structure_flip", "prev_structural_bias", "flip_confidence", "flip_strength",
 ]
@@ -180,8 +180,12 @@ def _build(con, n_sessions: int) -> dict:
             MS_COLS, sessions),
         "setups": table(
             con,
-            f"SELECT {', '.join(SETUP_COLS)} FROM daily_setups "
-            f"WHERE date IN ({ph}) AND setup_type != 'NONE'",
+            f"SELECT c.date, c.symbol, COALESCE(m.sector, 'Equity') as sector, "
+            f"COALESCE(c.fno_setup, c.equity_setup) as setup_type, '' as setup_types, "
+            f"c.bias, c.trigger_strike, c.invalidation_strike, c.expected_behavior, '' as dealer_behavior "
+            f"FROM daily_confluence_setups c "
+            f"LEFT JOIN daily_market_structure m ON c.symbol = m.symbol AND c.date = m.date "
+            f"WHERE c.date IN ({ph}) AND (c.fno_setup != 'NONE' OR c.equity_setup != 'NONE')",
             SETUP_COLS, sessions),
         "changes": table(
             con,

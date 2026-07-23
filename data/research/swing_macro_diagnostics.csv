@@ -1,0 +1,5 @@
+macro_regime_bucket,holding_days,trades,avg_return_pct,median_return_pct,total_return_pct,best_return_pct,worst_return_pct,win_rate_pct,stop_rate_pct,expectancy_rank
+macro_25_50,15,9550,-0.376,-1.482,-3588.012,45.074,-7.2,27.11,66.346,-9.954
+macro_25_50,3,10105,-0.268,-0.647,-2703.358,21.11,-7.2,37.298,37.199,-10.031
+macro_25_50,10,9716,-0.375,-1.231,-3645.453,30.548,-7.2,29.518,59.767,-10.917
+macro_25_50,5,9957,-0.339,-0.89,-3378.633,21.946,-7.2,34.83,47.032,-11.793

@@ -183,10 +183,12 @@ def main():
 
                 
                 # IFS Score Computation
-                vol_ce_t = safe_float(row.get('VOLUME_CE_T'))
-                vol_pe_t = safe_float(row.get('VOLUME_PE_T'))
-                vol_ce_tm1 = safe_float(row.get('VOLUME_CE_TM1'))
-                vol_pe_tm1 = safe_float(row.get('VOLUME_PE_TM1'))
+                lot_size = safe_float(row.get('LOT_SIZE', 1.0))
+                
+                vol_ce_t = safe_float(row.get('VOLUME_CE_T')) * lot_size
+                vol_pe_t = safe_float(row.get('VOLUME_PE_T')) * lot_size
+                vol_ce_tm1 = safe_float(row.get('VOLUME_CE_TM1')) * lot_size
+                vol_pe_tm1 = safe_float(row.get('VOLUME_PE_TM1')) * lot_size
                 
                 vol_t = vol_ce_t + vol_pe_t
                 vol_tm1 = vol_ce_tm1 + vol_pe_tm1

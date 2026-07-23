@@ -1,0 +1,118 @@
+2026-07-22 10:31:46.876 Uvicorn server started on 0.0.0.0:8502
+
+  You can now view your Streamlit app in your browser.
+
+  Local URL: http://localhost:8502
+  Network URL: http://192.168.29.31:8502
+
+  For better performance, install the Watchdog module:
+
+  $ xcode-select --install
+  $ pip install watchdog
+            
+2026-07-22 10:33:05.016 The widget with key "sidebar_strike_pct_slider" was created with a default value but also had its value set via the Session State API.
+Stack (most recent call last):
+  File "/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1002, in _bootstrap
+    self._bootstrap_inner()
+  File "/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1045, in _bootstrap_inner
+    self.run()
+  File "/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 982, in run
+    self._target(*self._args, **self._kwargs)
+  File "/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/streamlit/runtime/scriptrunner/script_runner.py", line 379, in _run_script_thread
+    self._run_script(request.rerun_data)
+  File "/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/streamlit/runtime/scriptrunner/script_runner.py", line 705, in _run_script
+    ) = exec_func_with_error_handling(code_to_exec, ctx)
+  File "/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/streamlit/runtime/scriptrunner/exec_code.py", line 129, in exec_func_with_error_handling
+    result = func()
+  File "/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/streamlit/runtime/scriptrunner/script_runner.py", line 689, in code_to_exec
+    exec(code, module.__dict__)  # noqa: S102
+  File "/Users/shivanidamodar/Desktop/FNO_BHAV/dashboard.py", line 137, in <module>
+    view_mode, selected_symbol, selected_expiry, strike_pct, active_date, selected_sectors = render_sidebar(
+  File "/Users/shivanidamodar/Desktop/FNO_BHAV/vanguard/ui/sidebar.py", line 99, in render_sidebar
+    strike_pct = st.slider(
+  File "/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/streamlit/runtime/metrics_util.py", line 698, in wrapped_func
+    result = non_optional_func(*args, **kwargs)
+  File "/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/streamlit/elements/widgets/slider.py", line 721, in slider
+    return self._slider(
+  File "/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/streamlit/elements/widgets/slider.py", line 762, in _slider
+    check_widget_policies(
+  File "/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/streamlit/elements/lib/policies.py", line 180, in check_widget_policies
+    check_session_state_rules(
+  File "/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/streamlit/elements/lib/policies.py", line 91, in check_session_state_rules
+    _LOGGER.warning(
+2026-07-22 10:33:05.093 Please replace `use_container_width` with `width`.
+
+`use_container_width` will be removed after 2025-12-31.
+
+For `use_container_width=True`, use `width='stretch'`. For `use_container_width=False`, use `width='content'`.
+2026-07-22 10:33:05.097 Please replace `use_container_width` with `width`.
+
+`use_container_width` will be removed after 2025-12-31.
+
+For `use_container_width=True`, use `width='stretch'`. For `use_container_width=False`, use `width='content'`.
+2026-07-22 10:33:05.303 Please replace `use_container_width` with `width`.
+
+`use_container_width` will be removed after 2025-12-31.
+
+For `use_container_width=True`, use `width='stretch'`. For `use_container_width=False`, use `width='content'`.
+2026-07-22 10:33:05.415 Please replace `use_container_width` with `width`.
+
+`use_container_width` will be removed after 2025-12-31.
+
+For `use_container_width=True`, use `width='stretch'`. For `use_container_width=False`, use `width='content'`.
+2026-07-22 10:33:05.445 Please replace `use_container_width` with `width`.
+
+`use_container_width` will be removed after 2025-12-31.
+
+For `use_container_width=True`, use `width='stretch'`. For `use_container_width=False`, use `width='content'`.
+2026-07-22 10:37:36.721 Please replace `use_container_width` with `width`.
+
+`use_container_width` will be removed after 2025-12-31.
+
+For `use_container_width=True`, use `width='stretch'`. For `use_container_width=False`, use `width='content'`.
+2026-07-22 10:37:36.723 Please replace `use_container_width` with `width`.
+
+`use_container_width` will be removed after 2025-12-31.
+
+For `use_container_width=True`, use `width='stretch'`. For `use_container_width=False`, use `width='content'`.
+2026-07-22 10:37:36.800 Please replace `use_container_width` with `width`.
+
+`use_container_width` will be removed after 2025-12-31.
+
+For `use_container_width=True`, use `width='stretch'`. For `use_container_width=False`, use `width='content'`.
+2026-07-22 10:37:36.863 Please replace `use_container_width` with `width`.
+
+`use_container_width` will be removed after 2025-12-31.
+
+For `use_container_width=True`, use `width='stretch'`. For `use_container_width=False`, use `width='content'`.
+2026-07-22 10:37:36.906 Please replace `use_container_width` with `width`.
+
+`use_container_width` will be removed after 2025-12-31.
+
+For `use_container_width=True`, use `width='stretch'`. For `use_container_width=False`, use `width='content'`.
+2026-07-22 10:51:34.953 Please replace `use_container_width` with `width`.
+
+`use_container_width` will be removed after 2025-12-31.
+
+For `use_container_width=True`, use `width='stretch'`. For `use_container_width=False`, use `width='content'`.
+2026-07-22 10:51:34.955 Please replace `use_container_width` with `width`.
+
+`use_container_width` will be removed after 2025-12-31.
+
+For `use_container_width=True`, use `width='stretch'`. For `use_container_width=False`, use `width='content'`.
+2026-07-22 10:51:35.044 Please replace `use_container_width` with `width`.
+
+`use_container_width` will be removed after 2025-12-31.
+
+For `use_container_width=True`, use `width='stretch'`. For `use_container_width=False`, use `width='content'`.
+2026-07-22 10:51:35.124 Please replace `use_container_width` with `width`.
+
+`use_container_width` will be removed after 2025-12-31.
+
+For `use_container_width=True`, use `width='stretch'`. For `use_container_width=False`, use `width='content'`.
+2026-07-22 10:51:35.151 Please replace `use_container_width` with `width`.
+
+`use_container_width` will be removed after 2025-12-31.
+
+For `use_container_width=True`, use `width='stretch'`. For `use_container_width=False`, use `width='content'`.
+  Stopping...

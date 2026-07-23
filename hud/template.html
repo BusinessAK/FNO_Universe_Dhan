@@ -1,6 +1,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>VANGUARD // ORBITAL DECK</title>
+<script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
 <style>
 /* ── tokens ──────────────────────────────────────────────────────────── */
 :root{
@@ -230,21 +231,40 @@ figure figcaption{font-size:10px;color:var(--muted);letter-spacing:.06em;margin-
 #scan tbody tr.wall-break-bear{border-left:2px solid var(--bear-hi);background:rgba(232,84,111,.06)}
 .pos{color:var(--bull-hi)}.neg{color:var(--bear-hi)}.dim{color:var(--muted)}
 
-/* ── Track Record table (no sticky header/sort — short, static list) ─── */
-#tr-wrap{overflow-x:auto}
-#tr-table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
-#tr-table th{text-align:right;font-size:9.5px;letter-spacing:.12em;color:var(--muted);
-  text-transform:uppercase;padding:8px 10px;border-bottom:1px solid var(--edge)}
-#tr-table th:first-child,#tr-table th:nth-child(2){text-align:left}
-#tr-table td{padding:7px 10px;text-align:right;font-size:12px;border-bottom:1px solid rgba(124,140,160,.07)}
-#tr-table td:first-child{text-align:left;font-weight:600;letter-spacing:.03em}
-#tr-table td:nth-child(2){text-align:left}
+#dss{position:relative;width:min(880px,100%);max-height:92vh;overflow-y:auto;background:var(--panel-solid);
+  border:1px solid var(--edge-hot);border-radius:8px;padding:22px 26px;scrollbar-width:thin;scrollbar-color:var(--faint) transparent}
+#dss-close{position:absolute;top:12px;right:14px}
+#dss h3{font-size:16px;letter-spacing:.08em;margin:0 0 2px;display:flex;align-items:baseline;gap:12px}
+#dss-date{font-size:10.5px;color:var(--cyan-mark);letter-spacing:.12em;text-transform:uppercase}
+#dss-date.hist{color:var(--bear-hi)}
+#dss-grid{display:grid;grid-template-columns:250px 1fr;gap:24px;margin-top:20px}
+.sect{margin-top:20px}
+.sect h4{font-size:9.5px;letter-spacing:.15em;text-transform:uppercase;color:var(--muted);margin:0 0 10px;border-bottom:1px solid var(--edge);padding-bottom:6px}
+#dss .tiles{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;align-items:start}
+
+/* ── intelligence panel ──────────────────────────────────────────────── */
+#dss-intel{display:flex;flex-direction:column;gap:12px;margin-bottom:12px}
+.intel-card{border:1px solid rgba(124,140,160,.15);border-radius:4px;padding:12px 14px;background:rgba(124,140,160,.04)}
+.intel-card.danger{border-color:rgba(239,68,68,.3);background:rgba(239,68,68,.04)}
+.intel-title{font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink);margin-bottom:8px;font-weight:700}
+.migration-labels{display:flex;justify-content:space-between;font-size:9px;margin-bottom:4px}
+.migration-track{height:6px;background:rgba(255,255,255,.1);border-radius:3px;position:relative;overflow:hidden}
+.migration-fill{height:100%;background:linear-gradient(90deg,var(--bear-hi),#fbbf24,var(--bull-hi));position:absolute;left:0}
+.migration-marker{position:absolute;top:0;width:2px;height:100%;background:#fff;box-shadow:0 0 4px #fff;transform:translateX(-1px)}
+.velocity-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.velocity-card{background:rgba(0,0,0,.15);padding:8px;border-radius:4px;text-align:center}
+.velocity-label{font-size:8.5px;color:var(--muted);letter-spacing:.05em;margin-bottom:4px}
+.velocity-value{font-size:12.5px;font-weight:700;font-variant-numeric:tabular-nums}
+.narrative-body{font-size:11px;color:var(--muted);line-height:1.5;margin-top:10px}
+
+
 .meter{display:inline-block;width:54px;height:5px;border-radius:3px;background:rgba(124,140,160,.15);vertical-align:1px;margin-left:6px;overflow:hidden}
 .meter i{display:block;height:100%;background:var(--cyan-mark)}
 
 /* ── dossier overlay ─────────────────────────────────────────────────── */
 #dossier{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;padding:24px;
-  background:rgba(3,5,10,.72);backdrop-filter:blur(6px)}
+  background:rgba(3,5,10,.95);animation:fadeIn .15s ease-out}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
 #dossier[hidden]{display:none}
 #dss{position:relative;width:min(880px,100%);max-height:92vh;overflow-y:auto;background:var(--panel-solid);
   border:1px solid var(--edge-hot);border-radius:8px;padding:22px 26px;scrollbar-width:thin;
@@ -361,7 +381,7 @@ figure figcaption{font-size:10px;color:var(--muted);letter-spacing:.06em;margin-
       <figcaption><span id="pos-cap">FII net index futures</span> · last 60 sessions · <b id="pos-fii-val"></b></figcaption></figure>
   </section>
 
-  <section class="panel" style="--i:4" id="p-flips">
+  <section class="panel" style="--i:4; display: none !important;" id="p-flips">
     <div class="ph"><h2>Flip Radar</h2><span class="sub" id="flip-count">structural polarity flips · sorted by confidence</span>
       <span class="sub dim" title="Pre-registered backtest (vanguard/research/flip_backtester.py): STRONG flips return -0.12% fwd-3d / 48.2% hit rate; WEAK flips return +0.16% / 52.2% hit rate. The score ranks flips, it does not predict them — see data/research/flip_backtest_report.md.">⚠ confidence is not predictive — see backtest</span>
       <span class="spacer"></span><div style="display:flex;gap:6px;flex-wrap:wrap" id="flip-chips"></div></div>
@@ -382,14 +402,7 @@ figure figcaption{font-size:10px;color:var(--muted);letter-spacing:.06em;margin-
     </div>
   </section>
 
-  <section class="panel" style="--i:6" id="p-track-record" hidden>
-    <div class="ph"><h2>Track Record</h2><span class="sub" id="tr-sub"></span>
-      <span class="spacer"></span><div style="display:flex;gap:6px" id="tr-chips"></div></div>
-    <div id="tr-wrap"><table id="tr-table" aria-label="Setup track record by type">
-      <thead><tr><th>Setup</th><th>Track</th><th>N</th><th>Win %</th><th>Avg R</th><th>Total R</th><th>Verdict</th></tr></thead>
-      <tbody></tbody>
-    </table></div>
-  </section>
+  
 
   <section class="panel" style="--i:7" id="p-setups">
     <div class="ph"><h2>Setup Queue</h2><span class="sub" id="setup-count"></span>
@@ -429,14 +442,30 @@ figure figcaption{font-size:10px;color:var(--muted);letter-spacing:.06em;margin-
         <div class="sect"><h4>Wall Trail · 30 sessions</h4><div id="dss-trail"></div></div>
       </div>
       <div>
-        <div class="sect" style="margin-top:0"><h4>Structure Readout</h4><div class="tiles" id="dss-tiles"></div></div>
-        <div class="sect" id="dss-live-structure-sect" hidden>
-          <h4>Live Structure <span id="dss-live-structure-watermark" class="bias" style="background:rgba(232,180,92,.15);color:#E8B45C;font-size:9px;letter-spacing:.08em;padding:1px 6px;margin-left:6px" hidden title="Not yet confirmed against the next EOD compile — see scripts/live_parity_check.py">INDICATIVE</span></h4>
-          <div id="dss-live-structure"></div>
-        </div>
-        <div class="sect"><h4>Desk Line</h4><div id="dss-strat"></div></div>
-        <div class="sect" id="dss-setups-sect"><h4>Active Setups</h4><div id="dss-setups"></div></div>
-        <div class="sect" id="dss-sigs-sect"><h4>Structure Alerts</h4><div id="dss-sigs"></div></div>
+        <div class="sect" style="margin-top:0" id="dss-intel-sect"><h4>Vanguard Intelligence</h4><div id="dss-intel"></div></div>
+      </div>
+    </div>
+
+    <div class="sect" style="margin-top:20px"><h4>Structure Readout</h4><div class="tiles" id="dss-tiles"></div></div>
+    <div class="sect" id="dss-live-structure-sect" hidden>
+      <h4>Live Structure <span id="dss-live-structure-watermark" class="bias" style="background:rgba(232,180,92,.15);color:#E8B45C;font-size:9px;letter-spacing:.08em;padding:1px 6px;margin-left:6px" hidden title="Not yet confirmed against the next EOD compile — see scripts/live_parity_check.py">INDICATIVE</span></h4>
+      <div id="dss-live-structure"></div>
+    </div>
+    <div class="sect"><h4>Desk Line</h4><div id="dss-strat"></div></div>
+    <div class="sect" id="dss-setups-sect"><h4>Active Setups</h4><div id="dss-setups"></div></div>
+    <div class="sect" id="dss-sigs-sect"><h4>Structure Alerts</h4><div id="dss-sigs"></div></div>
+
+    <div class="sect" style="margin-top:20px" id="dss-charts-sect">
+      <h4>Detailed Longitudinal Analysis Panel</h4>
+      <div class="dss-tabs" id="dss-chart-tabs">
+        <button class="dss-tab active" data-target="gex">📊 GEX PROFILE</button>
+        <button class="dss-tab" data-target="oi">📈 OI CONCENTRATION</button>
+        <button class="dss-tab" data-target="iv">🌡 IV SKEW</button>
+      </div>
+      <div id="dss-chart-panels">
+        <div class="dss-chart-panel" id="dss-chart-gex"></div>
+        <div class="dss-chart-panel" id="dss-chart-oi" hidden></div>
+        <div class="dss-chart-panel" id="dss-chart-iv" hidden></div>
       </div>
     </div>
   </div>
@@ -844,16 +873,9 @@ function drawInternals(){
     p50:p50,p200:p200,nh:nh,nl:nl,mcclellan:last.cm_mcclellan_osc,
     cash_date:cashDate,fii_cash:cashBy("FII")?.net_cr??null,dii_cash:cashBy("DII")?.net_cr??null};
   $("#cm-tiles").innerHTML=[
-    ["A/D",fmt2(ad_r),cAD,(last.cm_net_advances>0?"+":"")+last.cm_net_advances+" net"+dlt(ad_r,prev?.cm_ad_ratio,2)],
     [">50 DMA",pct(p50),c50,pct(last.cm_pct_above_20dma)+" >20D"+dlt(p50,prev?.cm_pct_above_50dma,1,"pt")],
     [">200 DMA",pct(p200),c200,dlt(p200,prev?.cm_pct_above_200dma,1,"pt")||"structural"],
     ["NH − NL",(nh-nl>0?"+":"")+(nh-nl),cNH,nh+"H / "+nl+"L"+dlt(nh-nl,prev?(prev.cm_new_highs??0)-(prev.cm_new_lows??0):null,0)],
-    ...(cashDate?["FII","DII"].map(cat=>{
-        const r=cashBy(cat);
-        if(!r)return null;
-        const col=r.net_cr>0?C.bull:r.net_cr<0?C.bear:C.ink;
-        return[cat+" CASH",(r.net_cr>0?"+":"")+Math.round(r.net_cr).toLocaleString("en-IN")+"Cr",col,"provisional · "+fdate(r.date)];
-      }).filter(Boolean):[]),
   ].map(([k,v,c,d])=>`<div class="tile"><span class="k">${k}</span><div class="v" style="color:${c}">${v}</div><span class="d">${d}</span></div>`).join("");
 
   /* McClellan: thin bars around zero, diverging by sign, 2px gaps.
@@ -1089,42 +1111,145 @@ let setupFilter=null;
    appearing in the data — delisted, dropped from F&O eligibility, a
    corporate-action ticker change) are excluded entirely, same as any other
    resolved status. */
-/* Track Record — win rate/avg R/total R per setup type, both tracks. Verdict
-   thresholds mirror vanguard/research/equity_setups_backtest.py's _verdict()
-   exactly (MIN_N=30; total_r<=0 -> NO-GO; win_rate>50 -> PASS; else PASS
-   (asymmetric payoff)) so the HUD never disagrees with the .md report. */
-const TR_MIN_N = 30;
-let trTrack = "both";           // 'both' | 'fno' | 'equity'
-function trVerdict(r){
-  if(r.n < TR_MIN_N) return {label:"INCONCLUSIVE", k:"neut"};
-  if(r.total_r <= 0) return {label:"NO-GO", k:"bear"};
-  if(r.win_rate > 50) return {label:"PASS", k:"bull"};
-  return {label:"PASS (asym)", k:"bull"};
-}
-function drawTrackRecord(){
-  const p=$("#p-track-record");if(!p)return;
-  if(!TRACK_RECORD.length){p.hidden=true;return}
-  p.hidden=false;
-  const rows=TRACK_RECORD.filter(r=>trTrack==="both"||r.track===trTrack)
-    .sort((a,b)=>b.total_r-a.total_r);
-  CHK.trackRecord={n:rows.length,track:trTrack};
-  $("#tr-sub").textContent=rows.length+" setup type"+(rows.length===1?"":"s")+" · resolved positions only";
-  $("#tr-chips").innerHTML=["both","fno","equity"].map(t=>
-    `<button class="chip" data-t="${t}" aria-pressed="${trTrack===t}">${t==="both"?"ALL":t.toUpperCase()}</button>`).join("");
-  document.querySelectorAll("#tr-chips .chip").forEach(c=>c.addEventListener("click",()=>{
-    trTrack=c.dataset.t;drawTrackRecord();}));
-  $("#tr-table tbody").innerHTML=rows.map(r=>{
-    const v=trVerdict(r);
-    return `<tr>
-      <td>${esc(r.setup_type.replace(/_/g," "))}</td>
-      <td class="dim">${r.track==="fno"?"F&amp;O":"Equity"}</td>
-      <td>${r.n}</td>
-      <td class="${r.win_rate>50?"pos":"neg"}">${r.win_rate.toFixed(1)}%</td>
-      <td class="${r.avg_r>=0?"pos":"neg"}">${r.avg_r>=0?"+":""}${r.avg_r.toFixed(3)}R</td>
-      <td class="${r.total_r>=0?"pos":"neg"}">${r.total_r>=0?"+":""}${r.total_r.toFixed(2)}R</td>
-      <td><span class="bias ${v.k}">${v.label}</span></td>
-    </tr>`;
-  }).join("");
+/* ── Deep Dive Charting (Plotly) ── */
+async function loadDeepDiveCharts(sym, r) {
+  const tabs = document.querySelectorAll('.dss-tab');
+  const panels = document.querySelectorAll('.dss-chart-panel');
+  tabs.forEach(t => t.onclick = (e) => {
+    tabs.forEach(tt => tt.classList.remove('active'));
+    panels.forEach(pp => pp.hidden = true);
+    t.classList.add('active');
+    document.getElementById('dss-chart-' + t.dataset.target).hidden = false;
+  });
+
+  const layoutBase = {
+    height: 550,
+    paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
+    font: { family: 'ui-monospace, "SF Mono", Menlo, Consolas', size: 10, color: '#7C8CA0' },
+    margin: { t: 70, b: 50, l: 45, r: 20 },
+    showlegend: true, legend: {orientation: 'h', yanchor: 'top', y: -0.12, xanchor: 'center', x: 0.5, bgcolor: 'rgba(0,0,0,0)'}
+  };
+
+  try {
+    const res = await fetch('http://127.0.0.1:8787/api/chain/' + sym);
+    if (!res.ok) throw new Error('fetch err');
+    const data = await res.json();
+    if (!data.length) {
+      document.getElementById('dss-chart-gex').innerHTML = '<div style="color:var(--muted)">No chain data available.</div>';
+      return;
+    }
+
+    const spot = r.spot_close;
+    const cw = r.call_wall;
+    const pw = r.put_wall;
+    const gf = r.gamma_flip;
+    const lo = spot * 0.85;
+    const hi = spot * 1.15;
+    
+    // Aggregate by strike
+    let byStrike = {};
+    data.forEach(d => {
+      if (d.STRIKE_PR >= lo && d.STRIKE_PR <= hi) {
+        if (!byStrike[d.STRIKE_PR]) byStrike[d.STRIKE_PR] = {STRIKE: d.STRIKE_PR, CE_GEX:0, PE_GEX:0, CE_OI:0, PE_OI:0, CE_IV:0, PE_IV:0};
+        if (d.OPTION_TYP === 'CE') {
+          byStrike[d.STRIKE_PR].CE_GEX += d.GEX||0;
+          byStrike[d.STRIKE_PR].CE_OI += d.OPEN_INT||0;
+          byStrike[d.STRIKE_PR].CE_IV = d.IV||0;
+        } else {
+          byStrike[d.STRIKE_PR].PE_GEX += d.GEX||0;
+          byStrike[d.STRIKE_PR].PE_OI += d.OPEN_INT||0;
+          byStrike[d.STRIKE_PR].PE_IV = d.IV||0;
+        }
+      }
+    });
+    
+    let rows = Object.values(byStrike).sort((a,b)=>a.STRIKE - b.STRIKE);
+    const strikes = rows.map(r=>r.STRIKE);
+    const cGEX = rows.map(r=>r.CE_GEX/1e5);
+    const pGEX = rows.map(r=>r.PE_GEX/1e5);
+    const nGEX = rows.map(r=>(r.CE_GEX + r.PE_GEX)/1e5);
+    const nGEXColors = nGEX.map(v => v >= 0 ? '#1ca169' : '#d84c4c');
+    const cGEXHover = rows.map(r => `Strike: ${r.STRIKE}<br>Call GEX: ${(r.CE_GEX/1e5).toFixed(2)}L`);
+    const pGEXHover = rows.map(r => `Strike: ${r.STRIKE}<br>Put GEX: ${(r.PE_GEX/1e5).toFixed(2)}L`);
+    const nGEXHover = rows.map(r => `Strike: ${r.STRIKE}<br>Net GEX: ${((r.CE_GEX + r.PE_GEX)/1e5).toFixed(2)}L`);
+    
+    const cOI = rows.map(r=>r.CE_OI);
+    const pOI = rows.map(r=>-r.PE_OI);
+    const dOI = rows.map(r=>r.CE_OI - r.PE_OI);
+    const dOIColors = dOI.map(v => v >= 0 ? '#5294e2' : '#d84c4c');
+    const cOIHover = rows.map(r => `Strike: ${r.STRIKE}<br>Call OI: ${r.CE_OI.toLocaleString()}`);
+    const pOIHover = rows.map(r => `Strike: ${r.STRIKE}<br>Put OI: ${r.PE_OI.toLocaleString()}`);
+    const dOIHover = rows.map(r => `Strike: ${r.STRIKE}<br>Divergence: ${(r.CE_OI - r.PE_OI).toLocaleString()}`);
+    
+    const cIV = rows.map(r=>r.CE_IV*100);
+    const pIV = rows.map(r=>r.PE_IV*100);
+
+    const shapes = [];
+    const addHoriz = (val, color, dash) => {
+      shapes.push({type: 'line', x0: 0, x1: 1, xref: 'x domain', y0: val, y1: val, yref: 'y', line: {color: color, width: 1, dash: dash}});
+      shapes.push({type: 'line', x0: 0, x1: 1, xref: 'x2 domain', y0: val, y1: val, yref: 'y2', line: {color: color, width: 1, dash: dash}});
+    };
+    if(spot) addHoriz(spot, '#f59e0b', 'dot');
+    
+    const vshapes = [];
+    const addVert = (val, color, dash) => {
+      vshapes.push({type: 'line', y0: 0, y1: 1, yref: 'paper', x0: val, x1: val, line: {color: color, width: 1, dash: dash}});
+    };
+    if(spot) addVert(spot, '#f59e0b', 'dot');
+
+    const config = { displayModeBar: false, responsive: true };
+
+    // GEX Profile
+    Plotly.react('dss-chart-gex', [
+      { y: strikes, x: pGEX, type: 'bar', orientation: 'h', marker: {color: '#d84c4c'}, name: 'PUT GEX', xaxis: 'x1', yaxis: 'y1', hovertext: pGEXHover, hoverinfo: 'text' },
+      { y: strikes, x: cGEX, type: 'bar', orientation: 'h', marker: {color: '#5294e2'}, name: 'CALL GEX', xaxis: 'x1', yaxis: 'y1', hovertext: cGEXHover, hoverinfo: 'text' },
+      { y: strikes, x: nGEX, type: 'bar', orientation: 'h', marker: {color: nGEXColors}, name: 'NET GEX', xaxis: 'x2', yaxis: 'y2', hovertext: nGEXHover, hoverinfo: 'text', showlegend: false }
+    ], Object.assign({}, layoutBase, {
+      barmode: 'relative',
+      grid: {rows: 1, columns: 2, pattern: 'independent'},
+      xaxis: { domain: [0, 0.45], title: 'GEX (Lakhs)', gridcolor: 'rgba(83,221,242,.05)' },
+      yaxis: { title: 'Strike Price', gridcolor: 'rgba(83,221,242,.05)' },
+      xaxis2: { domain: [0.55, 1], title: 'Net GEX (Lakhs)', gridcolor: 'rgba(83,221,242,.05)' },
+      yaxis2: { anchor: 'x2', matches: 'y', showticklabels: false, gridcolor: 'rgba(83,221,242,.05)' },
+      annotations: [
+        {text: 'Dealer GEX by Strike (Lakhs)', x: 0.225, y: 1.12, xref: 'paper', yref: 'paper', showarrow: false, xanchor: 'center'},
+        {text: 'Net GEX Profile', x: 0.775, y: 1.12, xref: 'paper', yref: 'paper', showarrow: false, xanchor: 'center'}
+      ],
+      shapes: shapes
+    }), config);
+
+    // OI Concentration
+    Plotly.react('dss-chart-oi', [
+      { y: strikes, x: pOI, type: 'bar', orientation: 'h', marker: {color: '#d84c4c'}, name: 'PUT OI', xaxis: 'x1', yaxis: 'y1', hovertext: pOIHover, hoverinfo: 'text' },
+      { y: strikes, x: cOI, type: 'bar', orientation: 'h', marker: {color: '#5294e2'}, name: 'CALL OI', xaxis: 'x1', yaxis: 'y1', hovertext: cOIHover, hoverinfo: 'text' },
+      { y: strikes, x: dOI, type: 'bar', orientation: 'h', marker: {color: dOIColors}, name: 'DIVERGENCE', xaxis: 'x2', yaxis: 'y2', hovertext: dOIHover, hoverinfo: 'text', showlegend: false }
+    ], Object.assign({}, layoutBase, {
+      barmode: 'relative',
+      grid: {rows: 1, columns: 2, pattern: 'independent'},
+      xaxis: { domain: [0, 0.45], title: 'Open Interest (Lots)', gridcolor: 'rgba(83,221,242,.05)' },
+      yaxis: { title: 'Strike Price', gridcolor: 'rgba(83,221,242,.05)' },
+      xaxis2: { domain: [0.55, 1], title: 'Divergence (CE-PE)', gridcolor: 'rgba(83,221,242,.05)' },
+      yaxis2: { anchor: 'x2', matches: 'y', showticklabels: false, gridcolor: 'rgba(83,221,242,.05)' },
+      annotations: [
+        {text: 'Call vs Put OI Profile (Lots)', x: 0.225, y: 1.12, xref: 'paper', yref: 'paper', showarrow: false, xanchor: 'center'},
+        {text: 'CE - PE Divergence', x: 0.775, y: 1.12, xref: 'paper', yref: 'paper', showarrow: false, xanchor: 'center'}
+      ],
+      shapes: shapes
+    }), config);
+
+    // IV Skew
+    Plotly.react('dss-chart-iv', [
+      { x: strikes, y: cIV, type: 'scatter', mode: 'lines+markers', line: {color: '#5294e2'}, name: 'CALL IV', hoverinfo: 'none' },
+      { x: strikes, y: pIV, type: 'scatter', mode: 'lines+markers', line: {color: '#d84c4c'}, name: 'PUT IV', hoverinfo: 'none' }
+    ], Object.assign({}, layoutBase, {
+      xaxis: { title: 'Strike Price', gridcolor: 'rgba(83,221,242,.05)' },
+      yaxis: { title: 'Implied Volatility (%)', gridcolor: 'rgba(83,221,242,.05)' },
+      shapes: vshapes
+    }), config);
+
+  } catch(e) {
+    document.getElementById('dss-chart-gex').innerHTML = '<div style="color:var(--bear-hi)">Error loading chart data.</div>';
+  }
 }
 
 let queueTrack="fno";   // 'fno' | 'equity' | 'both' -- defaults to fno (pre-U3 behavior unchanged by default)
@@ -1231,7 +1356,7 @@ function drawPositioning(){
     calls:Object.fromEntries(["FII","DII","PRO","CLIENT"].map(k=>[k,nc(cur[k])])),
     puts:Object.fromEntries(["FII","DII","PRO","CLIENT"].map(k=>[k,np(cur[k])])),
     fii_tilt:tilt(cur.FII)};
-  $("#pos-tiles").innerHTML=["FII","DII","PRO","CLIENT"].map(pt=>{
+  $("#pos-tiles").innerHTML=["FII","CLIENT"].map(pt=>{
     const n=net(cur[pt]),d=prev&&net(prev[pt])!=null&&n!=null?n-net(prev[pt]):null;
     const col=n>0?C.bullHi:n<0?C.bearHi:"var(--ink)";
     const dch=d?`<span style="color:${d>0?C.bull:C.bear}">${d>0?"▲":"▼"}${fmtOI(Math.abs(d))}</span>`:"&nbsp;";
@@ -1244,7 +1369,7 @@ function drawPositioning(){
     const dch=d?`<span style="color:${(d>0)===bullPos?C.bull:C.bear};font-size:9.5px">${d>0?"▲":"▼"}${fmtOI(Math.abs(d))}</span>`:"";
     return`${tag} <span style="color:${col}">${fmtOI(v)}</span> ${dch}`;
   };
-  $("#pos-opt-tiles").innerHTML=hasOpt?["FII","DII","PRO","CLIENT"].map(pt=>{
+  $("#pos-opt-tiles").innerHTML=hasOpt?["FII","CLIENT"].map(pt=>{
     const c=nc(cur[pt]),q=np(cur[pt]);
     const dc=prev&&nc(prev[pt])!=null&&c!=null?c-nc(prev[pt]):null;
     const dq=prev&&np(prev[pt])!=null&&q!=null?q-np(prev[pt]):null;
@@ -1527,6 +1652,129 @@ function interpCol(side,txt){
   const bear=side==="CE"?/Call Writing/.test(t):/Put Buying|Short Covering/.test(t);
   return bull?C.bull:bear?C.bear:"var(--muted)";
 }
+
+function generateNarrative(r, sym) {
+  const hist = msBySymbol[sym] || [];
+  const idx = hist.findIndex(h => h.date === r.date);
+  let bull_p = 0, bear_p = 0;
+  if (idx >= 0) {
+      for (let i = idx; i >= 0; i--) {
+          const b = hist[i].structural_bias || "";
+          if (b.includes("Bullish") || b === "Volatility Expansion") bull_p++; else break;
+      }
+      for (let i = idx; i >= 0; i--) {
+          const b = hist[i].structural_bias || "";
+          if (b.includes("Bearish")) bear_p++; else break;
+      }
+  }
+
+  const narrative = [];
+  if (bull_p >= 3) narrative.push(`Persistent <b>Put Writing floor support</b> observed for ${bull_p} consecutive sessions, signaling heavy institutional accumulation.`);
+  else if (bear_p >= 3) narrative.push(`Aggressive <b>Call Writing reinforcement</b> observed for ${bear_p} consecutive sessions, indicating heavy dealer ceiling pressure.`);
+  else if (bull_p > 0) narrative.push(`Mild bullish Put writing bias observed for ${bull_p} session${bull_p>1?"s":""} as dealer support starts to firm up.`);
+  else if (bear_p > 0) narrative.push(`Mild bearish Call writing pressure noted for ${bear_p} session${bear_p>1?"s":""} as ceiling limits near term rallies.`);
+  else narrative.push("Active rotational flow and neutral inventory shifts observed, indicating structural compression.");
+
+  const spot = r.spot_close || 0, cw = r.call_wall || 0, pw = r.put_wall || 0, gf = r.gamma_flip || 0;
+  if (spot > cw && cw > 0) narrative.push(`Spot accepts <b>above the Call Wall</b> (${fmtPr(cw)}), forcing dealers into short covering (gamma squeeze) buying cascades.`);
+  else if (cw > 0 && Math.abs(spot - cw)/spot <= 0.025) narrative.push(`Spot compresses just below the Call Wall (${fmtPr(cw)}). A breakout above this level could accelerate dealer buying.`);
+  else if (pw > 0 && Math.abs(spot - pw)/spot <= 0.025) narrative.push(`Spot hovers near the major Put Wall support (${fmtPr(pw)}), serving as a strong institutional floor.`);
+  else narrative.push(`Spot is currently trading in a well-defined channel between dealer walls (Call Wall: ${fmtPr(cw)} | Put Wall: ${fmtPr(pw)}).`);
+
+  const reg = r.gamma_regime || "TRANSITION_REGIME";
+  if (reg.includes("LONG_GAMMA")) narrative.push("Dealer positioning is in <b>Positive (Long) Gamma</b>. Volatility remains suppressed, favoring mean-reversion buying on dips.");
+  else if (reg.includes("SHORT_GAMMA")) narrative.push("Dealer positioning is in <b>Negative (Short) Gamma</b>. Delta-hedging moves accelerate volatility; expect highly expanded price swings.");
+  else narrative.push(`Spot sits directly in the <b>Regime Flip Zone</b> (${fmtPr(gf)}), indicating an active regime transition.`);
+
+  const st = SET.filter(s => s.symbol === sym);
+  const strat = r.suggested_strategy || "Wait for Setup";
+  if (st.length > 0) narrative.push(`This specific structure triggers the <b>${st.map(s=>s.setup_type.replace(/_/g," ")).join(" / ")} Setup</b>. Recommended tactical strategy: <b>${strat}</b>.`);
+  else narrative.push(`Tactical structure shows a <b>${r.structural_bias || "Transition Regime"}</b> regime. Suggested positioning: <b>${strat}</b>.`);
+
+  return narrative.join(" ");
+}
+
+function renderIntelligencePanel(r, sym){
+  const el=$("#dss-intel");el.innerHTML="";
+  if(!r.spot_close){el.parentElement.style.display="none";return;}
+  el.parentElement.style.display="block";
+  let h="";
+
+  /* Quant Narrative */
+  const conv_score = r.conviction_score || 0;
+  const cc = conv_score >= 70 ? "#10b981" : conv_score >= 40 ? "#fbbf24" : "#7888aa";
+  const svg = `<svg width="46" height="46" viewBox="0 0 36 36" style="flex:none;margin-right:12px">
+    <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="rgba(124,140,160,.2)" stroke-width="3" />
+    <path stroke-dasharray="${conv_score}, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="${cc}" stroke-width="3" stroke-linecap="round" />
+    <text x="18" y="21.5" font-family="monospace" font-size="8" font-weight="bold" fill="${cc}" text-anchor="middle">${conv_score.toFixed(0)}</text>
+  </svg>`;
+  h+=`<div class="intel-card">
+    <div class="intel-title">🤖 Vanguard Quant Narrative</div>
+    <div style="display:flex;align-items:center">
+      ${svg}
+      <div>
+        <div style="font-size:9.5px;color:var(--muted);letter-spacing:.05em">VANGUARD CONVICTION SCORE</div>
+        <div style="font-size:14px;font-weight:700;color:${cc}">${conv_score.toFixed(1)}%</div>
+        <div style="font-size:9px;color:var(--faint)">Smart Money Accumulation Conviction</div>
+      </div>
+    </div>
+    <div class="narrative-body">${generateNarrative(r, sym)}</div>
+  </div>`;
+
+  /* Wall Migration */
+  let cw=r.call_wall||0, pw=r.put_wall||0, spot=r.spot_close||0;
+  let prox=0, lbls="", sub="";
+  if(cw>pw){
+    prox=Math.max(0,Math.min(100,(spot-pw)/(cw-pw+1e-5)*100));
+    lbls=`<span style="color:var(--bear-hi);font-weight:600">PUT WALL (${fmtPr(pw)})</span>
+          <span style="color:#fbbf24;font-weight:600">SPOT (${fmtPr(spot)})</span>
+          <span style="color:var(--bull-hi);font-weight:600">CALL WALL (${fmtPr(cw)})</span>`;
+    sub=`Spot is ${prox.toFixed(1)}% of the way from Put Wall to Call Wall`;
+  }else{
+    const wall=cw;
+    const dev=(spot-wall)/(wall+1e-5);
+    prox=Math.max(0,Math.min(100,50+dev*20*50));
+    lbls=`<span style="color:var(--muted);font-weight:600">${fmtPr(0.95*wall)} (-5%)</span>
+          <span style="color:${C.violet};font-weight:600">CONCENTRATED WALL (${fmtPr(wall)})</span>
+          <span style="color:var(--muted);font-weight:600">${fmtPr(1.05*wall)} (+5%)</span>`;
+    const diff=Math.abs(dev)*100;
+    sub=spot<wall?`Spot (${fmtPr(spot)}) is ${diff.toFixed(2)}% below Concentrated Wall (${fmtPr(wall)})`
+       :spot>wall?`Spot (${fmtPr(spot)}) is ${diff.toFixed(2)}% above Concentrated Wall (${fmtPr(wall)})`
+       :`Spot is exactly at the Concentrated Wall (${fmtPr(wall)})`;
+  }
+  h+=`<div class="intel-card">
+    <div class="intel-title">🔄 Live Wall Migration Meter</div>
+    <div style="font-size:10px;color:var(--muted);margin-bottom:8px">Tracking spot proximity relative to major dealer positioning.</div>
+    <div class="migration-labels">${lbls}</div>
+    <div class="migration-track"><div class="migration-fill" style="width:${prox}%"></div><div class="migration-marker" style="left:${prox}%"></div></div>
+    <div style="font-size:9.5px;color:var(--muted);font-style:italic;text-align:center;margin-top:5px">${sub}</div>
+  </div>`;
+  
+  /* Gamma Radar */
+  const gf=r.gamma_flip||0, reg=r.gamma_regime||"ROTATION";
+  const dang=reg==="SHORT_GAMMA";
+  const gap=spot>0?Math.abs(spot-gf)/spot*100:0;
+  h+=`<div class="intel-card ${dang?"danger":""}">
+    <div class="intel-title" style="color:${dang?"var(--bear-hi)":C.violet}">${dang?"⚠ DEALER DANGER ZONE":"🛡 GAMMA FLIP RADAR"}</div>
+    <div style="font-size:10px;color:var(--muted);margin-bottom:8px">${dang?"Spot is currently trading in a <b>SHORT GAMMA</b> hedging regime. Dealer delta-hedging will expand volatility.":"Spot is currently in a stable <b>LONG GAMMA</b> or transition zone. Volatility is structurally capped."}</div>
+    <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted)"><span style="letter-spacing:.05em">REGIME FLIP TRIGGER:</span><span style="color:#fbbf24;font-weight:600">${fmtPr(gf)}</span></div>
+    <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-top:3px"><span style="letter-spacing:.05em">PROXIMITY TO PIVOT:</span><span style="color:${dang?"var(--bear-hi)":"var(--bull-hi)"};font-weight:600">${gap.toFixed(2)}% gap</span></div>
+  </div>`;
+  
+  /* EOD Flow Velocity */
+  const noi=(r.net_inv_shift||0)/1e5, vol=(r.delta_volume||0)/1e5;
+  const noic=noi>=0?C.bull:C.bear, volc=vol>=0?C.bull:C.bear;
+  h+=`<div class="intel-card">
+    <div class="intel-title">⚡ EOD FLOW VELOCITY</div>
+    <div style="font-size:10px;color:var(--muted);margin-bottom:8px">Session velocity representing daily net inventory & volume shifts.</div>
+    <div class="velocity-grid">
+      <div class="velocity-card"><div class="velocity-label">NET INVENTORY SHIFT</div><div class="velocity-value" style="color:${noic}">${noi>0?"+":""}${noi.toFixed(2)}L shares</div></div>
+      <div class="velocity-card"><div class="velocity-label">VOLUME DELTA</div><div class="velocity-value" style="color:${volc}">${vol>0?"+":""}${vol.toFixed(2)}L shares</div></div>
+    </div>
+  </div>`;
+  el.innerHTML=h;
+}
+
 function openDossier(sym){
   const r=bySym[sym];if(!r)return;
   $("#dss-sym").textContent=r.symbol;
@@ -1551,6 +1799,7 @@ function openDossier(sym){
   const evChip=evs.length?` · <span style="color:#E8B45C;border:1px solid rgba(179,136,56,.4);border-radius:3px;padding:0 5px;font-size:10px;font-weight:700">📅 ${esc(evs[0].event_type.replace(/_/g," "))} ${fdate(evs[0].event_date)}</span>`:"";
   const banChip=r._ban?` · <span style="color:var(--bear-hi);border:1px solid rgba(255,122,146,.4);border-radius:3px;padding:0 5px;font-size:10px;font-weight:700">⛔ F&O BAN — OI flows partly forced</span>`:"";
   $("#dss-sub").innerHTML=`${banChip?banChip.slice(3)+" · ":""}${esc(r.sector||"—")}${evChip} · ${fmtPr(r.spot_close)} <span class="${cls(r.spot_change_pct)}">${fmtP(r.spot_change_pct)}</span> · <span class="bias ${biasKind(r.structural_bias)}">${esc(r.structural_bias)}</span> · ${esc((r.gamma_regime||"").replace(/_/g," "))}${flipChip}`;
+  renderIntelligencePanel(r, sym);
   ladder(r);
   wallTrail(sym);
   /* Δ vs previous session (suppressed on the oldest exported session) */
@@ -1602,6 +1851,7 @@ function openDossier(sym){
   $("#dss-sigs").innerHTML=sg.map(s=>{const m=SIGMETA[s.type]||["·"];
     return`<div style="font-size:11px;color:var(--muted);margin-bottom:5px">${m[0]} ${esc(s.msg)}</div>`}).join("");
   $("#dossier").hidden=false;
+  loadDeepDiveCharts(sym, r);
   renderLiveStructure(LIVE.feed_ts>0 && (Date.now()/1000-LIVE.feed_ts)<LIVE_STALE_SECS);
   $("#dss").scrollTop=0;
   $("#dss-close").focus();
@@ -1672,7 +1922,7 @@ document.addEventListener("keydown",e=>{
 document.body.classList.add("boot");
 function renderSession(){
   drawCmdbar();drawRegime();drawVix();drawPositioning();drawFlips();drawSectors();drawSignals();
-  drawTrackRecord();drawSetups();renderScan();drawBreadth();drawInternals();
+  drawSetups();renderScan();drawBreadth();drawInternals();
   if(!$("#dossier").hidden)$("#dossier").hidden=true;
 }
 renderSession();

@@ -27,7 +27,7 @@ class LongitudinalEngine:
 
         # 1. Bullish Flow Days Factor (0.0 to 1.0)
         # Ratio of positive net inventory flow shifts
-        bullish_days = sum(1 for s in recent if s.get("net_inv_shift", 0.0) > 50000)
+        bullish_days = sum(1 for s in recent if s.get("ifs_score", 0.0) > 10)
         bullish_factor = bullish_days / n_sessions if n_sessions > 0 else 0.0
 
         # 2. Wall Shift Strength Factor (0.0 to 1.0)

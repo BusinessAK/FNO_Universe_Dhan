@@ -1,0 +1,49 @@
+metric,value,top_gainer_rate_pct,all_fno_rate_pct,lift_pct_points,top_samples,all_samples
+same_day_setup,inventory_migration,73.852,43.187,30.665,1802,22218
+trend_rs20_pct,>5,42.582,22.583,19.999,1039,11618
+trend_ret20_pct,>0,63.484,44.464,19.02,1549,22875
+same_day_setup,regime_shift,44.057,37.83,6.227,1075,19462
+same_day_setup,floor_bounce,14.221,9.357,4.864,347,4814
+prev_structural_bias,Expansion,51.352,47.479,3.874,1253,24426
+same_day_setup,iv_skew_accumulation,36.598,33.165,3.433,893,17062
+sector,NIFTY METAL,6.475,4.269,2.207,158,2196
+prior_setup,inventory_migration,45.369,43.187,2.182,1107,22218
+prev_ifs_score,>30,14.057,12.036,2.021,343,6192
+sector,NIFTY INFRA,10.492,8.547,1.945,256,4397
+prev_net_inv_shift,>0,41.967,40.658,1.309,1024,20917
+sector,NIFTY IT,6.967,5.837,1.13,170,3003
+prev_ml_breakout_prob,>60,6.762,5.703,1.059,165,2934
+sector,NIFTY MEDIA & COMM,2.213,1.423,0.79,54,732
+sector,NIFTY CONS DURABLES,5.41,4.735,0.675,132,2436
+prev_gamma_regime,LONG_GAMMA,31.311,30.745,0.567,764,15817
+prev_gex_shift,>0,57.254,56.718,0.536,1397,29179
+prev_structural_bias,Resistance Weakening,1.639,1.11,0.529,40,571
+prior_setup,floor_bounce,9.795,9.357,0.438,239,4814
+sector,NIFTY FIN SERVICE,15.902,15.467,0.435,388,7957
+sector,Other,5.984,5.577,0.407,146,2869
+prev_gamma_regime,SHORT_GAMMA,3.484,3.248,0.236,85,1671
+prior_setup,gamma_squeeze,0.861,0.708,0.153,21,364
+sector,NIFTY AUTO,6.762,6.692,0.07,165,3443
+prior_setup,iv_skew_accumulation,33.115,33.165,-0.05,808,17062
+prev_structural_bias,Support Weakening,7.541,7.682,-0.141,184,3952
+same_day_setup,gamma_squeeze,0.533,0.708,-0.175,13,364
+sector,NIFTY PSU BANK,3.074,3.32,-0.246,75,1708
+sector,NIFTY SERVICES,2.705,2.953,-0.248,66,1519
+sector,NIFTY ENERGY,6.393,6.667,-0.274,156,3430
+sector,NIFTY OIL & GAS,3.852,4.269,-0.416,94,2196
+prev_iv_shift,>0,56.967,57.62,-0.652,1390,29643
+prev_structural_bias,Support Building,4.385,5.067,-0.682,107,2607
+sector,NIFTY PVT BANK,4.385,5.217,-0.832,107,2684
+prev_structural_bias,Dealer Controlled,10.943,11.828,-0.885,267,6085
+sector,NIFTY REALTY,2.377,3.32,-0.943,58,1708
+sector,NIFTY PHARMA,6.598,7.589,-0.99,161,3904
+prev_structural_bias,Flip Zone,13.852,15.078,-1.225,338,7757
+prev_gamma_regime,TRANSITION_REGIME,64.754,66.007,-1.253,1580,33958
+sector,NIFTY FMCG,8.361,9.851,-1.49,204,5068
+prior_setup,regime_shift,35.943,37.83,-1.887,877,19462
+prev_structural_bias,Compression,9.836,11.756,-1.92,240,6048
+prior_setup,pinch_zone,14.098,16.036,-1.938,344,8250
+sector,NIFTY COMMODITIES,2.049,4.269,-2.219,50,2196
+prior_setup,volatility_coil,14.262,16.571,-2.308,348,8525
+same_day_setup,pinch_zone,7.295,16.036,-8.741,178,8250
+same_day_setup,volatility_coil,0.82,16.571,-15.751,20,8525
