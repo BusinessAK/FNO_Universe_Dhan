@@ -1,15 +1,21 @@
 """
 Live-layer instrument keying.
 
-Dhan identifies an instrument by (exchange_segment, security_id) — security_id
-alone is NOT unique across segments. Two real collisions exist in the F&O 215:
+Under the old Dhan feed, security_id alone was NOT unique across segments —
+two real collisions existed in the F&O 215 (sid 13 = NIFTY(IDX) + ABB(NSE_EQ);
+sid 25 = BANKNIFTY(IDX) + ADANIENT(NSE_EQ)), and keying live state by
+security_id alone made each pair share one SecurityState: the equity vanished
+from the snapshot and its ticks corrupted the index's LTP/chg%/OHLC/bars
+(observed live: NIFTY reading 7230.0 at -69.94%).
 
-    sid 13 -> NIFTY     (IDX, seg 0)  +  ABB      (NSE_EQ, seg 1)
-    sid 25 -> BANKNIFTY (IDX, seg 0)  +  ADANIENT (NSE_EQ, seg 1)
-
-Keying live state by security_id alone made each pair share one SecurityState:
-the equity vanished from the snapshot and its ticks corrupted the index's
-LTP/chg%/OHLC/bars (observed live: NIFTY reading 7230.0 at -69.94%).
+Fyers keys instruments by a ticker string (e.g. "NSE:NIFTY50-INDEX") that is
+already globally unique, so this specific collision can no longer occur in
+practice — feed_handler._key() now hardcodes seg=0 for every Fyers tick
+(nothing computes a real segment from the packet anymore). The (seg, sid)
+tuple shape is kept in StateStore/snapshot only for generality; these tests
+exercise the underlying invariant (two distinct instruments' state must never
+merge) using two distinct fake sids rather than a real segment collision,
+since that's what actually flows through the system today.
 """
 import tempfile
 import unittest
@@ -20,8 +26,8 @@ from vanguard.live.feed_handler import normalize
 from vanguard.live.snapshot import build_key_symbol_map, write_snapshot
 from vanguard.live.state_store import StateStore
 
-NIFTY_KEY = (C.SEG_IDX, 13)          # NIFTY spot
-ABB_KEY = (C.SEG_NSE_EQ, 13)         # ABB equity — same security_id, other segment
+NIFTY_KEY = (0, "NSE:NIFTY50-INDEX")   # NIFTY spot
+ABB_KEY = (0, "NSE:ABB-EQ")            # ABB equity — distinct ticker, same seg (0, always, under Fyers)
 
 NIFTY_CLOSE, ABB_CLOSE = 24052.0, 7280.0
 NIFTY_LTP, ABB_LTP = 24074.85, 7230.0
@@ -32,14 +38,14 @@ def tick(seg, sid, ltp, ts=1_784_100_000.0):
 
 
 class _FakeMaster:
-    """Minimal InstrumentMaster stand-in: the two colliding pairs, offline."""
+    """Minimal InstrumentMaster stand-in, Fyers-ticker-shaped."""
 
     _ROWS = {
-        "NIFTY": {"security_id": 13, "feed_segment": C.SEG_IDX},
-        "ABB": {"security_id": 13, "feed_segment": C.SEG_NSE_EQ},
-        "BANKNIFTY": {"security_id": 25, "feed_segment": C.SEG_IDX},
-        "ADANIENT": {"security_id": 25, "feed_segment": C.SEG_NSE_EQ},
-        "RELIANCE": {"security_id": 2885, "feed_segment": C.SEG_NSE_EQ},
+        "NIFTY": {"security_id": "NSE:NIFTY50-INDEX", "feed_segment": 0},
+        "ABB": {"security_id": "NSE:ABB-EQ", "feed_segment": 0},
+        "BANKNIFTY": {"security_id": "NSE:NIFTYBANK-INDEX", "feed_segment": 0},
+        "ADANIENT": {"security_id": "NSE:ADANIENT-EQ", "feed_segment": 0},
+        "RELIANCE": {"security_id": "NSE:RELIANCE-EQ", "feed_segment": 0},
     }
 
     def spot(self, symbol):
@@ -47,29 +53,26 @@ class _FakeMaster:
 
 
 class TestNormalizeKeepsSegment(unittest.TestCase):
-    def test_quote_packet_preserves_exchange_segment(self):
-        t = normalize({"type": "Quote Data", "exchange_segment": C.SEG_NSE_EQ,
-                       "security_id": 13, "LTP": "7230.00"})
-        self.assertEqual(t["seg"], C.SEG_NSE_EQ)
-        self.assertEqual(t["sid"], 13)
+    def test_quote_packet_is_keyed_by_ticker(self):
+        t = normalize({"symbol": "NSE:ABB-EQ", "ltp": 7230.00})
+        self.assertEqual(t["seg"], 0)
+        self.assertEqual(t["sid"], "NSE:ABB-EQ")
 
-    def test_oi_packet_preserves_exchange_segment(self):
-        t = normalize({"type": "OI Data", "exchange_segment": C.SEG_NSE_FNO,
-                       "security_id": 13, "OI": 4200})
-        self.assertEqual(t["seg"], C.SEG_NSE_FNO)
+    def test_oi_packet_is_keyed_by_ticker(self):
+        t = normalize({"symbol": "NSE:ABB-EQ", "open_interest": 4200})
+        self.assertEqual(t["seg"], 0)
         self.assertEqual(t["oi"], 4200)
 
-    def test_packet_without_segment_is_dropped(self):
+    def test_packet_without_symbol_is_dropped(self):
         # An unkeyable tick must never be silently attributed to another instrument.
-        self.assertIsNone(normalize({"type": "Quote Data", "security_id": 13,
-                                     "LTP": "7230.00"}))
+        self.assertIsNone(normalize({"ltp": 7230.00}))
 
 
-class TestCollidingSecurityIds(unittest.TestCase):
+class TestDistinctInstrumentsStayIsolated(unittest.TestCase):
     def setUp(self):
         self.store = StateStore()
 
-    def test_colliding_sids_keep_separate_state(self):
+    def test_distinct_sids_keep_separate_state(self):
         self.store.ingest(tick(*NIFTY_KEY, NIFTY_LTP))
         self.store.ingest(tick(*ABB_KEY, ABB_LTP))
 
@@ -78,7 +81,7 @@ class TestCollidingSecurityIds(unittest.TestCase):
         self.assertEqual(n.ltp, NIFTY_LTP)
         self.assertEqual(a.ltp, ABB_LTP)
 
-    def test_colliding_sids_keep_separate_session_ohlc(self):
+    def test_distinct_sids_keep_separate_session_ohlc(self):
         self.store.ingest(tick(*NIFTY_KEY, NIFTY_LTP))
         self.store.ingest(tick(*ABB_KEY, ABB_LTP))
 
@@ -86,7 +89,7 @@ class TestCollidingSecurityIds(unittest.TestCase):
         self.assertEqual(n.l, NIFTY_LTP)   # ABB's 7230 must not become NIFTY's low
         self.assertEqual(n.h, NIFTY_LTP)
 
-    def test_colliding_sids_keep_separate_bars(self):
+    def test_distinct_sids_keep_separate_bars(self):
         # Two minutes of NIFTY ticks; an ABB tick in between must not enter
         # NIFTY's bar (M3's trigger engine fires on 1-min bar close).
         self.store.ingest(tick(*NIFTY_KEY, NIFTY_LTP, ts=60.0))
@@ -108,13 +111,13 @@ class TestCollidingSecurityIds(unittest.TestCase):
 
 
 class TestSnapshotKeying(unittest.TestCase):
-    def test_map_keeps_both_colliding_symbols(self):
+    def test_map_keeps_both_distinct_symbols(self):
         m = build_key_symbol_map(_FakeMaster(), ["ABB", "NIFTY", "ADANIENT", "BANKNIFTY"])
         self.assertEqual(len(m), 4)
         self.assertEqual(m[NIFTY_KEY], "NIFTY")
         self.assertEqual(m[ABB_KEY], "ABB")
 
-    def test_snapshot_reports_both_colliding_symbols(self):
+    def test_snapshot_reports_both_distinct_symbols(self):
         store = StateStore()
         store.seed_prev_close(*NIFTY_KEY, NIFTY_CLOSE)
         store.seed_prev_close(*ABB_KEY, ABB_CLOSE)

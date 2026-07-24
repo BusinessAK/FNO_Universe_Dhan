@@ -18,7 +18,7 @@ def _wd():
     print("[watchdog] force exit", flush=True); os._exit(0)
 threading.Thread(target=_wd, daemon=True).start()
 
-from vanguard.data.dhan_client import DhanClient
+from vanguard.data.fyers_client import FyersClient
 from vanguard.data.instrument_master import InstrumentMaster
 from vanguard.live import config as C
 from vanguard.live.state_store import StateStore
@@ -35,10 +35,10 @@ instruments = []
 for s in symbols:
     sp = im.spot(s)
     if sp:
-        instruments.append((int(sp["feed_segment"]), str(int(sp["security_id"])), C.MODE_QUOTE))
+        instruments.append((int(sp["feed_segment"]), str(sp["security_id"]), C.MODE_QUOTE))
 key_symbol = build_key_symbol_map(im, symbols)
 
-client = DhanClient()
+client = FyersClient()
 store = StateStore()
 # seed prev_close from EOD so chg% is correct from the first tick
 import duckdb
@@ -49,7 +49,7 @@ con.close()
 for s in symbols:
     sp = im.spot(s)
     if sp and _closes.get(s):
-        store.seed_prev_close(int(sp["feed_segment"]), int(sp["security_id"]), float(_closes[s]))
+        store.seed_prev_close(int(sp["feed_segment"]), str(sp["security_id"]), float(_closes[s]))
 journal = TickJournal("BRIDGEVERIFY")
 fh = FeedHandler(client, store, journal)
 

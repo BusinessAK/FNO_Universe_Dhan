@@ -64,47 +64,18 @@ class Oracle:
         self.ms["sec"] = [
             m if (m := get_sector(sym)) != "Other" else (raw or "UNMAPPED")
             for sym, raw in zip(self.ms.symbol, self.ms.sector)]
+        # Same source export_service.py uses for data["scanner_universe"] —
+        # see scan() below.
+        from vanguard.live.universe import get_nifty50_constituents
+        from vanguard.config.live import INDEX_SYMBOLS
+        self.scanner_universe = set(get_nifty50_constituents()) | set(INDEX_SYMBOLS)
 
     def _one(self, sql, params):
         r = self.con.execute(sql, params).fetchone()
         return r if r else None
 
-    def track_record_n(self) -> int:
-        """Not time-travel dependent (aggregates over ALL resolved history,
-        same as vanguard/research/position_stats.summarize_by_group), so
-        checked once, outside the per-session loop. Independently re-derived
-        via COUNT(DISTINCT setup_type) rather than importing summarize_by_
-        group itself — catches a bug in that shared function too, not just
-        in the export/render layers."""
-        tables = {r[0] for r in self.con.execute("SHOW TABLES").fetchall()}
-        total = 0
-        for tbl in ("daily_setup_positions", "daily_equity_setup_positions"):
-            if tbl not in tables:
-                continue
-            total += self._one(
-                f"SELECT COUNT(DISTINCT setup_type) FROM {tbl} "
-                "WHERE resolved_price IS NOT NULL", [])[0]
-        return total
-
-    def setups_n(self, sdate: str, track: str) -> int:
-        """Setup Queue's position count for a given track filter ('fno' /
-        'equity' / 'both') -- mirrors drawSetups()'s inWindow() filter
-        exactly (trigger_date <= sdate, not yet resolved before sdate)."""
-        def one(tbl):
-            r = self._one(
-                f"SELECT COUNT(*) FROM {tbl} WHERE trigger_date <= ? "
-                "AND (resolved_date IS NULL OR resolved_date >= ?)", [sdate, sdate])
-            return r[0] if r else 0
-        tables = {r[0] for r in self.con.execute("SHOW TABLES").fetchall()}
-        n = 0
-        if track in ("fno", "both") and "daily_setup_positions" in tables:
-            n += one("daily_setup_positions")
-        if track in ("equity", "both") and "daily_equity_setup_positions" in tables:
-            n += one("daily_equity_setup_positions")
-        return n
-
     def expected(self, sdate: str) -> dict:
-        con, S = self.con, self.sessions
+        con = self.con
         cur = self.ms[self.ms.date == sdate]
         exp = {"session": sdate}
 
@@ -191,29 +162,6 @@ class Oracle:
             "repeat": self._flip_repeats(flips, sdate),
         }
 
-        by_type = {t: int(n) for t, n in con.execute(
-            "SELECT type, COUNT(*) FROM daily_changes WHERE date=? GROUP BY type",
-            [sdate]).fetchall()}
-        si = S.index(sdate) if sdate in S else -1
-        if si > 0:
-            bans = lambda d: {r[0] for r in con.execute(
-                "SELECT symbol FROM daily_ban WHERE date=?", [d]).fetchall()}
-            p, c = bans(S[si - 1]), bans(sdate)
-            if c - p:
-                by_type["ban_enter"] = len(c - p)
-            if p - c:
-                by_type["ban_exit"] = len(p - c)
-        exp["signals"] = {"n": sum(by_type.values()), "by_type": by_type}
-
-        # Setup Queue now tracks position lifecycle (vanguard/rules/
-        # setup_positions.py), not raw daily_setups rows: "active" means
-        # triggered and not yet resolved as of sdate, tracked from its
-        # original trigger date. Mirrors the point-in-time filter
-        # drawSetups() applies client-side in hud/template.html.
-        # queueTrack defaults to "fno" client-side (U3, pre-toggle behavior
-        # unchanged), so the default expectation stays F&O-only here too;
-        # the equity/both toggle states are checked separately in main().
-        exp["setups"] = {"n": self.setups_n(sdate, "fno"), "track": "fno"}
         exp["scan"] = self.scan(sdate, "1D")
         return exp
 
@@ -247,7 +195,11 @@ class Oracle:
         return per_sym, win, cur
 
     def sectors(self, sdate, horizon):
+        """Also aligned to scanner_universe (Nifty50+indices) now — Sector
+        Flow Grid was re-scoped to match the Scanner it sits next to, same
+        change as scan() below, so its oracle needs the same filter."""
         per_sym, win, cur = self._per_symbol_return(sdate, horizon)
+        cur = cur[cur.symbol.isin(self.scanner_universe)]
         df = cur[["symbol", "sec"]].merge(
             per_sym.rename("ret"), left_on="symbol", right_index=True)
         g = df.groupby("sec").ret
@@ -255,7 +207,14 @@ class Oracle:
                 "avg": g.mean().to_dict(), "n": g.size().astype(int).to_dict()}
 
     def scan(self, sdate, horizon):
+        """Scanner is filtered to the Nifty50+indices universe (matches the
+        live-covered universe — see vanguard.live.universe/select_covered_names
+        and the same filter applied client-side in hud/template.html's
+        renderScan()). Sector Flow Grid stays full-215-universe market
+        context, so this filter is applied here, not inside
+        _per_symbol_return (shared with sectors())."""
         per_sym, win, cur = self._per_symbol_return(sdate, horizon)
+        cur = cur[cur.symbol.isin(self.scanner_universe)]
         return {"shown": len(cur), "total": len(cur), "horizon": horizon,
                 "win": len(win), "chg": per_sym.reindex(cur.symbol).to_dict()}
 
@@ -347,8 +306,7 @@ def main() -> int:
             print(f"[{label}] session {sdate}")
             chk, exp = registry(), ref.expected(sdate)
             for panel in ("session", "cmdbar", "regime", "vix", "breadth",
-                          "internals", "positioning", "flips", "signals",
-                          "setups", "scan"):
+                          "internals", "positioning", "flips", "scan"):
                 if panel in exp:
                     check(panel, exp[panel], chk.get(panel), failures)
             check("sectors", exp["sectors"][chk["sectors"]["horizon"]],
@@ -357,41 +315,40 @@ def main() -> int:
         # 1) latest session, default state
         assert_session(latest, "latest")
 
-        # Track Record panel — default "both" track filter, not session-
-        # dependent (aggregates over all resolved history).
-        check("trackRecord", {"n": ref.track_record_n(), "track": "both"},
-              registry().get("trackRecord"), failures)
-
-        # Setup Queue's track toggle (U3) — default state already covered by
-        # assert_session() above (queueTrack defaults to "fno"); exercise the
-        # other two states here.
-        for t in ("equity", "both"):
-            page.click(f'#queue-track-chips .chip[data-t="{t}"]')
-            page.wait_for_function("t => window.__VG_CHECK__.setups.track===t", arg=t)
-            check(f"setups[{t}]", {"n": ref.setups_n(latest, t), "track": t},
-                  registry()["setups"], failures)
-        page.click('#queue-track-chips .chip[data-t="fno"]')
-        page.wait_for_function("window.__VG_CHECK__.setups.track==='fno'")
+        # Regime/Breadth/Internals/Positioning/Sectors + the date picker all
+        # live under the Market Context tab now — Playwright's click/
+        # inner_text/locator calls require the target actually visible, so
+        # switch tabs before touching any of them.
+        def goto_tab(tab):
+            page.click(f'.tab-btn[data-tab="{tab}"]')
+        goto_tab("context")
 
         # DOM sanity: the numbers made it to screen
         exp = ref.expected(latest)
         cb = page.inner_text("#cb-count")
         if not cb.startswith(str(exp["cmdbar"]["universe"])):
             failures.append(("dom.#cb-count", exp["cmdbar"]["universe"], cb))
-        cm = page.inner_text("#cm-tiles")
-        if f"{exp['internals']['ad_ratio']:.2f}" not in cm:
-            failures.append(("dom.#cm-tiles A/D", f"{exp['internals']['ad_ratio']:.2f}", cm[:80]))
+        # (A/D ratio itself is already covered by the "internals" CHK.internals.ad_ratio
+        # check above — #cm-tiles only ever renders >50DMA/>200DMA/NH-NL text,
+        # never the raw ratio, so there's no matching DOM string to assert on.)
+        # drawPositioning() only ever renders FII + CLIENT tiles (hud/
+        # template.html's #pos-tiles/#pos-opt-tiles map ["FII","CLIENT"]
+        # explicitly, not all 4 PARTS) — (4,4) was a stale expectation here,
+        # not a real 4-tile layout.
         ntiles = page.locator("#pos-tiles .tile").count()
         nopt = page.locator("#pos-opt-tiles .tile").count()
-        if (ntiles, nopt) != (4, 4):
-            failures.append(("dom.positioning tiles", (4, 4), (ntiles, nopt)))
+        if (ntiles, nopt) != (2, 2):
+            failures.append(("dom.positioning tiles", (2, 2), (ntiles, nopt)))
         nsec = page.locator(".sec-tile").count()
         if nsec != len(exp["sectors"]["1D"]["avg"]):
             failures.append(("dom.sector tiles", len(exp["sectors"]["1D"]["avg"]), nsec))
         print(f"  DOM sanity: cmdbar/internals/positioning/sectors "
               f"{'PASS' if not any(str(f[0]).startswith('dom.') for f in failures) else 'FAIL'}")
 
-        # 2) sector horizons at the latest session
+        # 2) sector horizons at the latest session — Sector Flow Grid now
+        # lives in the Scanner tab (moved there so clicking a sector tile
+        # can actually scroll to the now-visible, same-tab Scanner table).
+        goto_tab("scanner")
         for hz in ("1W", "1M", "1D"):
             page.click(f'#sec-chips .chip[data-hz="{hz}"]')
             page.wait_for_function(
@@ -412,6 +369,7 @@ def main() -> int:
                 failures.append((f"dom.#scan thead[{hz}]", want, hdr[:120]))
 
         # 3) positioning fut/opt toggle
+        goto_tab("context")
         page.click('#pos-chips .chip[data-pm="OPT"]')
         page.wait_for_function("window.__VG_CHECK__.positioning.mode==='OPT'")
         if "tilt" not in page.inner_text("#pos-cap"):
@@ -420,6 +378,7 @@ def main() -> int:
         page.click('#pos-chips .chip[data-pm="FUT"]')
 
         # 4) dossier: first scanner card opens with the right symbol + date
+        goto_tab("scanner")
         sym = page.get_attribute("#scan tbody tr", "data-sym")
         page.click("#scan tbody tr")
         page.wait_for_function(
@@ -432,6 +391,7 @@ def main() -> int:
         page.keyboard.press("Escape")
 
         # 5) time travel: two sessions back, full re-assert
+        goto_tab("context")
         back = ref.sessions[-3]
         page.select_option("#d-sel", back)
         page.wait_for_function(

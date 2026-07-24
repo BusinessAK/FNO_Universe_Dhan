@@ -1,8 +1,11 @@
 """
-Subscription manager — turns the instrument master into Dhan MarketFeed
-instrument tuples (feed_segment, "security_id", mode), respecting the
-per-connection (5,000) and per-message (100) caps, and the near-ATM scoping
-that keeps the options universe inside budget.
+Subscription manager — turns the instrument master into feed instrument
+tuples (feed_segment, "security_id", mode), respecting the per-connection
+(5,000, Fyers-SDK-verified — see vanguard/config/live.py) cap and the
+near-ATM scoping that keeps the options universe inside budget. The
+mode/per-message-cap fields are a holdover from the Dhan integration this
+manager originally targeted; feed_handler.py and the Fyers SDK don't read
+them today.
 
 M0/M1 use spot + futures (the live tape). M2 adds scoped near-ATM options.
 """
@@ -39,7 +42,9 @@ class SubscriptionManager:
     # F&O default is FULL, not QUOTE: Dhan's Quote packet carries NO OI field
     # (SDK-verified, TRD_fullmap_live_v1 §0 V6) — a Quote-mode F&O subscription
     # silently starves every OI-derived metric. Observed live 2026-07-16:
-    # ~1.15M ticks, zero OI all day.
+    # ~1.15M ticks, zero OI all day. Kept as historical context even though
+    # `mode` itself is inert under Fyers today (feed_handler.py doesn't read
+    # it) — re-verify against Fyers' own OI dissemination if this ever matters again.
     def futures_manifest(self, underlyings: list[str], mode: int = C.MODE_FULL) -> list[tuple]:
         out = []
         for u in underlyings:
@@ -47,7 +52,7 @@ class SubscriptionManager:
             if not fut.empty:
                 fut = fut.sort_values("expiry")               # front future
                 r = fut.iloc[0]
-                out.append((C.SEG_NSE_FNO, str(int(r.security_id)), mode))
+                out.append((C.SEG_NSE_FNO, str(r.security_id), mode))
         return out
 
     def options_manifest(self, name_spots: dict[str, float], mode: int = C.MODE_FULL) -> list[tuple]:
@@ -57,7 +62,7 @@ class SubscriptionManager:
             win = C.STRIKE_WINDOW_INDEX if sym in C.INDEX_SYMBOLS else C.STRIKE_WINDOW
             chain = self.im.near_atm(sym, spot, n_strikes=win)
             for r in chain.itertuples():
-                out.append((C.SEG_NSE_FNO, str(int(r.security_id)), mode))
+                out.append((C.SEG_NSE_FNO, str(r.security_id), mode))
         return out
 
     # ── budget-aware packing ──────────────────────────────────────────────

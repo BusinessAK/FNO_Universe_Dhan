@@ -1,122 +1,120 @@
 """
-Dhan instrument master — the security-id catalog the live feed subscribes by.
+Fyers instrument master — the security-id catalog the live feed subscribes by.
 
-Parses Dhan's public scrip master into a clean table of NSE equity, index, and
+Parses Fyers's public scrip master into a clean table of NSE equity, index, and
 F&O (futures + options) instruments with exactly the fields the subscription
 manager and feed handler need. The live WebSocket subscribes by
-(feed_segment, security_id), so this table is the foundation of the whole
+SymbolTicker (e.g., 'NSE:NIFTY24JUL24500CE'), so this table is the foundation of the whole
 realtime layer.
 
-Feed segment codes mirror dhanhq.marketfeed:  IDX=0 · NSE=1 (equity) · NSE_FNO=2.
-
 Build:
-    python3 -m src.data.instrument_master              # downloads scrip master
-    python3 -m src.data.instrument_master --csv PATH   # use a local copy
+    python3 -m vanguard.data.instrument_master
 """
 from __future__ import annotations
 
 import argparse
-import re
 from pathlib import Path
-
 import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[2]
-SCRIP_URL = "https://images.dhan.co/api-data/api-scrip-master.csv"
+CM_URL = "https://public.fyers.in/sym_details/NSE_CM.csv"
+FO_URL = "https://public.fyers.in/sym_details/NSE_FO.csv"
 OUT = ROOT / "data" / "live" / "instrument_master.parquet"
 
-# dhanhq.marketfeed exchange-segment codes
-SEG_IDX, SEG_NSE_EQ, SEG_NSE_FNO = 0, 1, 2
 
-# Underlying = everything before the "-MonYYYY" expiry token; non-greedy so
-# hyphenated underlyings survive (BAJAJ-AUTO-Jul2026-840-CE → "BAJAJ-AUTO").
-_UNDERLYING_RE = re.compile(r"^(.+?)-[A-Z][a-z]{2}\d{4}")
+def build() -> pd.DataFrame:
+    print(f"[instrument_master] loading Fyers CM master: {CM_URL}")
+    cm = pd.read_csv(CM_URL, header=None, low_memory=False)
+    print(f"[instrument_master] loading Fyers FO master: {FO_URL}")
+    fo = pd.read_csv(FO_URL, header=None, low_memory=False)
 
-
-def _underlying(trading_symbol: str) -> str:
-    m = _UNDERLYING_RE.match(str(trading_symbol))
-    return m.group(1) if m else str(trading_symbol)
-
-
-def build(csv_path: str | None = None) -> pd.DataFrame:
-    src = csv_path or SCRIP_URL
-    print(f"[instrument_master] loading scrip master: {src}")
-    df = pd.read_csv(src, low_memory=False)
-
-    nse = df[df["SEM_EXM_EXCH_ID"] == "NSE"].copy()
     rows = []
 
-    # ── Equity spot (segment E, series EQ) ────────────────────────────────
-    eq = nse[(nse["SEM_SEGMENT"] == "E") & (nse["SEM_SERIES"] == "EQ")]
-    for r in eq.itertuples():
+    # Columns of interest in Fyers CSV:
+    # 3: LotSize
+    # 4: TickSize
+    # 8: ExpiryDate (epoch)
+    # 9: SymbolTicker ('NSE:360ONE-EQ', 'NSE:NIFTY50-INDEX')
+    # 13: UnderlyingSymbol ('360ONE', 'NIFTY')
+    # 15: StrikePrice (-1.0 for EQ/FUT/INDEX)
+    # 16: OptionType ('XX' for EQ/FUT, 'CE' or 'PE' for OPT)
+
+    # ── Equity & Index spot ──────────────────────────────────────────────────
+    for r in cm.itertuples(index=False):
+        ticker = str(r[9])
+        if not ticker.startswith("NSE:"):
+            continue
+        
+        # Determine kind
+        if "-INDEX" in ticker:
+            kind = "INDEX"
+        elif "-EQ" in ticker:
+            kind = "EQ"
+        else:
+            continue
+
         rows.append({
-            "security_id": int(r.SEM_SMST_SECURITY_ID), "feed_segment": SEG_NSE_EQ,
-            "kind": "EQ", "underlying": str(r.SEM_TRADING_SYMBOL),
-            "trading_symbol": str(r.SEM_TRADING_SYMBOL), "expiry": None,
-            "strike": 0.0, "option_type": "", "lot_size": _num(r.SEM_LOT_UNITS, 1),
-            "tick_size": _num(r.SEM_TICK_SIZE, 0.05),
+            "security_id": ticker, # Fyers string is the ID
+            "feed_segment": 0,     # Not heavily used in Vanguard post-migration
+            "kind": kind,
+            "underlying": str(r[13]),
+            "trading_symbol": ticker,
+            "expiry": None,
+            "strike": 0.0,
+            "option_type": "",
+            "lot_size": int(r[3] if pd.notna(r[3]) else 1) or 1,
+            "tick_size": float(r[4] if pd.notna(r[4]) else 0.05) or 0.05,
         })
 
-    # ── Index spot (segment I) ────────────────────────────────────────────
-    idx = nse[nse["SEM_SEGMENT"] == "I"]
-    for r in idx.itertuples():
-        rows.append({
-            "security_id": int(r.SEM_SMST_SECURITY_ID), "feed_segment": SEG_IDX,
-            "kind": "INDEX", "underlying": str(r.SEM_TRADING_SYMBOL),
-            "trading_symbol": str(r.SEM_TRADING_SYMBOL), "expiry": None,
-            "strike": 0.0, "option_type": "", "lot_size": 0, "tick_size": 0.05,
-        })
-
-    # ── Derivatives (segment D): FUTSTK/FUTIDX + OPTSTK/OPTIDX ─────────────
-    deriv = nse[nse["SEM_SEGMENT"] == "D"]
-    for r in deriv.itertuples():
-        iname = str(r.SEM_INSTRUMENT_NAME)
-        if iname.startswith("FUT"):
+    # ── Futures & Options ────────────────────────────────────────────────────
+    for r in fo.itertuples(index=False):
+        ticker = str(r[9])
+        if not ticker.startswith("NSE:"):
+            continue
+            
+        opt_type = str(r[16])
+        if opt_type == "XX":
             kind = "FUT"
-        elif iname.startswith("OPT"):
+            opt_type = ""
+        elif opt_type in ("CE", "PE"):
             kind = "OPT"
         else:
             continue
+            
+        expiry_ts = r[8]
+        expiry_str = None
+        if pd.notna(expiry_ts):
+            expiry_str = pd.to_datetime(expiry_ts, unit='s', utc=True).tz_convert('Asia/Kolkata').strftime('%Y-%m-%d')
+            
         rows.append({
-            "security_id": int(r.SEM_SMST_SECURITY_ID), "feed_segment": SEG_NSE_FNO,
-            "kind": kind, "underlying": _underlying(r.SEM_TRADING_SYMBOL),
-            "trading_symbol": str(r.SEM_TRADING_SYMBOL),
-            "expiry": _date(r.SEM_EXPIRY_DATE),
-            "strike": _num(r.SEM_STRIKE_PRICE, 0.0),
-            "option_type": str(r.SEM_OPTION_TYPE) if pd.notna(r.SEM_OPTION_TYPE) else "",
-            "lot_size": _num(r.SEM_LOT_UNITS, 0), "tick_size": _num(r.SEM_TICK_SIZE, 0.05),
+            "security_id": ticker,
+            "feed_segment": 0,
+            "kind": kind,
+            "underlying": str(r[13]),
+            "trading_symbol": ticker,
+            "expiry": expiry_str,
+            "strike": float(r[15]) if pd.notna(r[15]) and r[15] != -1.0 else 0.0,
+            "option_type": opt_type,
+            "lot_size": int(r[3] if pd.notna(r[3]) else 1) or 1,
+            "tick_size": float(r[4] if pd.notna(r[4]) else 0.05) or 0.05,
         })
 
-    out = pd.DataFrame(rows)
-    out["lot_size"] = out["lot_size"].astype(int)
+    df_out = pd.DataFrame(rows)
+    print(f"[instrument_master] mapped {len(df_out)} instruments.")
     OUT.parent.mkdir(parents=True, exist_ok=True)
-    out.to_parquet(OUT, index=False)
-    print(f"[instrument_master] {len(out)} instruments "
-          f"(EQ {sum(out.kind=='EQ')} · INDEX {sum(out.kind=='INDEX')} · "
-          f"FUT {sum(out.kind=='FUT')} · OPT {sum(out.kind=='OPT')}) → {OUT}")
-    return out
-
-
-def _num(v, default):
-    try:
-        f = float(v)
-        return default if f != f else f
-    except (TypeError, ValueError):
-        return default
-
-
-def _date(v):
-    try:
-        return pd.Timestamp(v).strftime("%Y-%m-%d")
-    except Exception:
-        return None
+    df_out.to_parquet(OUT)
+    print(f"[instrument_master] wrote {OUT}")
+    return df_out
 
 
 class InstrumentMaster:
-    """Query layer over instrument_master.parquet used by the subscription manager."""
+    """Read-only query layer over the compiled parquet."""
 
-    def __init__(self, path: str | Path = OUT):
-        self.df = pd.read_parquet(path)
+    def __init__(self, path: Path | str = OUT):
+        p = Path(path)
+        if not p.exists():
+            build()
+        self.df = pd.read_parquet(p)
 
     def spot(self, symbol: str) -> dict | None:
         m = self.df[(self.df.kind.isin(["EQ", "INDEX"])) & (self.df.underlying == symbol)]
@@ -148,16 +146,11 @@ class InstrumentMaster:
         return chain[chain.strike.isin(keep)]
 
     def _front_expiry(self, underlying: str) -> str | None:
-        exps = self.expiries(underlying)
-        return exps[0] if exps else None
-
-
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--csv", default=None)
-    args = ap.parse_args()
-    build(args.csv)
+        exs = self.expiries(underlying)
+        return exs[0] if exs else None
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser()
+    parser.parse_args()
+    build()

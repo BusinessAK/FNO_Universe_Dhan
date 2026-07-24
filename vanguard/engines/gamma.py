@@ -2,18 +2,6 @@ import pandas as pd
 import numpy as np
 
 class GammaAnalyzer:
-    def __init__(self, lot_sizes: dict = None):
-        # Default lot sizes for some major stocks if not provided
-        self.lot_sizes = lot_sizes or {
-            'NIFTY': 65,
-            'BANKNIFTY': 15,
-            'RELIANCE': 250,
-            'TCS': 175,
-            'HDFCBANK': 550,
-            'ICICIBANK': 700,
-            'INFY': 400
-        }
-
     def calculate_gex(self, greeks_df: pd.DataFrame, spot_prices: dict) -> pd.DataFrame:
         """
         Calculates GEX for each row and aggregates by Symbol.
@@ -38,17 +26,34 @@ class GammaAnalyzer:
             return pd.DataFrame(columns=['SYMBOL', 'GEX', 'OPEN_INT', 'CHG_IN_OI', 'IV', 'GEX_INTENSITY'])
 
         df['GEX'] = df.apply(get_gex, axis=1)
-        
+
+        # IV must be OI-weighted, not a naive per-strike mean — an unweighted
+        # mean lets dust (deep ITM/OTM strikes that barely trade, so their
+        # last CLOSE is stale and produces an erratic Black-Scholes-implied
+        # IV) pull the aggregate as hard as the liquid, near-ATM strikes that
+        # actually drive the chain. Same fix already applied on the EOD path
+        # (vanguard/engines/intelligence.py's get_detailed_metrics, per its
+        # own comment: "NIFTY's unweighted mean IV was 2x its OI-weighted
+        # true IV") — this was the one caller (vanguard/live/live_compute.py)
+        # still using the naive mean, which is why live IV in the HUD ran
+        # systematically ~10-20pt hotter than the EOD figure for the same
+        # name: confirmed against a real live chain (ONGC) where deep ITM/OTM
+        # strikes showed IV swinging 30-60% strike-to-strike on near-zero
+        # premiums, exactly the dust this weighting is meant to suppress.
+        df['IV_X_OI'] = df['IV'] * df['OPEN_INT']
+
         # Aggregate by symbol
         summary = df.groupby('SYMBOL').agg({
             'GEX': 'sum',
             'OPEN_INT': 'sum',
             'CHG_IN_OI': 'sum',
-            'IV': 'mean'
+            'IV_X_OI': 'sum',
         }).reset_index()
-        
+
+        summary['IV'] = (summary['IV_X_OI'] / summary['OPEN_INT'].replace(0, np.nan)).fillna(0.0)
+        summary = summary.drop(columns=['IV_X_OI'])
         summary['GEX_INTENSITY'] = ((summary['GEX'] / summary['OPEN_INT'].replace(0, np.nan)).fillna(0.0) * 1000.0)
-        
+
         return summary
 
     def advanced_analysis(self, df_options: pd.DataFrame, df_futures: pd.DataFrame):

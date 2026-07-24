@@ -22,6 +22,9 @@ credentials.json
 .DS_Store
 Thumbs.db
 
+# Fyers SDK logs (written to CWD by fyers_apiv3)
+*.log
+
 # Virtual environments
 venv/
 .venv/

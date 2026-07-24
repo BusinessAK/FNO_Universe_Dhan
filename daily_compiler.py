@@ -183,17 +183,57 @@ def main():
 
                 
                 # IFS Score Computation
+                #
+                # KNOWN ISSUE, tested and left UNFIXED on purpose (found + backtested
+                # 2026-07-24 — see vanguard/research/ifs_relative_scale_backtest.py and
+                # its report, data/research/ifs_relative_scale_validation.md).
+                #
+                # pe_oi_scaled/ce_oi_scaled/vol_delta_scaled divide by FIXED absolute
+                # constants (1e5, 2e5) applied identically to every symbol, unlike
+                # gamma_regime()'s spot-relative distance (deliberately scale-free
+                # "absolute GEX thresholds aren't comparable across symbols of very
+                # different notional size" — same principle, not applied here). Confirmed
+                # against the real compiled DB (57,181 rows, 265 sessions): bucketing by
+                # symbol OI decile, mean |ifs_score| ranges from 14.8 (lowest-OI decile,
+                # 3.3% of days clamped at +-100) to 95.1 (highest-OI decile — NIFTY, IDEA,
+                # YESBANK, SUZLON, ... — 90.5% of days clamped). For high-OI names only the
+                # SIGN of ifs_score carries information; the magnitude is pinned at the
+                # ceiling almost every day.
+                #
+                # A symbol-relative rescale (each delta divided by that symbol's own prior
+                # OI/volume instead of a fixed constant, floored near the 1st-percentile of
+                # real total_ce_oi/pe_oi/volume to avoid blowing up on thin names) WAS
+                # implemented and backtested end-to-end against 265 sessions of real raw
+                # bhavcopies, using this repo's own pre-registered validation gate (the
+                # same forward-3-day-return, quintile-monotonicity test flip_backtester.py
+                # and ifs_verified_flow_backtest.py use): it fixed the saturation cleanly
+                # (mean |ifs_score| flattened to ~43-47 across every OI decile, no more
+                # trend) but did NOT clear the predictive-validity gate — and neither did
+                # the CURRENT production formula. Both show ~zero correlation with forward
+                # 3-day return (old: -0.0025, new: -0.0033) and non-monotonic, in places
+                # wrong-signed quintile buckets. VERDICT: NO-GO — not adopted.
+                #
+                # Left as-is deliberately: the saturation problem is real, but "fixed
+                # saturation, still ~zero standalone forward-return correlation" is not a
+                # basis to ship a change to a score three other systems threshold off of
+                # (watchlist_screener.py's ifs>=0 sign gate, StructureClassifier's
+                # ifs>+-15 branches, MarketBreadthEngine's bullish/bearish breadth counts).
+                # The deeper open question this surfaced — whether ifs_score carries real
+                # signal only in the CONDITIONAL context it's actually used (combined with
+                # a fired setup/regime, never alone) rather than unconditionally across
+                # every symbol-day — is a separate, larger research question, not
+                # something to resolve with a scaling tweak.
                 lot_size = safe_float(row.get('LOT_SIZE', 1.0))
-                
+
                 vol_ce_t = safe_float(row.get('VOLUME_CE_T')) * lot_size
                 vol_pe_t = safe_float(row.get('VOLUME_PE_T')) * lot_size
                 vol_ce_tm1 = safe_float(row.get('VOLUME_CE_TM1')) * lot_size
                 vol_pe_tm1 = safe_float(row.get('VOLUME_PE_TM1')) * lot_size
-                
+
                 vol_t = vol_ce_t + vol_pe_t
                 vol_tm1 = vol_ce_tm1 + vol_pe_tm1
                 vol_delta = vol_t - vol_tm1
-                
+
                 pe_oi_scaled = chg_pe_t / 1e5
                 ce_oi_scaled = chg_ce_t / 1e5
                 vol_delta_scaled = vol_delta / 1e5
@@ -345,6 +385,20 @@ def main():
                 structure_flip_data = long_engine.detect_structure_flip(sym_history_list_temp)
                 
                 # Compute conviction
+                #
+                # The x1.5 below has no documented empirical basis (unlike
+                # GEX_INTENSITY_PIN_THRESHOLD/MIN_WALL_MIGRATION_PCT in
+                # vanguard/config/eod.py, which cite specific percentiles). Checked
+                # 2026-07-24 against the real compiled DB (57,181 rows): the raw
+                # (pre-x1.5) weighted sum never exceeds ~52.7 in practice (mean 27.0,
+                # p99 42.4) — so x1.5 never clamps (0.00% of rows hit the 100 ceiling
+                # either raw or scaled), but it also means the observed conviction_score
+                # ceiling is ~79, not 100 — the top ~20% of the nominal scale is never
+                # used. Not fixed here: conviction_score >= 30 is a live gate in
+                # vanguard/core/watchlist_screener.py's swing-candidate filter, so
+                # re-tuning the multiplier changes how many symbols pass that filter —
+                # same "don't recalibrate a live threshold without validating the new
+                # one" reasoning as the ifs_score note above.
                 conviction_score = (
                     30.0 * (smart_money_persistence / 100.0) +
                     20.0 * instab_factor +
@@ -354,7 +408,15 @@ def main():
                 )
                 conviction_score = round(max(0.0, min(100.0, conviction_score * 1.5)), 1)
                 
-                # Priority Score
+                # Priority Score — deliberately favors quiet, dealer-pinned names over
+                # ones already making an obvious move: price_comp below is INVERSELY
+                # proportional to |spot_chg| (a bigger daily move -> a SMALLER priority
+                # score), the opposite of what "priority" naively suggests. This is by
+                # design (matches the system's dealer-positioning thesis — a coiled,
+                # heavily-pinned name is more actionable than one already trending), and
+                # it directly drives the HUD's default sort (ORDER BY priority_score DESC)
+                # — quiet names surface first. Flagging explicitly since it reads as a
+                # bug to anyone assuming "priority" tracks momentum.
                 inv_persist = max(bull_persist, bear_persist) + 1.0
                 gamma_instab = (abs(gex_intensity) / 10.0) + 1.0
                 price_comp = 5.0 / (abs(spot_chg) + 0.1)

@@ -102,8 +102,8 @@ def main():
         print("[probe] market closed — run during 09:15-15:30 IST (or --force)")
         return 1
 
-    from vanguard.data.dhan_client import DhanClient
-    client = DhanClient()
+    from vanguard.data.fyers_client import FyersClient
+    client = FyersClient()
     ok, msg = client.check_auth()
     print(f"[auth] {'OK' if ok else 'FAIL'} — {msg}")
     if not ok:

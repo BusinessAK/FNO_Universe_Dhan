@@ -21,7 +21,7 @@ class TestExportService(unittest.TestCase):
     def test_payload_shape(self):
         p = build_payload(sessions=3)
         for k in ("meta", "market_structure", "setups", "changes",
-                  "breadth", "cm_breadth", "nifty", "dhan_map"):
+                  "breadth", "cm_breadth", "nifty", "fyers_map"):
             self.assertIn(k, p)
         self.assertEqual(p["meta"]["session"], p["meta"]["sessions"][-1])
         self.assertEqual(p["meta"]["sessions"], sorted(p["meta"]["sessions"]))

@@ -21,33 +21,36 @@ from vanguard.live.snapshot import write_snapshot
 from vanguard.live.state_store import StateStore
 
 
-def sdk_quote(seg, sid, ltp, vol=100, oi=None):
-    d = {"type": "Quote Data", "exchange_segment": seg, "security_id": sid,
-         "LTP": str(ltp), "volume": vol, "avg_price": str(ltp)}
+def sdk_quote(sid, ltp, vol=100, oi=None):
+    d = {"symbol": sid, "ltp": ltp, "vol_traded_today": vol, "avg_trade_price": ltp}
     if oi is not None:
-        d["OI"] = oi
+        d["open_interest"] = oi
     return d
 
 
-def sdk_oi(seg, sid, oi):
-    return {"type": "OI Data", "exchange_segment": seg, "security_id": sid, "OI": oi}
+def sdk_oi(sid, oi):
+    return {"symbol": sid, "open_interest": oi}
 
 
 class TestE2ESnapshotBridge(unittest.TestCase):
     def test_packets_to_http_snapshot(self):
         store = StateStore()
-        # NIFTY(IDX sid 13) and ABB(EQ sid 13): the collision pair — must stay distinct
-        key_symbol = {(0, 13): "NIFTY", (1, 13): "ABB", (2, 999): "RELFUT"}
-        store.seed_prev_close(0, 13, 24000.0)
-        store.seed_prev_close(1, 13, 5000.0)
+        # feed_handler._key() always uses seg=0 for Fyers (ticker strings are
+        # globally unique, unlike Dhan's numeric security_id — no cross-segment
+        # collision to defend against here); seg is kept in the key shape only
+        # for state_store's own generality, not because Fyers needs it.
+        key_symbol = {(0, "NSE:NIFTY50-INDEX"): "NIFTY", (0, "NSE:ABB-EQ"): "ABB",
+                      (0, "NSE:RELIANCE25AUGFUT"): "RELFUT"}
+        store.seed_prev_close(0, "NSE:NIFTY50-INDEX", 24000.0)
+        store.seed_prev_close(0, "NSE:ABB-EQ", 5000.0)
 
         # SDK-shaped packets through the real normalize()
-        for raw in (sdk_quote(0, 13, 24120.5),          # NIFTY +0.5%
-                    sdk_quote(1, 13, 4950.0),           # ABB -1%
-                    sdk_quote(2, 999, 101.0, oi=777),   # future WITH OI (Full mode)
-                    sdk_oi(2, 999, 888)):               # then a standalone OI update
+        for raw in (sdk_quote("NSE:NIFTY50-INDEX", 24120.5),                  # NIFTY +0.5%
+                    sdk_quote("NSE:ABB-EQ", 4950.0),                          # ABB -1%
+                    sdk_quote("NSE:RELIANCE25AUGFUT", 101.0, oi=777),         # future WITH OI
+                    sdk_oi("NSE:RELIANCE25AUGFUT", 888)):                     # then a standalone OI update
             tick = normalize(raw)
-            self.assertIsNotNone(tick, f"normalize dropped {raw['type']}")
+            self.assertIsNotNone(tick, f"normalize dropped {raw['symbol']}")
             store.ingest(tick)
 
         events = [{"ts": time.time(), "symbol": "NIFTY", "type": "REGIME_CROSS",
@@ -74,7 +77,7 @@ class TestE2ESnapshotBridge(unittest.TestCase):
                     srv.shutdown()
 
         s = json.loads(body)
-        # symbol-keyed quotes; collision pair distinct; chg from seeded prev close
+        # symbol-keyed quotes, each instrument's state distinct; chg from seeded prev close
         self.assertAlmostEqual(s["quotes"]["NIFTY"]["ltp"], 24120.5)
         self.assertAlmostEqual(s["quotes"]["NIFTY"]["chg"], 0.5, places=2)
         self.assertAlmostEqual(s["quotes"]["ABB"]["ltp"], 4950.0)

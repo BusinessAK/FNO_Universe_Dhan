@@ -203,8 +203,15 @@ figure figcaption{font-size:10px;color:var(--muted);letter-spacing:.06em;margin-
 .sc .top{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
 .sc .sym{font-weight:700;font-size:13px;letter-spacing:.04em}
 .sc .typ{font-size:9px;letter-spacing:.1em;color:var(--muted)}
-.sc .strikes{display:flex;gap:14px;margin:7px 0 5px;font-variant-numeric:tabular-nums}
-.sc .strikes .k{font-size:9px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;display:block}
+.sc .strikes{display:flex;justify-content:space-between;align-items:center;margin:7px 0 5px}
+.sc .rr{margin:1px 0 6px}
+.sc .rr-track{position:relative;height:3px;border-radius:2px;
+  background:linear-gradient(90deg,var(--bear) 0%,rgba(124,140,160,.3) 50%,var(--bull) 100%)}
+.sc .rr-mark{position:absolute;top:50%;width:7px;height:7px;border-radius:50%;background:var(--ink);
+  border:1.5px solid var(--panel-solid);transform:translate(-50%,-50%)}
+.sc .rr-lbls{display:flex;justify-content:space-between;font-size:9px;color:var(--muted);letter-spacing:.06em;
+  margin-top:4px;font-variant-numeric:tabular-nums}
+.sc .rr-lbls b{color:var(--ink);font-weight:600}
 .sc .beh{font-size:10.5px;color:var(--muted);line-height:1.45;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 
 /* ── scanner ─────────────────────────────────────────────────────────── */
@@ -430,9 +437,9 @@ figure figcaption{font-size:10px;color:var(--muted);letter-spacing:.06em;margin-
     <a id="dss-tv" class="chip" target="_blank" rel="noopener"
        title="One-click chart view (TradingView, NSE). Renders the exact stock — for a quick look."
        style="position:absolute;top:12px;right:76px;text-decoration:none">📈 CHART ⤴</a>
-    <a id="dss-chart" class="chip" href="https://tv.dhan.co/"
-       title="Opens Dhan terminal (ONE reused tab, saved layout) · symbol copied — paste (⌘V) + Enter in Symbol Search"
-       style="position:absolute;top:12px;right:166px;text-decoration:none">DHAN ⤴</a>
+    <a id="dss-chart" class="chip" href="https://my.fyers.in/"
+       title="Opens Fyers terminal (ONE reused tab, saved layout) · symbol copied — paste (⌘V) + Enter in Symbol Search"
+       style="position:absolute;top:12px;right:166px;text-decoration:none">FYERS ⤴</a>
     <h3><span id="dss-sym">—</span><span id="dss-date"></span></h3>
     <div class="sub" id="dss-sub">—</div>
     <div class="sub" id="dss-live" style="margin-top:2px"></div>
@@ -514,18 +521,16 @@ const SESSIONS = META.sessions;
 /* Shared lookback for all trend charts (waveform, McClellan, A/D line).
    Mirrors TREND_WINDOW_SESSIONS in vanguard/config/eod.py — keep in sync. */
 const TREND_WINDOW = 60;
-/* Dhan terminal link. tv.dhan.co DOES resolve ?symbol= (re-verified 2026-07
-   by deobfuscating bundle3.0.7.js: an ff("symbol") URL-param getter feeds the
-   TradingView widget's initial symbol, saved layout intact via
-   load_last_chart — it's the same mechanism as Dhan's own chart-popout
-   button, which generates "?symbol="+activeChart().symbol()). The accepted
-   format is the Dhan trading symbol ("DIXON-EQ"), which is exactly what
-   DHAN_MAP (scripts/build_dhan_map.py) holds. Earlier "label-only" testing
-   failed on wrong formats (NSE:TICKER etc.), not a missing feature. The
-   symbol is still copied to the clipboard as a fallback: if a format ever
-   fails to resolve, paste + Enter in Symbol Search recovers. */
-const DHAN_MAP = VG.dhan_map || {};
-const CHART_URL = s => "https://tv.dhan.co/?symbol=" + encodeURIComponent(DHAN_MAP[s] || s);
+/* Fyers terminal link. FYERS_MAP (scripts/build_fyers_map.py) holds the
+   compiled-symbol -> Fyers ticker fragment; the accepted deep-link format is
+   NSE:<TICKER>-EQ. The symbol is still copied to the clipboard as a
+   fallback: if the deep link ever fails to resolve, paste + Enter in
+   Symbol Search recovers. */
+const FYERS_MAP = VG.fyers_map || {};
+const CHART_URL = s => {
+    let sym = FYERS_MAP[s] || s;
+    return `https://my.fyers.in/?symbol=NSE:${sym}-EQ`;
+};
 // TradingView: real deep-link that renders the exact stock in one click (viewing, no orders).
 const TV_URL = s => "https://www.tradingview.com/chart/?symbol=NSE:" + encodeURIComponent(String(s).replace(/[&-]/g, "_"));
 const groupByDate = rows => { const m = {}; rows.forEach(r => { (m[r.date] ??= []).push(r); }); return m; };
@@ -1298,13 +1303,20 @@ function drawSetups(){
     const hasDossier=!!bySym[s.symbol];   // F&O-only dossier (bySym is daily_market_structure)
     const trackTag=queueTrack==="both"
       ?`<span class="dim" style="font-size:9px;letter-spacing:.08em">${s._track==="equity"?"EQ":"F&amp;O"}</span> `:"";
+    // Risk-reward line: SL anchors 0%, TARGET anchors 100%, regardless of
+    // which is numerically larger (bear setups have SL above entry, target
+    // below) — the marker sits at the entry price's position between them.
+    const sl=+s.sl_price, tgt=+s.target_price;
+    const rrPct=tgt!==sl?Math.max(0,Math.min(100,(s.trigger_price-sl)/(tgt-sl)*100)):50;
     return`<div class="sc ${k}" ${hasDossier?'tabindex="0" role="button"':""} data-sym="${esc(s.symbol)}">
       <div class="top"><span class="sym">${trackTag}${esc(s.symbol)}${bySym[s.symbol]?._ban?' <span title="F&O ban — setup NOT armed live" style="color:var(--bear-hi);font-size:11px">⛔ BAN</span>':""}${(EVENTS_BY_SYM[s.symbol]||[]).some(e=>e.event_type==="RESULTS"&&e.event_date>=SDATE)?' <span title="results inside the event window — this is an event bet" style="color:#E8B45C;font-size:10px">📅</span>':""}</span><span class="typ">${esc(s.setup_type.replace(/_/g," "))}</span></div>
-      <span class="bias ${k}">${esc(s.bias)}</span>
       <div class="strikes">
-        <span><span class="k">SL</span>${fmtPr(s.sl_price)}</span>
-        <span><span class="k">Target</span>${fmtPr(s.target_price)}</span>
+        <span class="bias ${k}">${esc(s.bias)}</span>
         ${badge}
+      </div>
+      <div class="rr" title="Entry ${fmtPr(s.trigger_price)} vs SL ${fmtPr(sl)} / Target ${fmtPr(tgt)}">
+        <div class="rr-track"><i class="rr-mark" style="left:${rrPct}%"></i></div>
+        <div class="rr-lbls"><span>SL <b>${fmtPr(sl)}</b></span><span><b>${fmtPr(tgt)}</b> TARGET</span></div>
       </div>
       <div class="beh">Entered ${fdate(s.trigger_date)} @ ${fmtPr(s.trigger_price)} · ${daysHeld}d held</div>
     </div>`}).join("");
@@ -1857,8 +1869,8 @@ function openDossier(sym){
   $("#dss-close").focus();
 }
 $("#dss-close").addEventListener("click",()=>$("#dossier").hidden=true);
-/* One-click Dhan deep link (see CHART_URL note): opens ?symbol=<DHAN_MAP sym>
-   in ONE named tab ("dhan_terminal", navigated + refocused every click — a
+/* One-click Fyers deep link (see CHART_URL note): opens ?symbol=<FYERS_MAP sym>
+   in ONE named tab ("fyers_terminal", navigated + refocused every click — a
    new tab per click left stale charts around, which read as "opens the wrong
    chart"). The symbol is ALSO copied (clipboard promise awaited; rejections
    used to show "✓ copied" over an unchanged clipboard) so if a symbol format
@@ -1866,20 +1878,20 @@ $("#dss-close").addEventListener("click",()=>$("#dossier").hidden=true);
 $("#dss-chart").addEventListener("click",e=>{
   e.preventDefault();
   const sym=$("#dss-sym").textContent;
-  const dhanSym=DHAN_MAP[sym]||sym;
+  const fyersSym=FYERS_MAP[sym]||sym;
   const done=ok=>showToast(ok
-    ?`⤴ Opening <b>${esc(dhanSym)}</b> in Dhan — also copied (⌘V + Enter in Symbol Search if the chart didn't switch)`
-    :`⤴ Opening <b>${esc(dhanSym)}</b> in Dhan — if the chart didn't switch, type it in Symbol Search`);
-  const legacyCopy=()=>{const ta=document.createElement("textarea");ta.value=dhanSym;
+    ?`⤴ Opening <b>${esc(fyersSym)}</b> in Fyers — also copied (⌘V + Enter in Symbol Search if the chart didn't switch)`
+    :`⤴ Opening <b>${esc(fyersSym)}</b> in Fyers — if the chart didn't switch, type it in Symbol Search`);
+  const legacyCopy=()=>{const ta=document.createElement("textarea");ta.value=fyersSym;
     ta.style.cssText="position:fixed;opacity:0";document.body.appendChild(ta);ta.select();
     let ok=false;try{ok=document.execCommand("copy")}catch(_){/* denied */}
     ta.remove();return ok};
   if(navigator.clipboard?.writeText)
-    navigator.clipboard.writeText(dhanSym).then(()=>done(true),()=>done(legacyCopy()));
+    navigator.clipboard.writeText(fyersSym).then(()=>done(true),()=>done(legacyCopy()));
   else done(legacyCopy());
-  /* open/refocus the single Dhan tab synchronously inside the click gesture
+  /* open/refocus the single Fyers tab synchronously inside the click gesture
      (popup blockers require it) */
-  const w=window.open(CHART_URL(sym),"dhan_terminal");
+  const w=window.open(CHART_URL(sym),"fyers_terminal");
   try{w&&w.focus()}catch(_){/* cross-origin focus refusal is fine */}
 });
 $("#dossier").addEventListener("click",e=>{if(e.target.id==="dossier")$("#dossier").hidden=true});

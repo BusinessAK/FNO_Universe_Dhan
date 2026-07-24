@@ -82,7 +82,7 @@ def seed_prev_close(store, im, symbols):
         for s in symbols:
             row = im.spot(s)
             if row and closes.get(s):
-                store.seed_prev_close(int(row["feed_segment"]), int(row["security_id"]),
+                store.seed_prev_close(int(row["feed_segment"]), str(row["security_id"]),
                                       float(closes[s]))
                 n += 1
         print(f"[seed] prev_close seeded for {n} symbols from EOD {latest}")
@@ -155,7 +155,7 @@ def seed_oi_baseline() -> dict[tuple[str, float, str], float]:
 
 def structure_loop(store, structure_engine: lc.LiveStructureEngine, symbol_spot_key: dict,
                     covered_names: list[str], spot_closes: dict[str, float],
-                    alert_sink: AlertSink, latest_structure: dict, log):
+                    alert_sink: AlertSink, latest_structure: dict, live_chains_cache: dict, log):
     """Runs forever in its own daemon thread at COMPUTE_CADENCE. Never lets one
     bad cycle kill the thread — same resilience posture as the main loop."""
     while True:
@@ -166,7 +166,7 @@ def structure_loop(store, structure_engine: lc.LiveStructureEngine, symbol_spot_
                 key = symbol_spot_key.get(sym)
                 st = store.get(*key) if key else None
                 spot_prices[sym] = float(st.ltp) if (st and st.ltp is not None) else spot_closes.get(sym, 0.0)
-            structure, events = structure_engine.run_cycle(store, spot_prices)
+            structure, events = structure_engine.run_cycle(store, spot_prices, live_chains_cache)
             latest_structure.clear()
             latest_structure.update(structure)
             if events:
@@ -199,16 +199,60 @@ def main():
     print(f"[manifest] F&O {stats['fno']} · spot {stats['spot']} · futures {stats['fut']} "
           f"→ {stats['total']} instruments / {stats['conns']} conn / {stats['msgs']} msgs")
 
+    def check_ws_budget(total: int, label: str):
+        """Only one WebSocket connection is actually opened today (fh.run()
+        gets the whole tape); pack_connections()/WS_MAX_CONN describe a
+        multi-connection mode nothing wires up. So the real ceiling for
+        anything that reaches the wire is WS_MAX_PER_CONN, and nothing
+        upstream enforces it — a universe grown past Nifty50 (see
+        vanguard.live.universe / select_covered_names) can walk the combined
+        spot+futures+options tape well past it without any error until
+        Fyers' own subscribe() rejects the overflow silently (On_error, not
+        an exception). Fail loud here instead."""
+        if total > C.WS_MAX_PER_CONN:
+            print(f"[FATAL] {label}: {total} instruments exceeds the single-connection "
+                  f"budget (WS_MAX_PER_CONN={C.WS_MAX_PER_CONN}). Fyers' own subscribe() "
+                  f"caps a connection at {C.WS_MAX_PER_CONN} and silently drops the rest "
+                  f"past that — it will not raise. Narrow the covered-names universe "
+                  f"(vanguard.live.universe.get_nifty50_constituents) or STRIKE_WINDOW/"
+                  f"STRIKE_WINDOW_INDEX, or wire up multi-connection packing "
+                  f"(SubscriptionManager.pack_connections already exists) before "
+                  f"running live.")
+            sys.exit(1)
+
     # auth probe
     auth_ok = False
     try:
-        from vanguard.data.dhan_client import DhanClient
-        client = DhanClient()
+        from vanguard.data.fyers_client import FyersClient
+        client = FyersClient()
         auth_ok, msg = client.check_auth()
         print(f"[auth] {'OK' if auth_ok else 'FAIL'} — {msg}")
     except Exception as e:
         print(f"[auth] client init failed: {e}")
         client = None
+
+    if not args.dry_run:
+        try:
+            import duckdb
+            from datetime import timedelta
+            db = ROOT / "data" / "compiled" / "vanguard.duckdb"
+            con = duckdb.connect(str(db), read_only=True)
+            db_latest_raw = con.execute("SELECT MAX(date) FROM daily_market_structure").fetchone()[0]
+            db_latest = db_latest_raw.strftime("%Y-%m-%d") if hasattr(db_latest_raw, "strftime") else str(db_latest_raw)
+            con.close()
+            
+            dt = cal.now_ist()
+            while True:
+                dt -= timedelta(days=1)
+                if cal.is_trading_day(dt):
+                    prev_trading_date = dt.strftime("%Y-%m-%d")
+                    break
+            
+            if db_latest != prev_trading_date:
+                print(f"[FATAL] Stale EOD Database. DB has {db_latest}, expected {prev_trading_date} (T-1).")
+                sys.exit(1)
+        except Exception as e:
+            print(f"[parity] DB parity check failed or skipped: {e}")
 
     if args.dry_run:
         try:
@@ -234,6 +278,10 @@ def main():
                   f"({len(key_to_meta)} catalog entries) — "
                   f"combined with spot/fut tape: {len(combined)} instruments / "
                   f"{len(sm.pack_connections(combined))} conn")
+            if len(combined) > C.WS_MAX_PER_CONN:
+                print(f"[!] {len(combined)} instruments exceeds WS_MAX_PER_CONN "
+                      f"({C.WS_MAX_PER_CONN}) — a real run will refuse to start "
+                      f"until the covered-names universe or strike windows are narrowed.")
         except Exception as e:
             print(f"[live_compute] dry-run manifest check failed: {e}")
         print("[dry-run] manifest assembled + auth probed; not connecting. Exiting.")
@@ -267,9 +315,10 @@ def main():
     options_tape, covered_names, name_spots, key_to_meta = build_options_tape(im, sm, spot_closes)
     tape = tape + options_tape   # same connection/thread — fits comfortably (see the M2 plan)
     stats["total"] += len(options_tape)
+    check_ws_budget(len(tape), "spot+futures+options tape")
     oi_baseline = seed_oi_baseline()
-    structure_engine = lc.LiveStructureEngine(key_to_meta, oi_baseline)
     symbol_spot_key = {sym: key for key, sym in key_symbol.items()}
+    structure_engine = lc.LiveStructureEngine(key_to_meta, oi_baseline, symbol_spot_key)
     latest_structure: dict = {}
     print(f"[live_compute] covered {len(covered_names)} names, {len(options_tape)} option "
           f"instruments ({len(oi_baseline)} EOD OI baseline rows seeded)")
@@ -282,7 +331,8 @@ def main():
 
     fh = FeedHandler(client, store, journal, on_bar_close=on_bar_close)
 
-    bridge = Bridge()
+    live_chains_cache = {}
+    bridge = Bridge(live_chains_cache=live_chains_cache)
     bridge.start()
 
     import traceback
@@ -312,14 +362,25 @@ def main():
             threading.Thread(target=fh.run, args=(tape,), daemon=True).start()
             threading.Thread(target=structure_loop,
                               args=(store, structure_engine, symbol_spot_key, covered_names,
-                                    spot_closes, alert_sink, latest_structure, log),
+                                    spot_closes, alert_sink, latest_structure, live_chains_cache, log),
                               daemon=True).start()
             feed_started = True
 
         # Resilient tick: one bad iteration must never kill the daemon.
         try:
             journal.flush()
-            write_snapshot(store, key_symbol, events=list(alert_sink.recent), structure=latest_structure)
+            
+            # Compute live setups from current structure and spot prices
+            from vanguard.live.live_compute import compute_live_setups
+            current_spots = {sym: float(store.get(*key).ltp) for sym, key in symbol_spot_key.items() if store.get(*key) and store.get(*key).ltp}
+            # Fall back to eod spots for those without live ticks
+            for sym, p in spot_closes.items():
+                if sym not in current_spots:
+                    current_spots[sym] = p
+                    
+            live_setups = compute_live_setups(latest_structure, current_spots)
+            
+            write_snapshot(store, key_symbol, events=list(alert_sink.recent), structure=latest_structure, setups=live_setups)
             age = time.time() - fh.last_tick_ts if fh.last_tick_ts else 0
             if cal.is_market_open() and fh.last_tick_ts and age > C.STALE_TICK_ALERT:
                 log(f"[watchdog] no tick for {age:.0f}s; feed reconnecting")

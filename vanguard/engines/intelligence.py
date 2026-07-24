@@ -367,7 +367,7 @@ class InstitutionalIntelligence:
         final['PE_INTERP'] = final['PE_INTERP'].fillna("Neutral")
 
         # 7. Gamma Structure Change
-        analyzer = GammaAnalyzer(lot_sizes=lots)
+        analyzer = GammaAnalyzer()
         gex_t = analyzer.calculate_gex(greeks_t, spots_t)
         gex_tm1 = analyzer.calculate_gex(greeks_tm1, spots_tm1)
         

@@ -217,16 +217,33 @@ def _build(con, n_sessions: int) -> dict:
     data["cm_breadth"]["rows"].reverse()
     data["nifty"]["rows"].reverse()
 
-    # Ticker → Dhan display-symbol map for chart deep links (tv.dhan.co resolves
-    # its own symbology, not NSE tickers). Regenerate via scripts/build_dhan_map.py.
-    dhan_map_path = COMPILED / "dhan_symbol_map.json"
-    dhan_map = {}
-    if dhan_map_path.exists():
-        full_map = json.loads(dhan_map_path.read_text())
+    # Ticker → Fyers display-symbol map for chart deep links.
+    # Regenerate via scripts/build_fyers_map.py.
+    fyers_map_path = COMPILED / "fyers_symbol_map.json"
+    fyers_map = {}
+    if fyers_map_path.exists():
+        full_map = json.loads(fyers_map_path.read_text())
+        # We only ship mappings for the symbols actually included in the export.
+        # This prevents the initial payload from bloating with 5000+ unused names.
         yi = MS_COLS.index("symbol")
         exported_syms = {r[yi] for r in data["market_structure"]["rows"]}
-        dhan_map = {s: full_map[s] for s in exported_syms if s in full_map}
-    data["dhan_map"] = dhan_map
+        fyers_map = {s: full_map[s] for s in exported_syms if s in full_map}
+    data["fyers_map"] = fyers_map
+
+    # Scanner universe (Nifty50 constituents + indices) — the HUD's Symbol
+    # Scanner narrows to this list so it matches exactly what run_live.py
+    # actually keeps live (see vanguard.live.universe / select_covered_names).
+    # Regime Core/Breadth/Internals/Positioning/Sectors stay full-215-universe
+    # market-wide context — deliberately NOT filtered by this list, that's a
+    # different, broader question than "what's live right now." Optional like
+    # fyers_map above: a fetch failure degrades to the HUD falling back to the
+    # full universe rather than blocking the whole EOD/HUD build.
+    try:
+        from vanguard.live.universe import get_nifty50_constituents
+        from vanguard.config.live import INDEX_SYMBOLS
+        data["scanner_universe"] = sorted(set(get_nifty50_constituents()) | set(INDEX_SYMBOLS))
+    except Exception:
+        data["scanner_universe"] = []
 
     add_flip_repeat(con, data["market_structure"], sessions)
     remap_sector(data["market_structure"])

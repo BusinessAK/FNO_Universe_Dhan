@@ -38,13 +38,14 @@ def build_key_symbol_map(im, symbols: list[str]) -> dict[tuple[int, int], str]:
     for s in symbols:
         row = im.spot(s)
         if row:
-            out[(int(row["feed_segment"]), int(row["security_id"]))] = s
+            out[(int(row["feed_segment"]), str(row["security_id"]))] = s
     return out
 
 
 def write_snapshot(store, key_symbol: dict[tuple[int, int], str], path=None,
-                    events: list[dict] | None = None,
-                    structure: dict[str, dict] | None = None) -> dict:
+                   events: list[dict] | None = None,
+                   structure: dict[str, dict] | None = None,
+                   setups: list[dict] | None = None) -> dict:
     """Serialize current live state to live_snapshot.json (symbol-keyed).
 
     Emits two distinct clocks, and consumers must not confuse them:
@@ -73,9 +74,12 @@ def write_snapshot(store, key_symbol: dict[tuple[int, int], str], path=None,
             quotes[sym] = {"ltp": round(st.ltp, 2), "chg": round(st.chg_pct, 2),
                            "oi": st.oi, "ts": st.ts}
             feed_ts = max(feed_ts, st.ts or 0.0)
+    live_date = cal.now_ist().strftime("%Y-%m-%d") if cal.is_trading_day() else None
     snap = {"ts": time.time(), "feed_ts": feed_ts, "market_open": cal.is_market_open(),
             "n": len(quotes), "quotes": quotes, "events": events or [],
-            "structure": structure or {}, "structure_validated": is_structure_validated()}
+            "live_date": live_date,
+            "structure": structure or {}, "structure_validated": is_structure_validated(),
+            "setups": setups or []}
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(".tmp")
     tmp.write_text(json.dumps(snap))

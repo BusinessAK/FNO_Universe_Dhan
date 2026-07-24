@@ -15,5 +15,5 @@ pnsea
 duckdb
 feedparser
 google-genai
-dhanhq
 websockets
+fyers-apiv3>=3.0.0

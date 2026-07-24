@@ -14,7 +14,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from vanguard.data.dhan_client import DhanClient          # noqa: E402
+from vanguard.data.fyers_client import FyersClient          # noqa: E402
+client = FyersClient()
 from vanguard.data.instrument_master import InstrumentMaster  # noqa: E402
 from vanguard.live.feed_handler import normalize            # noqa: E402
 from vanguard.live import config as C                       # noqa: E402
@@ -34,8 +35,8 @@ name = {}          # security_id -> readable label
 instruments = []
 
 def add(seg, sid, label):
-    instruments.append((int(seg), str(int(sid)), C.MODE_QUOTE))
-    name[int(sid)] = label
+    instruments.append((int(seg), str(sid), C.MODE_QUOTE))
+    name[str(sid)] = label
 
 if MODE == "light":
     for sym in ("NIFTY", "RELIANCE"):
@@ -59,22 +60,37 @@ else:
 
 print(f"[capture] mode={MODE}  instruments={len(instruments)}  duration={DURATION}s", flush=True)
 
-client = DhanClient()
-feed = client.market_feed(instruments)
 
 seen = {}          # sid -> latest normalized tick
 counts = defaultdict(int)
-start = time.time()
-try:
-    feed.run_forever()                     # connect + subscribe
-    while time.time() - start < DURATION:
-        data = feed.get_data()
-        if isinstance(data, dict):
-            t = data.get("type", "")
+
+def on_ticks(message):
+    if isinstance(message, list):
+        for m in message:
+            t = m.get("type", "")
             counts[t] += 1
-            n = normalize(data)
+            n = normalize(m)
             if n and n.get("ltp") is not None:
                 seen[n["sid"]] = n
+    else:
+        t = message.get("type", "")
+        counts[t] += 1
+        n = normalize(message)
+        if n and n.get("ltp") is not None:
+            seen[n["sid"]] = n
+
+def on_connect():
+    print("[capture] connected, subscribing...", flush=True)
+    syms = [i[1] for i in instruments]
+    feed.subscribe(symbols=syms, data_type="SymbolUpdate")
+
+feed = client.market_feed(instruments, on_ticks=on_ticks, on_connect=on_connect)
+
+start = time.time()
+try:
+    feed.connect()  # Connects on a background thread
+    while time.time() - start < DURATION:
+        time.sleep(1)
 except Exception as e:
     print(f"[capture] loop error: {e}", flush=True)
 

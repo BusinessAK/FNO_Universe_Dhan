@@ -2,6 +2,7 @@
 Tests for vanguard/live/live_compute.py (M2 — live structure engine) and the shared
 compute_walls_and_flip/gamma_regime helpers it reuses from vanguard/intelligence.py.
 """
+import json
 import time
 import unittest
 
@@ -171,16 +172,19 @@ class TestLiveStructureEngineEventDiffing(unittest.TestCase):
 
 
 class TestSelectCoveredNames(unittest.TestCase):
-    def test_indices_always_included_alongside_top_n_by_oi(self):
+    def test_indices_always_included_alongside_nifty50_constituents(self):
         class FakeCon:
             def execute(self, sql, params=None):
                 class R:
                     def fetchone(_): return ("2026-07-16",)
-                    def fetchall(_): return [("HIGHOI_A",), ("HIGHOI_B",)]
+                    def fetchall(_): return [("RELIANCE",), ("TCS",)]
                 return R()
-        names = lc.select_covered_names(FakeCon(), top_n=2)
-        self.assertIn("HIGHOI_A", names)
-        self.assertIn("HIGHOI_B", names)
+        names = lc.select_covered_names(FakeCon(), constituents=["RELIANCE", "TCS", "NOT_IN_UNIVERSE"])
+        self.assertIn("RELIANCE", names)
+        self.assertIn("TCS", names)
+        # a constituent absent from the compiled F&O universe is excluded,
+        # not fabricated into coverage
+        self.assertNotIn("NOT_IN_UNIVERSE", names)
         from vanguard.live import config as C
         for idx in C.INDEX_SYMBOLS:
             self.assertIn(idx, names)
@@ -198,13 +202,27 @@ class TestComputeIntegration(unittest.TestCase):
              "EXPIRY_DT": expiry, "TIMESTAMP": now, "CLOSE": 3.0, "OPEN_INT": 40000,
              "CHG_IN_OI": -500, "VOLUME": 300},
         ])
-        out = lc.compute(df, {SYM: 100.0})
+        out, chains = lc.compute(df, {SYM: 100.0})
         self.assertIn(SYM, out)
         self.assertIn(out[SYM]["gamma_regime"], ("LONG_GAMMA", "SHORT_GAMMA", "TRANSITION_REGIME"))
         self.assertGreaterEqual(out[SYM]["iv_avg"], 0.0)
+        self.assertIn(SYM, chains)   # per-symbol chain JSON, added for /api/chain/<symbol>
+
+        # Every row must carry a real, non-zero GEX value — this is what the
+        # dossier's GEX Profile chart (/api/chain/<symbol>) plots per strike.
+        # Regression guard: GEX used to be computed on a throwaway internal
+        # copy inside GammaAnalyzer.calculate_gex() and never merged back
+        # into greeks_df, so every chain row's GEX read as undefined ->
+        # the frontend's `d.GEX||0` silently rendered an all-zero, empty
+        # chart with no visible bars.
+        chain_rows = json.loads(chains[SYM])
+        self.assertTrue(chain_rows)
+        for row in chain_rows:
+            self.assertIn("GEX", row)
+            self.assertNotEqual(row["GEX"], 0.0)
 
     def test_compute_on_empty_frame_returns_empty(self):
-        self.assertEqual(lc.compute(pd.DataFrame(), {}), {})
+        self.assertEqual(lc.compute(pd.DataFrame(), {}), ({}, {}))
 
 
 class TestPerfRegression(unittest.TestCase):

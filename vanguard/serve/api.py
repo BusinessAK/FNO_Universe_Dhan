@@ -27,8 +27,13 @@ _payload_cache: dict = {"mtime": None, "body": None}
 
 _greeks_lock = threading.Lock()
 _greeks_cache: dict = {"mtime": None, "df": None}
+_live_chains_cache = None
 
 def get_chain_json(symbol: str) -> bytes | None:
+    global _live_chains_cache
+    if _live_chains_cache is not None and symbol in _live_chains_cache:
+        return _live_chains_cache[symbol].encode("utf-8")
+
     import pandas as pd
     greeks_path = Path("data/processed/greeks.csv")
     try:
@@ -109,9 +114,12 @@ class _Handler(BaseHTTPRequestHandler):
 
 
 class Bridge:
-    def __init__(self, host: str = C.BRIDGE_HOST, port: int = C.BRIDGE_PORT):
+    def __init__(self, host: str = C.BRIDGE_HOST, port: int = C.BRIDGE_PORT, live_chains_cache: dict = None):
         self.host, self.port = host, port
         self._srv = None
+        if live_chains_cache is not None:
+            global _live_chains_cache
+            _live_chains_cache = live_chains_cache
 
     def start(self):
         self._srv = ThreadingHTTPServer((self.host, self.port), _Handler)

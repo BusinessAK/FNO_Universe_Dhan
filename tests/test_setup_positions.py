@@ -34,9 +34,13 @@ class TestBasicLifecycle:
         hist = _history(
             "ABC",
             **{
-                "2026-01-01": _day(101, trigger=100, invalidation=98),  # triggers, target=100+2*2=104
+                # entry=spot=101 (not the nominal trigger 100), risk=|101-98|=3,
+                # target=101+2*3=107 — risk is sized off the actual entry price
+                # (see setup_positions.py's RISK_MULTIPLE docstring), not the
+                # trigger level that was crossed to get there.
+                "2026-01-01": _day(101, trigger=100, invalidation=98),
                 "2026-01-02": _day(103),
-                "2026-01-03": _day(104.5),  # >= target 104
+                "2026-01-03": _day(108),  # >= target 107
             },
         )
         rows = derive_positions(hist)
@@ -47,10 +51,10 @@ class TestBasicLifecycle:
         assert p["trigger_date"] == "2026-01-01"
         assert p["trigger_price"] == 101
         assert p["sl_price"] == 98
-        assert p["target_price"] == 104
+        assert p["target_price"] == 107
         assert p["status"] == "TARGET_HIT"
         assert p["resolved_date"] == "2026-01-03"
-        assert p["resolved_price"] == 104.5
+        assert p["resolved_price"] == 108
 
     def test_up_trigger_then_sl_hit(self):
         hist = _history(
@@ -70,15 +74,16 @@ class TestBasicLifecycle:
         hist = _history(
             "XYZ",
             **{
-                "2026-01-01": _day(99, trigger=100, invalidation=102),  # risk=2, target=100-4=96
-                "2026-01-02": _day(95.5),
+                # entry=spot=99, risk=|99-102|=3, target=99-2*3=93
+                "2026-01-01": _day(99, trigger=100, invalidation=102),
+                "2026-01-02": _day(92),  # <= target 93
             },
         )
         rows = derive_positions(hist)
         p = rows[0]
         assert p["direction"] == "down"
         assert p["sl_price"] == 102
-        assert p["target_price"] == 96
+        assert p["target_price"] == 93
         assert p["status"] == "TARGET_HIT"
 
     def test_down_trigger_then_sl_hit(self):
@@ -114,10 +119,11 @@ class TestScreenerSilentDays:
         hist = _history(
             "ABC",
             **{
+                # entry=101, risk=|101-98|=3, target=101+2*3=107
                 "2026-01-01": _day(101, trigger=100, invalidation=98),
                 "2026-01-02": _day(101.5),   # screener silent, position still open
                 "2026-01-03": _day(101.8),   # screener silent
-                "2026-01-04": _day(104.2),   # screener silent, but hits target
+                "2026-01-04": _day(108),     # screener silent, but hits target 107
             },
         )
         rows = derive_positions(hist)
@@ -129,9 +135,10 @@ class TestScreenerSilentDays:
         hist = _history(
             "ABC",
             **{
+                # entry=101, risk=3, target=107
                 "2026-01-01": _day(101, trigger=100, invalidation=98),
                 "2026-01-02": {"spot_close": None},
-                "2026-01-03": _day(104.5),
+                "2026-01-03": _day(108),
             },
         )
         rows = derive_positions(hist)
@@ -145,16 +152,20 @@ class TestRetriggerConflicts:
         hist = _history(
             "ABC",
             **{
+                # entry=101, risk=3, target=107 — day 2's retrigger must NOT
+                # re-freeze this off its own (101.2, 99) pair (which would give
+                # target=101.2+2*2.2=105.6); day 3 only clears the ORIGINAL 107.
                 "2026-01-01": _day(101, trigger=100, invalidation=98),
                 "2026-01-02": _day(101.2, trigger=101, invalidation=99),  # same up direction
-                "2026-01-03": _day(104.5),  # still resolves the ORIGINAL frozen target (104)
+                "2026-01-03": _day(108),  # resolves the ORIGINAL frozen target (107)
             },
         )
         rows = derive_positions(hist)
         assert len(rows) == 1
         assert rows[0]["trigger_date"] == "2026-01-01"
         assert rows[0]["trigger_price"] == 101
-        assert rows[0]["target_price"] == 104
+        assert rows[0]["target_price"] == 107
+        assert rows[0]["status"] == "TARGET_HIT"
 
     def test_opposite_direction_retrigger_closes_and_reopens(self):
         hist = _history(
@@ -181,9 +192,10 @@ class TestRetriggerConflicts:
         hist = _history(
             "ABC",
             **{
-                "2026-01-01": _day(101, trigger=100, invalidation=98),  # up, sl=98
-                "2026-01-02": _day(99, trigger=100, invalidation=102, bias="Bearish Breakdown"),  # reversal
-                "2026-01-03": _day(93.5),  # resolves the NEW down position: target=100-2*2=96
+                "2026-01-01": _day(101, trigger=100, invalidation=98),  # up, entry=101, risk=3, sl=98
+                # reversal: new entry=spot=99, risk=|99-102|=3, target=99-2*3=93
+                "2026-01-02": _day(99, trigger=100, invalidation=102, bias="Bearish Breakdown"),
+                "2026-01-03": _day(92),  # resolves the NEW down position at target 93
             },
         )
         rows = derive_positions(hist)
@@ -192,7 +204,7 @@ class TestRetriggerConflicts:
         assert reversal["status"] == "CLOSED_BY_REVERSAL"
         assert new_pos["direction"] == "down"
         assert new_pos["trigger_date"] == "2026-01-02"
-        assert new_pos["target_price"] == 96
+        assert new_pos["target_price"] == 93
         assert new_pos["status"] == "TARGET_HIT"
         assert new_pos["resolved_date"] == "2026-01-03"
 
@@ -252,10 +264,11 @@ class TestMultiplePositionsOverTime:
         hist = _history(
             "ABC",
             **{
-                "2026-01-01": _day(101, trigger=100, invalidation=98),
-                "2026-01-02": _day(104.5),  # target hit, position closes
-                "2026-01-05": _day(151, trigger=150, invalidation=147),  # new independent trigger
-                "2026-01-06": _day(157.5),  # target = 150+2*3=156
+                "2026-01-01": _day(101, trigger=100, invalidation=98),  # entry=101, risk=3, target=107
+                "2026-01-02": _day(108),  # target hit, position closes
+                # new independent trigger: entry=151, risk=|151-147|=4, target=151+2*4=159
+                "2026-01-05": _day(151, trigger=150, invalidation=147),
+                "2026-01-06": _day(160),  # target hit
             },
         )
         rows = derive_positions(hist)
@@ -295,8 +308,10 @@ class TestDegenerateAndMissingData:
 
     def test_multiple_symbols_are_independent(self):
         hist = {
+            # ABC: entry=101, risk=3, target=107 — day 2 clears it.
             "ABC": {"2026-01-01": _day(101, trigger=100, invalidation=98),
-                    "2026-01-02": _day(104.5)},
+                    "2026-01-02": _day(108)},
+            # XYZ: entry=50, risk=|50-48|=2, target=54 — no more data, stays open.
             "XYZ": {"2026-01-01": _day(50, trigger=49, invalidation=48)},
         }
         rows = derive_positions(hist)
