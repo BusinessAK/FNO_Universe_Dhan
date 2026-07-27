@@ -12,3 +12,6 @@ LIVE = DATA / "live"
 RESEARCH = DATA / "research"
 DB = COMPILED / "vanguard.duckdb"
 HUD = ROOT / "hud"
+
+# Local HUD/API server bind address (vanguard/serve/api.py).
+BRIDGE_HOST, BRIDGE_PORT = "127.0.0.1", 8787

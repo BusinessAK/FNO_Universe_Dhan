@@ -56,11 +56,6 @@ class TestTemplateBootWrap(unittest.TestCase):
         self.assertLess(t.index("function __boot(VG){"),
                         t.index("let data=__VANGUARD_DATA__"))
 
-    def test_bridge_shim_still_exports_handler(self):
-        from vanguard.live import bridge
-        self.assertIs(bridge._Handler, api._Handler)
-        self.assertIs(bridge.Bridge, api.Bridge)
-
 
 if __name__ == "__main__":
     unittest.main()

@@ -155,7 +155,7 @@ def seed_oi_baseline() -> dict[tuple[str, float, str], float]:
 
 def structure_loop(store, structure_engine: lc.LiveStructureEngine, symbol_spot_key: dict,
                     covered_names: list[str], spot_closes: dict[str, float],
-                    alert_sink: AlertSink, latest_structure: dict, live_chains_cache: dict, log):
+                    alert_sink: AlertSink, latest_structure: dict, log):
     """Runs forever in its own daemon thread at COMPUTE_CADENCE. Never lets one
     bad cycle kill the thread — same resilience posture as the main loop."""
     while True:
@@ -166,7 +166,7 @@ def structure_loop(store, structure_engine: lc.LiveStructureEngine, symbol_spot_
                 key = symbol_spot_key.get(sym)
                 st = store.get(*key) if key else None
                 spot_prices[sym] = float(st.ltp) if (st and st.ltp is not None) else spot_closes.get(sym, 0.0)
-            structure, events = structure_engine.run_cycle(store, spot_prices, live_chains_cache)
+            structure, events = structure_engine.run_cycle(store, spot_prices)
             latest_structure.clear()
             latest_structure.update(structure)
             if events:
@@ -331,8 +331,7 @@ def main():
 
     fh = FeedHandler(client, store, journal, on_bar_close=on_bar_close)
 
-    live_chains_cache = {}
-    bridge = Bridge(live_chains_cache=live_chains_cache)
+    bridge = Bridge()
     bridge.start()
 
     import traceback
@@ -362,7 +361,7 @@ def main():
             threading.Thread(target=fh.run, args=(tape,), daemon=True).start()
             threading.Thread(target=structure_loop,
                               args=(store, structure_engine, symbol_spot_key, covered_names,
-                                    spot_closes, alert_sink, latest_structure, live_chains_cache, log),
+                                    spot_closes, alert_sink, latest_structure, log),
                               daemon=True).start()
             feed_started = True
 

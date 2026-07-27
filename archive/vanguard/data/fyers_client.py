@@ -71,11 +71,10 @@ class FyersClient:
     def option_chain(self, under_security_id: str, under_segment: str, expiry: str) -> dict:
         """Permanent no-op, not a TODO: Fyers has no single REST call for an
         entire option chain, so this can never be filled in the way the old
-        DhanClient.option_chain() was. Live chains are served instead from
-        vanguard.live.live_compute.compute()'s in-memory chains_json, wired
-        through vanguard.serve.api's /api/chain/<symbol> — see Bridge's
-        live_chains_cache. This stub only exists so callers written against
-        the DhanClient interface don't crash."""
+        DhanClient.option_chain() was. The Dossier's Deep Dive Charts read a
+        baked EOD chain snapshot from the HUD payload instead (vanguard/
+        store/export_service.py) — this stub only exists so callers written
+        against the DhanClient interface don't crash."""
         return {"status": "success", "data": {"oc": {}}}
 
     def daily(self, security_id: str, segment: str, instrument_type: str,

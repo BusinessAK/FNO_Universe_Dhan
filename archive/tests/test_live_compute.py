@@ -2,7 +2,6 @@
 Tests for vanguard/live/live_compute.py (M2 — live structure engine) and the shared
 compute_walls_and_flip/gamma_regime helpers it reuses from vanguard/intelligence.py.
 """
-import json
 import time
 import unittest
 
@@ -16,44 +15,45 @@ from vanguard.live import alert_sink
 SYM = "TESTCO"
 
 
-def greeks_row(strike, opt_type, gamma, oi):
-    return {"SYMBOL": SYM, "STRIKE_PR": strike, "OPTION_TYP": opt_type,
-            "GAMMA": gamma, "OPEN_INT": oi}
+def greeks_row(strike, opt_type, oi):
+    return {"SYMBOL": SYM, "STRIKE_PR": strike, "OPTION_TYP": opt_type, "OPEN_INT": oi}
 
 
 class TestComputeWallsAndFlip(unittest.TestCase):
-    def test_call_wall_is_max_positive_ce_gex_strike(self):
-        # GEX = GAMMA * OI * spot * 0.01 * (+1 for CE) — strike 110 has the
-        # largest CE OI*GAMMA product, so it should win call_wall.
+    def test_call_wall_is_max_raw_ce_oi_strike(self):
+        # Raw OI, not Gamma-weighted (see compute_walls_and_flip's docstring
+        # for why the Gamma weighting was retired 2026-07-24) — strike 110
+        # has the largest CE OI, so it should win call_wall regardless of
+        # distance from spot.
         df = pd.DataFrame([
-            greeks_row(100, "CE", 0.01, 1000),
-            greeks_row(110, "CE", 0.02, 5000),   # largest CE GEX
-            greeks_row(90, "PE", 0.015, 4000),
-            greeks_row(80, "PE", 0.01, 1000),
+            greeks_row(100, "CE", 1000),
+            greeks_row(110, "CE", 5000),   # largest CE OI
+            greeks_row(90, "PE", 4000),
+            greeks_row(80, "PE", 1000),
         ])
-        out = InstitutionalIntelligence.compute_walls_and_flip(df, {SYM: 100.0})
+        out = InstitutionalIntelligence.compute_walls_and_flip(df)
         self.assertEqual(out[SYM]["call_wall"], 110.0)
         self.assertEqual(out[SYM]["put_wall"], 90.0)
 
-    def test_gamma_flip_is_max_overlap_of_ce_and_pe_gex(self):
-        # Strike 100 has both meaningful CE and PE GEX (the overlap min is
-        # largest there); strike 120 has huge CE GEX but ~0 PE GEX, so it must
+    def test_gamma_flip_is_max_overlap_of_ce_and_pe_oi(self):
+        # Strike 100 has both meaningful CE and PE OI (the overlap min is
+        # largest there); strike 120 has huge CE OI but ~0 PE OI, so it must
         # NOT win the flip despite having the single largest CE number.
         df = pd.DataFrame([
-            greeks_row(100, "CE", 0.02, 3000),
-            greeks_row(100, "PE", 0.02, 3000),
-            greeks_row(120, "CE", 0.05, 10000),   # huge CE GEX, but...
-            greeks_row(120, "PE", 0.0001, 100),   # ...negligible PE GEX here
+            greeks_row(100, "CE", 3000),
+            greeks_row(100, "PE", 3000),
+            greeks_row(120, "CE", 10000),   # huge CE OI, but...
+            greeks_row(120, "PE", 100),     # ...negligible PE OI here
         ])
-        out = InstitutionalIntelligence.compute_walls_and_flip(df, {SYM: 100.0})
+        out = InstitutionalIntelligence.compute_walls_and_flip(df)
         self.assertEqual(out[SYM]["gamma_flip"], 100.0)
 
     def test_empty_frame_returns_empty_dict(self):
-        self.assertEqual(InstitutionalIntelligence.compute_walls_and_flip(pd.DataFrame(), {}), {})
+        self.assertEqual(InstitutionalIntelligence.compute_walls_and_flip(pd.DataFrame()), {})
 
-    def test_no_positive_gex_side_falls_back_to_zero(self):
-        df = pd.DataFrame([greeks_row(100, "CE", 0.0, 0)])
-        out = InstitutionalIntelligence.compute_walls_and_flip(df, {SYM: 100.0})
+    def test_no_positive_oi_side_falls_back_to_zero(self):
+        df = pd.DataFrame([greeks_row(100, "CE", 0)])
+        out = InstitutionalIntelligence.compute_walls_and_flip(df)
         self.assertEqual(out[SYM]["call_wall"], 0.0)
         self.assertEqual(out[SYM]["put_wall"], 0.0)
         self.assertEqual(out[SYM]["gamma_flip"], 0.0)
@@ -202,27 +202,13 @@ class TestComputeIntegration(unittest.TestCase):
              "EXPIRY_DT": expiry, "TIMESTAMP": now, "CLOSE": 3.0, "OPEN_INT": 40000,
              "CHG_IN_OI": -500, "VOLUME": 300},
         ])
-        out, chains = lc.compute(df, {SYM: 100.0})
+        out = lc.compute(df, {SYM: 100.0})
         self.assertIn(SYM, out)
         self.assertIn(out[SYM]["gamma_regime"], ("LONG_GAMMA", "SHORT_GAMMA", "TRANSITION_REGIME"))
         self.assertGreaterEqual(out[SYM]["iv_avg"], 0.0)
-        self.assertIn(SYM, chains)   # per-symbol chain JSON, added for /api/chain/<symbol>
-
-        # Every row must carry a real, non-zero GEX value — this is what the
-        # dossier's GEX Profile chart (/api/chain/<symbol>) plots per strike.
-        # Regression guard: GEX used to be computed on a throwaway internal
-        # copy inside GammaAnalyzer.calculate_gex() and never merged back
-        # into greeks_df, so every chain row's GEX read as undefined ->
-        # the frontend's `d.GEX||0` silently rendered an all-zero, empty
-        # chart with no visible bars.
-        chain_rows = json.loads(chains[SYM])
-        self.assertTrue(chain_rows)
-        for row in chain_rows:
-            self.assertIn("GEX", row)
-            self.assertNotEqual(row["GEX"], 0.0)
 
     def test_compute_on_empty_frame_returns_empty(self):
-        self.assertEqual(lc.compute(pd.DataFrame(), {}), ({}, {}))
+        self.assertEqual(lc.compute(pd.DataFrame(), {}), {})
 
 
 class TestPerfRegression(unittest.TestCase):

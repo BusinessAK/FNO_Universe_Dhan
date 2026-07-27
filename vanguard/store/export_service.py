@@ -17,10 +17,11 @@ import re
 import duckdb
 import pandas as pd
 
-from vanguard.config.paths import DB, COMPILED
+from vanguard.config.paths import DB, COMPILED, PROCESSED
 from vanguard.config.sectors import get_sector
 from vanguard.config.eod import TREND_WINDOW_SESSIONS
 from vanguard.research.position_stats import summarize_by_group
+from vanguard.engines.rrg import build_rrg, build_stock_rrg
 
 MS_COLS = [
     "date", "symbol", "sector", "spot_close", "spot_change_pct", "pcr", "iv", "iv_shift",
@@ -30,6 +31,15 @@ MS_COLS = [
     "call_wall", "put_wall", "gamma_flip", "ce_interp", "pe_interp", "suggested_strategy",
     "structure_flip", "prev_structural_bias", "flip_confidence", "flip_strength",
 ]
+# Joined from daily_equity_technicals (index symbols like NIFTY/BANKNIFTY have
+# no equity technicals, so these come back NULL for them — the Scanner shows
+# "—" in that case rather than treating it as an error).
+MS_52W_COLS = ["pct_from_52w_high", "pct_from_52w_low"]
+# Cash-market traded volume + its 20d relative ratio, also from
+# daily_equity_technicals (same LEFT JOIN as the 52W cols). Pairs with the
+# Scanner's DLV% column — both are cash-market reads, so the volume shown is
+# cash traded qty (matches daily_delivery.traded_qty), NOT F&O total_volume.
+MS_VOL_COLS = ["volume", "volume_ratio_20d"]
 
 # Sessions of lookback the flip radar's whipsaw guard needs behind each exported
 # session. Derived here rather than in the HUD: the guard has to see sessions the
@@ -171,13 +181,28 @@ def _build(con, n_sessions: int) -> dict:
     sessions.sort()
     ph = ", ".join("?" * len(sessions))
 
+    # 52w/volume enrichment rides on daily_equity_technicals via a LEFT JOIN.
+    # On a pre-C1 DB that table is absent (PRD degradation contract) — keep the
+    # columns as NULL so the payload shape stays stable, just drop the join.
+    et_cols = MS_52W_COLS + MS_VOL_COLS
+    have_et = "daily_equity_technicals" in {
+        r[0] for r in con.execute("SHOW TABLES").fetchall()}
+    if have_et:
+        et_select = ", ".join(f"et.{c}" for c in et_cols)
+        et_join = ("LEFT JOIN daily_equity_technicals et "
+                   "  ON et.symbol = ms.symbol AND CAST(et.date AS DATE) = CAST(ms.date AS DATE) ")
+    else:
+        et_select = ", ".join(f"NULL AS {c}" for c in et_cols)
+        et_join = ""
+
     data = {
         "meta": {"session": sessions[-1], "sessions": sessions},
         "market_structure": table(
             con,
-            f"SELECT {', '.join(MS_COLS)} FROM daily_market_structure "
-            f"WHERE date IN ({ph}) ORDER BY date, priority_score DESC NULLS LAST",
-            MS_COLS, sessions),
+            f"SELECT {', '.join(f'ms.{c}' for c in MS_COLS)}, {et_select} "
+            f"FROM daily_market_structure ms {et_join}"
+            f"WHERE ms.date IN ({ph}) ORDER BY ms.date, ms.priority_score DESC NULLS LAST, ms.symbol",
+            MS_COLS + et_cols, sessions),
         "setups": table(
             con,
             f"SELECT c.date, c.symbol, COALESCE(m.sector, 'Equity') as sector, "
@@ -230,17 +255,44 @@ def _build(con, n_sessions: int) -> dict:
         fyers_map = {s: full_map[s] for s in exported_syms if s in full_map}
     data["fyers_map"] = fyers_map
 
+    # Per-symbol option chain (strike/OI/IV/GEX) for the Dossier's Deep Dive
+    # Charts (GEX Profile / OI Concentration / IV Skew). Previously an
+    # unconditional fetch('http://127.0.0.1:8787/api/chain/<symbol>') with no
+    # offline fallback, so these charts only rendered when scripts/
+    # run_bridge.py or run_live.py happened to be running -- even though the
+    # data isn't inherently live (unlike /snapshot's LTP overlay, which
+    # genuinely needs a running feed). Baked here from the latest EOD
+    # compile's snapshot (data/processed/greeks.csv, written by
+    # analyze_market_structure) instead, same as everything else in this
+    # payload. Always reflects the LATEST compiled session regardless of
+    # which SDATE the HUD has time-traveled to -- matches the old
+    # live-fetch's behavior exactly, since that never varied by selected
+    # date either (a chain snapshot isn't kept per historical session).
+    chain_path = PROCESSED / "greeks.csv"
+    chain_cols = ["symbol", "strike_pr", "option_typ", "open_int", "iv", "gex"]
+    if chain_path.exists():
+        gdf = pd.read_csv(chain_path, usecols=["SYMBOL", "STRIKE_PR", "OPTION_TYP", "OPEN_INT", "IV", "GAMMA"])
+        gdf = gdf[gdf["SYMBOL"].isin(exported_syms)].copy()
+        spot_by_symbol = dict(con.execute(
+            "SELECT symbol, spot_close FROM daily_market_structure WHERE date = ?",
+            (sessions[-1],)).fetchall())
+        spot = gdf["SYMBOL"].map(spot_by_symbol).fillna(0.0)
+        mult = gdf["OPTION_TYP"].map({"CE": 1.0, "PE": -1.0}).fillna(1.0)
+        gdf["GEX"] = gdf["GAMMA"] * gdf["OPEN_INT"] * spot * 0.01 * mult
+        rows = gdf[["SYMBOL", "STRIKE_PR", "OPTION_TYP", "OPEN_INT", "IV", "GEX"]].values.tolist()
+        data["chains"] = {"cols": chain_cols, "rows": [[clean(c) for c in r] for r in rows]}
+    else:
+        data["chains"] = {"cols": chain_cols, "rows": []}
+
     # Scanner universe (Nifty50 constituents + indices) — the HUD's Symbol
-    # Scanner narrows to this list so it matches exactly what run_live.py
-    # actually keeps live (see vanguard.live.universe / select_covered_names).
-    # Regime Core/Breadth/Internals/Positioning/Sectors stay full-215-universe
-    # market-wide context — deliberately NOT filtered by this list, that's a
-    # different, broader question than "what's live right now." Optional like
-    # fyers_map above: a fetch failure degrades to the HUD falling back to the
-    # full universe rather than blocking the whole EOD/HUD build.
+    # Scanner narrows to this list. Regime Core/Breadth/Internals/Positioning/
+    # Sectors stay full-215-universe market-wide context — deliberately NOT
+    # filtered by this list. Optional like fyers_map above: a fetch failure
+    # degrades to the HUD falling back to the full universe rather than
+    # blocking the whole EOD/HUD build.
     try:
-        from vanguard.live.universe import get_nifty50_constituents
-        from vanguard.config.live import INDEX_SYMBOLS
+        from vanguard.pipeline.context.nifty50_universe import (
+            get_nifty50_constituents, INDEX_SYMBOLS)
         data["scanner_universe"] = sorted(set(get_nifty50_constituents()) | set(INDEX_SYMBOLS))
     except Exception:
         data["scanner_universe"] = []
@@ -315,6 +367,20 @@ def _context_blocks(con, data, sessions, ph):
             VIX_COLS)
         vix["rows"].reverse()
         data["vix"] = vix
+        # RRG (sector rotation) uses full daily_index_close history, not the
+        # sessions/TREND_WINDOW_SESSIONS caps above — RS-Ratio needs long
+        # context, so build_rrg() queries the table itself rather than being
+        # handed a pre-filtered slice.
+        rrg = build_rrg(con)
+        if rrg is not None:
+            data["rrg"] = rrg
+            # Stock-level drill-down (F&O stocks per sector, vs NIFTY + vs
+            # their sector index). Attached under the sector RRG so the HUD
+            # can drill from a sector into its constituents; omitted if the
+            # equity/index tables are absent (HUD hides the drill-down).
+            stocks = build_stock_rrg(con)
+            if stocks is not None:
+                data["rrg"]["stocks"] = stocks
     if "daily_ban" in tables:
         data["ban"] = table(
             con,

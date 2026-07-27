@@ -11,13 +11,22 @@ independently across runs. Re-deriving the whole position history every time
 is the only correct approach here, not a stylistic choice.
 
 Direction (up/down) is inferred from trigger vs invalidation ordering via
-vanguard.live.trigger_engine._direction — the same rule the live trigger
-engine and the HUD/dashboard status badges already use, single-sourced rather
-than re-implemented a fourth time.
+_direction below — the canonical home for that rule since the live layer (which
+previously owned it, in vanguard.live.trigger_engine) was archived.
 """
 from __future__ import annotations
 
-from vanguard.live.trigger_engine import _direction
+
+def _direction(trig: float, inval: float) -> str | None:
+    """'up' = bullish/breakout shape (trigger above invalidation), 'down' =
+    bearish/breakdown shape. None for the degenerate case (no inferable
+    direction) — skip rather than guess; playbook.py's own construction should
+    prevent this in practice, but callers must fail safe if it recurs."""
+    if trig > inval:
+        return "up"
+    if trig < inval:
+        return "down"
+    return None
 
 # target = spot +/- RISK_MULTIPLE * abs(spot - invalidation): a 1:2 R:R based on
 # the ACTUAL entry price (spot), not the nominal trigger, to preserve the math

@@ -106,27 +106,15 @@ def build_option_frame(store, key_to_meta: dict[tuple[int, int], dict],
     return pd.DataFrame(rows)
 
 
-def compute(df: pd.DataFrame, spot_prices: dict[str, float]) -> tuple[dict[str, dict], dict[str, str]]:
+def compute(df: pd.DataFrame, spot_prices: dict[str, float]) -> dict[str, dict]:
     """One live compute cycle: IV/Greeks -> walls/flip -> GEX -> regime, per
-    covered symbol. Returns structure dictionary and serialized Live Chain JSONs."""
+    covered symbol."""
     if df.empty:
-        return {}, {}
+        return {}
     greeks_df = _engine.process_dataframe(df, spot_prices)
     if greeks_df.empty:
-        return {}, {}
-    # Per-strike GEX on greeks_df itself (same formula/precedent as the EOD
-    # export path — vanguard/engines/intelligence.py's analyze_market_
-    # structure(), greeks_t['GEX'] = GAMMA*OPEN_INT*SPOT*0.01*MULTIPLIER).
-    # Needed so the chain JSON below (served at /api/chain/<symbol>, the
-    # dossier's GEX Profile chart) actually carries a GEX field per strike —
-    # GammaAnalyzer.calculate_gex() computes its own GEX internally too, but
-    # only to aggregate it away into a per-symbol summary; that per-row copy
-    # was never returned or merged back, so every chain row's GEX silently
-    # read as undefined -> 0 client-side, rendering the chart as empty bars.
-    greeks_df["SPOT"] = greeks_df["SYMBOL"].map(spot_prices)
-    multiplier = greeks_df["OPTION_TYP"].map({"CE": 1, "PE": -1}).fillna(1)
-    greeks_df["GEX"] = greeks_df["GAMMA"] * greeks_df["OPEN_INT"] * greeks_df["SPOT"].fillna(0.0) * 0.01 * multiplier
-    walls = InstitutionalIntelligence.compute_walls_and_flip(greeks_df, spot_prices)
+        return {}
+    walls = InstitutionalIntelligence.compute_walls_and_flip(greeks_df)
     gex_summary = _gamma.calculate_gex(greeks_df, spot_prices)
     gex_by_symbol = gex_summary.set_index("SYMBOL") if not gex_summary.empty else gex_summary
 
@@ -147,14 +135,7 @@ def compute(df: pd.DataFrame, spot_prices: dict[str, float]) -> tuple[dict[str, 
             "gex_intensity": gex_intensity, "iv_avg": iv_avg,
             "gamma_regime": regime, "computed_at": now,
         }
-        
-    chains_json = {}
-    cols = ["STRIKE_PR", "OPTION_TYP", "EXPIRY_DT", "CLOSE", "OPEN_INT", "CHG_IN_OI", "IV", "DELTA", "GAMMA", "VEGA", "THETA", "GEX"]
-    for sym, group in greeks_df.groupby("SYMBOL"):
-        available_cols = [c for c in cols if c in group.columns]
-        chains_json[sym] = group[available_cols].to_json(orient="records")
-        
-    return out, chains_json
+    return out
 
 
 def compute_live_setups(structure: dict, spot_prices: dict) -> list[dict]:
@@ -233,9 +214,8 @@ class LiveStructureEngine:
         self._executor = None   # lazily created — most cycles never need it, see run_cycle()
 
         self._cached_result = {}
-        self._cached_chains = {}
 
-    def run_cycle(self, store, spot_prices: dict[str, float], live_chains_cache: dict) -> tuple[dict, list[dict]]:
+    def run_cycle(self, store, spot_prices: dict[str, float]) -> tuple[dict, list[dict]]:
         # dirty_keys() is the store's own thread-safe accessor — this used to
         # read store._s directly, racing the feed thread's key inserts.
         dirty_keys = store.dirty_keys()
@@ -271,7 +251,7 @@ class LiveStructureEngine:
         # cycles (a handful of symbols ticking) run inline.
         n_workers = min(6, len(symbols))
         if n_workers <= 1 or len(df_dirty) < MIN_ROWS_FOR_POOL:
-            result, chains_json = compute(df_dirty, spot_prices)
+            result = compute(df_dirty, spot_prices)
         else:
             if self._executor is None:
                 self._executor = concurrent.futures.ProcessPoolExecutor(max_workers=6)
@@ -283,19 +263,12 @@ class LiveStructureEngine:
                 futures.append(self._executor.submit(compute, chunk, spot_prices))
 
             result = {}
-            chains_json = {}
             for f in concurrent.futures.as_completed(futures):
-                res_out, res_chains = f.result()
-                result.update(res_out)
-                chains_json.update(res_chains)
-                
-        # Merge with caches
+                result.update(f.result())
+
+        # Merge with cache
         self._cached_result.update(result)
-        self._cached_chains.update(chains_json)
-        
-        # Update the live chains cache (in-memory)
-        live_chains_cache.update(self._cached_chains)
-        
+
         events = self._diff_events(self._cached_result)
         
         # Acknowledge processed ticks

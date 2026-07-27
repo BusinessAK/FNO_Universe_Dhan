@@ -16,7 +16,7 @@ import unittest
 
 from vanguard.config.equity import NATR_SL_MULT, NATR_TRIGGER_MULT
 from vanguard.rules.equity_playbook import build_equity_playbook
-from vanguard.live.trigger_engine import _direction
+from vanguard.rules.setup_positions import _direction
 
 _IC_TRIGGER_MULT = NATR_TRIGGER_MULT["IMBALANCE_CONSOLIDATION"]
 _IC_SL_MULT = NATR_SL_MULT["IMBALANCE_CONSOLIDATION"]
@@ -133,7 +133,7 @@ class TestImbalanceConsolidationRangeAnchor(unittest.TestCase):
         trigger > invalidation holds for any positive anchor value,
         independent of where dma20/dma50 happen to sit. Direction must
         always infer "up" for this setup."""
-        from vanguard.live.trigger_engine import _direction
+        from vanguard.rules.setup_positions import _direction
         # dma50 deliberately ABOVE the range high -- would have inverted
         # direction under the old split-anchor design.
         pb = build_equity_playbook("IMBALANCE_CONSOLIDATION", close=105.0, dma20=95.0,

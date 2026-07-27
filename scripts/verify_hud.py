@@ -36,6 +36,23 @@ from vanguard.store.export_service import FLIP_REPEAT_LOOKBACK  # noqa: E402
 PARTS = ["FII", "DII", "PRO", "CLIENT"]
 jround = lambda x: math.floor(x + 0.5)               # JS Math.round, not banker's
 
+# HUD sector label -> daily_index_close.index_name — deliberately duplicated
+# here rather than imported from vanguard/engines/rrg.py (same principle as
+# PARTS/DLV_COLS above: this oracle re-derives the answer, it doesn't replay
+# the code under test).
+RRG_INDEX_BY_SECTOR = {
+    "NIFTY IT": "Nifty IT", "NIFTY PVT BANK": "Nifty Private Bank",
+    "NIFTY PSU BANK": "Nifty PSU Bank", "NIFTY FIN SERVICE": "Nifty Financial Services",
+    "NIFTY MEDIA & COMM": "Nifty Media", "NIFTY OIL & GAS": "Nifty Oil & Gas",
+    "NIFTY ENERGY": "Nifty Energy", "NIFTY INFRA": "Nifty Infrastructure",
+    "NIFTY AUTO": "Nifty Auto", "NIFTY PHARMA": "Nifty Pharma", "NIFTY FMCG": "Nifty FMCG",
+    "NIFTY CONS DURABLES": "Nifty Consumer Durables", "NIFTY METAL": "Nifty Metal",
+    "NIFTY COMMODITIES": "Nifty Commodities", "NIFTY REALTY": "Nifty Realty",
+    "NIFTY SERVICES": "Nifty Services Sector",
+}
+RRG_BENCHMARK = "Nifty 50"
+RRG_TAIL = {"1D": 8, "1W": 8, "1M": 5}
+
 
 class Oracle:
     """Recomputes every panel's numbers straight from DuckDB."""
@@ -66,8 +83,8 @@ class Oracle:
             for sym, raw in zip(self.ms.symbol, self.ms.sector)]
         # Same source export_service.py uses for data["scanner_universe"] —
         # see scan() below.
-        from vanguard.live.universe import get_nifty50_constituents
-        from vanguard.config.live import INDEX_SYMBOLS
+        from vanguard.pipeline.context.nifty50_universe import (
+            get_nifty50_constituents, INDEX_SYMBOLS)
         self.scanner_universe = set(get_nifty50_constituents()) | set(INDEX_SYMBOLS)
 
     def _one(self, sql, params):
@@ -154,6 +171,9 @@ class Oracle:
             }
 
         exp["sectors"] = {h: self.sectors(sdate, h) for h in ("1D", "1W", "1M")}
+        # Not session-indexed — RRG always reflects the latest compiled
+        # session regardless of time-travel, same as drawRRG() client-side.
+        exp["rrg"] = self.rrg()
 
         flips = cur[cur.structure_flip.notna() & (cur.structure_flip != "NONE")]
         exp["flips"] = {
@@ -217,6 +237,139 @@ class Oracle:
         cur = cur[cur.symbol.isin(self.scanner_universe)]
         return {"shown": len(cur), "total": len(cur), "horizon": horizon,
                 "win": len(win), "chg": per_sym.reindex(cur.symbol).to_dict()}
+
+    def rrg(self) -> dict | None:
+        """Independent RS-Ratio/RS-Momentum recomputation straight from
+        daily_index_close — re-derived with its own zscore/window logic, not
+        by importing vanguard/engines/rrg.py's build_rrg(). Doesn't take an
+        sdate: the RRG panel always reflects the latest compiled session
+        regardless of time-travel, same as the HUD's drawRRG()."""
+        names = [RRG_BENCHMARK] + list(RRG_INDEX_BY_SECTOR.values())
+        ph = ", ".join("?" * len(names))
+        df = self.con.execute(
+            f"SELECT date, index_name, close FROM daily_index_close "
+            f"WHERE index_name IN ({ph}) ORDER BY date", names).df()
+        if df.empty or RRG_BENCHMARK not in set(df.index_name):
+            return None
+        df["date"] = pd.to_datetime(df["date"])
+        wide = df.pivot(index="date", columns="index_name", values="close").sort_index()
+
+        def zscore(x, w):
+            mean, std = x.rolling(w).mean(), x.rolling(w).std()
+            return ((x - mean) / std.clip(lower=1e-9)).clip(-4.0, 4.0)
+
+        def resample(s, tf):
+            # mirror engines/rrg._resample: label each bucket by its actual
+            # last trading date, not the calendar period-end
+            s = s.dropna()
+            if tf == "1D":
+                return s
+            rule = {"1W": "W-FRI", "1M": "ME"}[tf]
+            val = s.resample(rule).last()
+            last_date = s.index.to_series().resample(rule).last()
+            mask = val.notna()
+            return pd.Series(val[mask].values,
+                             index=pd.DatetimeIndex(last_date[mask].values)).sort_index()
+
+        out = {}
+        for tf, tail in RRG_TAIL.items():
+            bench_r = resample(wide[RRG_BENCHMARK], tf)
+            sectors = {}
+            for label, name in RRG_INDEX_BY_SECTOR.items():
+                if name not in wide.columns:
+                    continue
+                sec_r = resample(wide[name], tf)
+                aligned = pd.concat({"s": sec_r, "b": bench_r}, axis=1).dropna()
+                n = len(aligned)
+                if n < 6:
+                    continue
+                w = int(min(10, max(3, (n - tail - 2 + 1) // 2)))
+                rs = 100.0 * aligned["s"] / aligned["b"]
+                rs_ratio = 100.0 + zscore(rs, w)
+                rs_mom = 100.0 + zscore(rs_ratio.diff(1), w)
+                last = pd.concat({"rs_ratio": rs_ratio, "rs_momentum": rs_mom}, axis=1).dropna()
+                if last.empty:
+                    continue
+                row = last.iloc[-1]
+                sectors[label] = {
+                    "date": last.index[-1].strftime("%Y-%m-%d"),
+                    "rs_ratio": round(float(row["rs_ratio"]), 4),
+                    "rs_momentum": round(float(row["rs_momentum"]), 4),
+                }
+            if sectors:
+                out[tf] = sectors
+        return out
+
+    def rrg_stock(self, sector_label: str) -> dict:
+        """Independent stock-RRG recompute for one sector's F&O names, vs BOTH
+        NIFTY 50 ("n") and the sector index ("s"), straight from
+        daily_equity_technicals.adj_close + daily_index_close. Re-derived (not
+        importing engines/rrg.py). Returns {tf: {"n": {sym:{...}}, "s": {...}}},
+        rounded to 2 dp to match the shipped precision."""
+        index_name = RRG_INDEX_BY_SECTOR[sector_label]
+        # F&O members of this sector
+        latest = self.con.execute("SELECT MAX(date) FROM daily_market_structure").fetchone()[0]
+        syms = [s for (s,) in self.con.execute(
+            "SELECT DISTINCT symbol FROM daily_market_structure WHERE date=?", [latest]).fetchall()
+            if get_sector(s) == sector_label]
+        if not syms:
+            return {}
+        idf = self.con.execute(
+            "SELECT date, index_name, close FROM daily_index_close WHERE index_name IN (?,?) ORDER BY date",
+            [RRG_BENCHMARK, index_name]).df()
+        idf["date"] = pd.to_datetime(idf["date"])
+        iw = idf.pivot(index="date", columns="index_name", values="close").sort_index()
+        phs = ", ".join("?" * len(syms))
+        sdf = self.con.execute(
+            f"SELECT date, symbol, adj_close FROM daily_equity_technicals "
+            f"WHERE symbol IN ({phs}) AND adj_close IS NOT NULL ORDER BY date", syms).df()
+        sdf["date"] = pd.to_datetime(sdf["date"])
+        sw = sdf.pivot(index="date", columns="symbol", values="adj_close").sort_index()
+
+        def zscore(x, w):
+            mean, std = x.rolling(w).mean(), x.rolling(w).std()
+            return ((x - mean) / std.clip(lower=1e-9)).clip(-4.0, 4.0)
+
+        def resample(s, tf):
+            s = s.dropna()
+            if tf == "1D":
+                return s
+            rule = {"1W": "W-FRI", "1M": "ME"}[tf]
+            val = s.resample(rule).last()
+            last_date = s.index.to_series().resample(rule).last()
+            mask = val.notna()
+            return pd.Series(val[mask].values,
+                             index=pd.DatetimeIndex(last_date[mask].values)).sort_index()
+
+        def last_point(stock_close, bench_close, tf, tail):
+            a = pd.concat({"s": resample(stock_close, tf), "b": resample(bench_close, tf)}, axis=1).dropna()
+            n = len(a)
+            if n < 6:
+                return None
+            w = int(min(10, max(3, (n - tail - 2 + 1) // 2)))
+            rr = 100.0 + zscore(100.0 * a["s"] / a["b"], w)
+            rm = 100.0 + zscore(rr.diff(1), w)
+            v = pd.concat({"rr": rr, "rm": rm}, axis=1).dropna()
+            if v.empty:
+                return None
+            row = v.iloc[-1]
+            return {"date": v.index[-1].strftime("%Y-%m-%d"),
+                    "rs_ratio": round(float(row["rr"]), 2), "rs_momentum": round(float(row["rm"]), 2)}
+
+        out = {}
+        for tf, tail in RRG_TAIL.items():
+            n_map, s_map = {}, {}
+            for sym in syms:
+                if sym not in sw.columns:
+                    continue
+                pn = last_point(sw[sym], iw[RRG_BENCHMARK], tf, tail)
+                ps = last_point(sw[sym], iw[index_name], tf, tail)
+                if pn:
+                    n_map[sym] = pn
+                if ps:
+                    s_map[sym] = ps
+            out[tf] = {"n": n_map, "s": s_map}
+        return out
 
     def _flip_repeats(self, flips, sdate) -> int:
         """Mirror export_service.add_flip_repeat exactly: lookback window is
@@ -311,6 +464,10 @@ def main() -> int:
                     check(panel, exp[panel], chk.get(panel), failures)
             check("sectors", exp["sectors"][chk["sectors"]["horizon"]],
                   chk["sectors"], failures)
+            if exp.get("rrg") and "rrg" in chk:
+                hz = chk["rrg"]["horizon"]
+                if hz in exp["rrg"]:
+                    check(f"rrg[{hz}]", exp["rrg"][hz], chk["rrg"]["sectors"], failures)
 
         # 1) latest session, default state
         assert_session(latest, "latest")
@@ -355,6 +512,15 @@ def main() -> int:
                 "h => window.__VG_CHECK__.sectors.horizon===h", arg=hz)
             check(f"sectors[{hz}]", ref.sectors(latest, hz),
                   registry()["sectors"], failures)
+
+        # 2c) RRG Daily/Weekly/Monthly toggle
+        rrg_exp = ref.rrg() or {}
+        for tf in ("1W", "1M", "1D"):
+            page.click(f'#rrg-chips .chip[data-tf="{tf}"]')
+            page.wait_for_function(
+                "t => window.__VG_CHECK__.rrg.horizon===t", arg=tf)
+            if tf in rrg_exp:
+                check(f"rrg[{tf}]", rrg_exp[tf], registry()["rrg"]["sectors"], failures)
 
         # 2b) scanner Δ% horizon toggle — same win/compounding math as
         # sectors, applied per-symbol; also exercises the sort comparator

@@ -180,10 +180,6 @@ figure figcaption{font-size:10px;color:var(--muted);letter-spacing:.06em;margin-
 
 /* ── signal feed ─────────────────────────────────────────────────────── */
 #sig-list{max-height:404px;overflow-y:auto;display:flex;flex-direction:column;gap:2px;scrollbar-width:thin;scrollbar-color:var(--faint) transparent}
-#wallbreak-list{max-height:220px;overflow-y:auto;display:flex;flex-direction:column;gap:2px;scrollbar-width:thin;scrollbar-color:var(--faint) transparent}
-#wallbreak-list .sig .tm{flex:none;color:var(--faint);font-size:10px;font-variant-numeric:tabular-nums;align-self:center}
-#triggers-list{max-height:220px;overflow-y:auto;display:flex;flex-direction:column;gap:2px;scrollbar-width:thin;scrollbar-color:var(--faint) transparent}
-#triggers-list .sig .tm{flex:none;color:var(--faint);font-size:10px;font-variant-numeric:tabular-nums;align-self:center}
 .sig{display:flex;gap:10px;padding:7px 8px;border-radius:4px;border-left:2px solid transparent;cursor:pointer}
 .sig:hover{background:rgba(83,221,242,.05)}
 .sig .ic{flex:none;width:16px;text-align:center}
@@ -194,25 +190,6 @@ figure figcaption{font-size:10px;color:var(--muted);letter-spacing:.06em;margin-
 .sig.vol{border-left-color:var(--violet)}
 
 /* ── setups queue ────────────────────────────────────────────────────── */
-#setup-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px;max-height:420px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--faint) transparent}
-.sc{border:1px solid rgba(124,140,160,.15);border-left-width:3px;border-radius:4px;padding:10px 12px;cursor:pointer;background:rgba(124,140,160,.04)}
-.sc:hover,.sc:focus-visible{border-color:var(--edge-hot);outline:none}
-.sc.bull{border-left-color:var(--bull)}
-.sc.bear{border-left-color:var(--bear)}
-.sc.neut{border-left-color:var(--violet)}
-.sc .top{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
-.sc .sym{font-weight:700;font-size:13px;letter-spacing:.04em}
-.sc .typ{font-size:9px;letter-spacing:.1em;color:var(--muted)}
-.sc .strikes{display:flex;justify-content:space-between;align-items:center;margin:7px 0 5px}
-.sc .rr{margin:1px 0 6px}
-.sc .rr-track{position:relative;height:3px;border-radius:2px;
-  background:linear-gradient(90deg,var(--bear) 0%,rgba(124,140,160,.3) 50%,var(--bull) 100%)}
-.sc .rr-mark{position:absolute;top:50%;width:7px;height:7px;border-radius:50%;background:var(--ink);
-  border:1.5px solid var(--panel-solid);transform:translate(-50%,-50%)}
-.sc .rr-lbls{display:flex;justify-content:space-between;font-size:9px;color:var(--muted);letter-spacing:.06em;
-  margin-top:4px;font-variant-numeric:tabular-nums}
-.sc .rr-lbls b{color:var(--ink);font-weight:600}
-.sc .beh{font-size:10.5px;color:var(--muted);line-height:1.45;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 
 /* ── scanner ─────────────────────────────────────────────────────────── */
 #scan-ctl{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
@@ -231,11 +208,6 @@ figure figcaption{font-size:10px;color:var(--muted);letter-spacing:.06em;margin-
 #scan td:nth-child(2){text-align:left;color:var(--muted);font-size:10.5px}
 #scan tbody tr{cursor:pointer}
 #scan tbody tr:hover{background:rgba(83,221,242,.05)}
-.live-px{display:inline-block;margin-left:6px;font-size:10.5px;font-weight:600}
-/* Wall-break row highlight (live, client-side): cleared automatically once
-   price moves back inside the wall — independent of the one-shot toast. */
-#scan tbody tr.wall-break-bull{border-left:2px solid var(--bull-hi);background:rgba(49,168,120,.06)}
-#scan tbody tr.wall-break-bear{border-left:2px solid var(--bear-hi);background:rgba(232,84,111,.06)}
 .pos{color:var(--bull-hi)}.neg{color:var(--bear-hi)}.dim{color:var(--muted)}
 
 #dss{position:relative;width:min(880px,100%);max-height:92vh;overflow-y:auto;background:var(--panel-solid);
@@ -252,7 +224,6 @@ figure figcaption{font-size:10px;color:var(--muted);letter-spacing:.06em;margin-
 /* ── intelligence panel ──────────────────────────────────────────────── */
 #dss-intel{display:flex;flex-direction:column;gap:12px;margin-bottom:12px}
 .intel-card{border:1px solid rgba(124,140,160,.15);border-radius:4px;padding:12px 14px;background:rgba(124,140,160,.04)}
-.intel-card.danger{border-color:rgba(239,68,68,.3);background:rgba(239,68,68,.04)}
 .intel-title{font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink);margin-bottom:8px;font-weight:700}
 .migration-labels{display:flex;justify-content:space-between;font-size:9px;margin-bottom:4px}
 .migration-track{height:6px;background:rgba(255,255,255,.1);border-radius:3px;position:relative;overflow:hidden}
@@ -262,11 +233,9 @@ figure figcaption{font-size:10px;color:var(--muted);letter-spacing:.06em;margin-
 .velocity-card{background:rgba(0,0,0,.15);padding:8px;border-radius:4px;text-align:center}
 .velocity-label{font-size:8.5px;color:var(--muted);letter-spacing:.05em;margin-bottom:4px}
 .velocity-value{font-size:12.5px;font-weight:700;font-variant-numeric:tabular-nums}
-.narrative-body{font-size:11px;color:var(--muted);line-height:1.5;margin-top:10px}
+.narrative-body{font-size:11px;color:var(--muted);line-height:1.5}
 
 
-.meter{display:inline-block;width:54px;height:5px;border-radius:3px;background:rgba(124,140,160,.15);vertical-align:1px;margin-left:6px;overflow:hidden}
-.meter i{display:block;height:100%;background:var(--cyan-mark)}
 
 /* ── dossier overlay ─────────────────────────────────────────────────── */
 #dossier{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;padding:24px;
@@ -289,7 +258,6 @@ figure figcaption{font-size:10px;color:var(--muted);letter-spacing:.06em;margin-
 @media(max-width:720px){#dss-grid{grid-template-columns:1fr}}
 #dss .sect{margin-top:16px}
 #dss .sect h4{font-size:10px;letter-spacing:.16em;color:var(--accent);text-transform:uppercase;margin-bottom:8px}
-.strat{display:inline-block;border:1px solid var(--edge-hot);color:var(--accent);border-radius:4px;padding:4px 12px;font-size:12px;letter-spacing:.05em}
 
 /* tooltip */
 #tip{position:fixed;z-index:99;pointer-events:none;background:#0D1522;border:1px solid var(--edge-hot);border-radius:5px;
@@ -329,20 +297,9 @@ figure figcaption{font-size:10px;color:var(--muted);letter-spacing:.06em;margin-
     <div class="cb-stat"><span class="k">Gamma regime</span><span class="v" id="cb-gamma">—</span></div>
     <div class="cb-stat" id="vix-tile" hidden><span class="k">India VIX <span id="vix-pct" style="color:var(--faint)"></span></span><span class="v" id="vix-val">—</span></div>
     <div class="spacer"></div>
-    <div class="cb-stat" id="live-badge" hidden><span class="k" style="color:var(--bull-hi)"><span class="pulse" style="background:var(--bull-hi)"></span>LIVE</span><span class="v" id="live-n" style="color:var(--bull-hi)">—</span></div>
     <div class="cb-stat"><span class="k"><span class="pulse"></span>IST</span><span class="v" id="clock">—</span></div>
     <div id="hint"><kbd>/</kbd> SCAN &nbsp; <kbd>ESC</kbd> CLOSE</div>
   </header>
-
-  <section class="panel" style="--i:0" id="p-triggers" hidden>
-    <div class="ph"><h2>⚡ Live Triggers</h2><span class="sub" id="triggers-sub"></span></div>
-    <div id="triggers-list"></div>
-  </section>
-
-  <section class="panel" style="--i:0" id="p-wallbreaks" hidden>
-    <div class="ph"><h2>🚨 Live Wall Breaks</h2><span class="sub" id="wallbreak-sub"></span></div>
-    <div id="wallbreak-list"></div>
-  </section>
 
   <section class="row r1">
     <div class="panel" style="--i:1" id="p-regime">
@@ -409,14 +366,18 @@ figure figcaption{font-size:10px;color:var(--muted);letter-spacing:.06em;margin-
     </div>
   </section>
 
-  
-
-  <section class="panel" style="--i:7" id="p-setups">
-    <div class="ph"><h2>Setup Queue</h2><span class="sub" id="setup-count"></span>
-      <span class="spacer"></span><div style="display:flex;gap:6px" id="queue-track-chips"></div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap" id="setup-chips"></div></div>
-    <div id="setup-cards"></div>
+  <section class="panel" style="--i:6" id="p-rrg">
+    <div class="ph"><h2>Relative Rotation</h2>
+      <span class="sub" id="rrg-sub">EOD close vs NIFTY 50 · JdK RS-Ratio / RS-Momentum</span>
+      <span class="spacer"></span>
+      <span id="rrg-count" class="sub dim" style="margin-right:10px"></span>
+      <div style="display:flex;gap:6px;margin-right:8px" id="rrg-bench"></div>
+      <div style="display:flex;gap:6px" id="rrg-chips"></div></div>
+    <div id="rrg-thin" class="sub dim" style="margin-bottom:6px" hidden></div>
+    <div class="legend" id="rrg-legend" style="margin-bottom:8px"></div>
+    <figure><div id="rrg-chart"></div></figure>
   </section>
+
 
   <section class="panel" style="--i:8" id="p-scanner">
     <div class="ph"><h2>Symbol Scanner</h2><span class="sub" id="scan-count"></span></div>
@@ -442,23 +403,17 @@ figure figcaption{font-size:10px;color:var(--muted);letter-spacing:.06em;margin-
        style="position:absolute;top:12px;right:166px;text-decoration:none">FYERS ⤴</a>
     <h3><span id="dss-sym">—</span><span id="dss-date"></span></h3>
     <div class="sub" id="dss-sub">—</div>
-    <div class="sub" id="dss-live" style="margin-top:2px"></div>
     <div id="dss-grid">
       <div>
         <div class="sect" style="margin-top:0"><h4>Strike Ladder</h4><div id="dss-ladder"></div></div>
-        <div class="sect"><h4>Wall Trail · 30 sessions</h4><div id="dss-trail"></div></div>
       </div>
       <div>
         <div class="sect" style="margin-top:0" id="dss-intel-sect"><h4>Vanguard Intelligence</h4><div id="dss-intel"></div></div>
       </div>
     </div>
 
+    <div class="sect" style="margin-top:20px"><h4>Wall Trail · 30 sessions</h4><div id="dss-trail"></div></div>
     <div class="sect" style="margin-top:20px"><h4>Structure Readout</h4><div class="tiles" id="dss-tiles"></div></div>
-    <div class="sect" id="dss-live-structure-sect" hidden>
-      <h4>Live Structure <span id="dss-live-structure-watermark" class="bias" style="background:rgba(232,180,92,.15);color:#E8B45C;font-size:9px;letter-spacing:.08em;padding:1px 6px;margin-left:6px" hidden title="Not yet confirmed against the next EOD compile — see scripts/live_parity_check.py">INDICATIVE</span></h4>
-      <div id="dss-live-structure"></div>
-    </div>
-    <div class="sect"><h4>Desk Line</h4><div id="dss-strat"></div></div>
     <div class="sect" id="dss-setups-sect"><h4>Active Setups</h4><div id="dss-setups"></div></div>
     <div class="sect" id="dss-sigs-sect"><h4>Structure Alerts</h4><div id="dss-sigs"></div></div>
 
@@ -504,11 +459,20 @@ const BR   = unpack(VG.breadth);
 const CM   = unpack(VG.cm_breadth);
 const NF   = unpack(VG.nifty || {cols: [], rows: []});
 const NF_BY_DATE = Object.fromEntries(NF.map(r => [r.date, r.spot_close]));
+// Baked option chain (strike/OI/IV/GEX) for the Dossier's Deep Dive Charts —
+// see export_service.py's chain_path comment for why this replaced a live
+// fetch('/api/chain/<symbol>'). Grouped by symbol once at boot rather than
+// filtered on every dossier open.
+const CHAIN_BY_SYMBOL = {};
+unpack(VG.chains || {cols: [], rows: []}).forEach(r => {
+  (CHAIN_BY_SYMBOL[r.symbol] ??= []).push(r);
+});
 const POS  = VG.positioning ? unpack(VG.positioning) : [];
 const VIXH = VG.vix ? unpack(VG.vix) : [];
-const SPOS = VG.setup_positions ? unpack(VG.setup_positions) : [];  // trigger->SL/target position lifecycle
+// Already a display-ready nested object (not cols/rows table shape) — built
+// server-side by vanguard/engines/rrg.py, not reshaped here.
+const RRG = VG.rrg || null;
 const TRACK_RECORD = VG.track_record ? unpack(VG.track_record) : [];  // win rate/avg R/total R per setup type, both tracks
-const EQ_SPOS = VG.equity_setup_positions ? unpack(VG.equity_setup_positions) : [];  // Track B mirror of SPOS
 const DLV_BY_DATE = {};
 (VG.delivery ? unpack(VG.delivery) : []).forEach(r => { (DLV_BY_DATE[r.date] ??= {})[r.symbol] = r; });
 const FIIDII = VG.fii_dii ? unpack(VG.fii_dii) : [];
@@ -562,6 +526,38 @@ const fmtOI= v => {if(v==null)return"—";const a=Math.abs(v),s=v<0?"−":"";
   if(a>=1e3)return s+(a/1e3).toFixed(0)+"k"; return s+a.toFixed(0)};
 const cls = v => v>0?"pos":v<0?"neg":"dim";
 const biasKind = b => /bull/i.test(b)?"bull":/bear/i.test(b)?"bear":"neut";
+/* Futures OI build-up: price × OI-change quadrant, same 2x2 read as the
+   Scanner Matrix's per-day buildup tag (vanguard/ui/matrix.py). Below the
+   ±0.5% band the price move is noise, so it's left unclassified. */
+const BUILDUP_INFO = {
+  LB:["bull","Long Build-up — price up, futures OI up (fresh longs)"],
+  SC:["bull","Short Covering — price up, futures OI down (shorts closing)"],
+  SB:["bear","Short Build-up — price down, futures OI up (fresh shorts)"],
+  LU:["bear","Long Unwinding — price down, futures OI down (longs closing)"],
+  NT:["neut","Neutral — spot move under 0.5% (or no futures OI change): no clear build-up"],
+};
+function buildupTag(r){
+  const chg=r.spot_change_pct, oi=r.futures_oi_chg;
+  if(chg==null||oi==null)return null;              // genuinely no data → —
+  if(Math.abs(chg)<0.5||!oi)return "NT";           // flat spot or no OI change → neutral
+  return chg>0?(oi>0?"LB":"SC"):(oi>0?"SB":"LU");
+}
+/* Options-side flow: nets the chain's own CE/PE build-up read (vanguard/
+   intelligence.classify_oi_flow, baked as ce_interp/pe_interp) into one
+   bull/bear/split/quiet tag — independent of the futures-based OI FLOW tag
+   above, so the two can be eyeballed against each other for agreement. */
+const CE_BIAS = {"Call Buying (Long Build-up)":1,"Short Covering":1,
+  "Call Writing (Short Build-up)":-1,"Long Unwinding":-1};
+const PE_BIAS = {"Put Writing (Short Build-up)":1,"Long Unwinding":1,
+  "Put Buying (Long Build-up)":-1,"Short Covering":-1};
+function optFlowTag(r){
+  const ce=CE_BIAS[r.ce_interp]||0, pe=PE_BIAS[r.pe_interp]||0;
+  const net=ce+pe;
+  if(ce&&pe&&ce!==pe)return["▲▼","neut","Calls and puts disagree — "+r.ce_interp+" vs "+r.pe_interp];
+  if(!net)return["—","dim",(r.ce_interp||"Neutral")+" · "+(r.pe_interp||"Neutral")];
+  const arrow=net>0?(Math.abs(net)>1?"▲▲":"▲"):(Math.abs(net)>1?"▼▼":"▼");
+  return[arrow,net>0?"bull":"bear",r.ce_interp+" · "+r.pe_interp];
+}
 const C = {bull:"#31A878",bear:"#E8546F",amber:"#B38838",cyan:"#00A0BE",violet:"#957CDE",neutral:"#566274",
            ink:"#DCE7F2",muted:"#7C8CA0",bullHi:"#3ED598",bearHi:"#FF7A92"};
 /* diverging: bear pole ↔ neutral gray ↔ bull pole (marks-validated poles) */
@@ -619,7 +615,7 @@ function stepSession(dir){
 }
 function setSession(d){
   SDATE=d;$("#d-sel").value=d;
-  sigFilter=null;setupFilter=null;
+  sigFilter=null;
   bindSession();renderSession();
 }
 
@@ -1016,10 +1012,10 @@ function drawInternals(){
 /* ── sector flow grid ────────────────────────────────────────────────── */
 /* Horizons: 1W/1M compound each symbol's daily spot_change_pct over the
    trailing window ending at the selected session, then average per sector.
-   conv μ + bull rail stay 1D always — conviction and structural bias are
-   state at the selected session, not something you can average over a month.
-   Payload holds 30 sessions, so 1M truncates when time-traveling back; the
-   header shows the actual window so a short one never masquerades as a month. */
+   The bull rail stays 1D always — structural bias is state at the selected
+   session, not something you can average over a month. Payload holds 30
+   sessions, so 1M truncates when time-traveling back; the header shows the
+   actual window so a short one never masquerades as a month. */
 let sectorFilter=null,sectorHorizon="1D";
 const SEC_HORIZONS={"1D":[1,1.2],"1W":[5,2.5],"1M":[21,4]};   // [sessions, color threshold %]
 /* Shared by sectors AND the scanner Δ% toggle: compound a symbol's daily
@@ -1037,10 +1033,10 @@ function drawSectors(){
   const hret={};   // per-symbol compounded % over the window
   if(hn>1)MS.forEach(r=>{hret[r.symbol]=symbolReturn(r.symbol,win);});
   const agg={};
-  MS.forEach(r=>{const s=r.sector||"UNMAPPED";(agg[s]??=({n:0,chg:0,conv:0,bull:0}));
-    const a=agg[s];a.n++;a.chg+=hn>1?hret[r.symbol]:(r.spot_change_pct||0);a.conv+=r.conviction_score||0;
+  MS.forEach(r=>{const s=r.sector||"UNMAPPED";(agg[s]??=({n:0,chg:0,bull:0}));
+    const a=agg[s];a.n++;a.chg+=hn>1?hret[r.symbol]:(r.spot_change_pct||0);
     if(biasKind(r.structural_bias)==="bull"||["Support Building","Expansion"].includes(r.structural_bias))a.bull++;});
-  const rows=Object.entries(agg).map(([s,a])=>({s,n:a.n,chg:a.chg/a.n,conv:a.conv/a.n,bull:a.bull}))
+  const rows=Object.entries(agg).map(([s,a])=>({s,n:a.n,chg:a.chg/a.n,bull:a.bull}))
     .sort((a,b)=>b.chg-a.chg);
   CHK.sectors={horizon:sectorHorizon,win:win.size,
     avg:Object.fromEntries(rows.map(r=>[r.s,r.chg])),
@@ -1056,12 +1052,12 @@ function drawSectors(){
     return`<div class="sec-tile" tabindex="0" role="button" data-sec="${esc(r.s)}">
       <div class="nm">${esc(r.s)}</div>
       <div class="chg" style="color:${col}">${fmtP(r.chg)}</div>
-      <div class="meta">${r.n} syms · conv μ ${r.conv.toFixed(0)}</div>
+      <div class="meta">${r.n} syms</div>
       <div class="rail"><i style="width:${(r.bull/r.n*100).toFixed(0)}%;background:${col}"></i></div>
     </div>`}).join("");
   document.querySelectorAll(".sec-tile").forEach(t=>{
     const go=()=>{sectorFilter=t.dataset.sec;$("#scan-q").value="";
-      renderScan();drawSetups();drawFlips();drawSignals();
+      renderScan();drawFlips();drawSignals();syncRRGToSector(sectorFilter);
       $("#scan-clear").hidden=false;$("#scan-clear").textContent="clear "+sectorFilter+" ✕";
       $("#p-scanner").scrollIntoView({behavior:"smooth"})};
     t.addEventListener("click",go);
@@ -1073,6 +1069,339 @@ function drawSectors(){
         <div class="r"><span>bullish structure</span><b>${r.bull}/${r.n}</b></div>`,e.clientX,e.clientY)});
     t.addEventListener("mouseleave",hideTip);
   });
+}
+
+/* ── relative rotation (RRG) ──────────────────────────────────────────
+   X = JdK RS-Ratio, Y = JdK RS-Momentum, both computed server-side
+   (vanguard/engines/rrg.py) from real NSE sector-index closes vs NIFTY 50 —
+   this panel only plots what's shipped, it does no calculation itself.
+   16-color categorical palette, distinct from the semantic C.bull/bear/
+   cyan/violet/amber constants used elsewhere (those mean bull/bear/neutral;
+   reusing them for arbitrary sector identity here would be misleading). */
+const RRG_PALETTE=["#53DDF2","#F2A153","#8CE85A","#F25391","#B38EFF","#53F2C7",
+  "#F2D453","#5385F2","#F25353","#7ADE9E","#DE7AD1","#9EB8DE","#F2925A","#5AC7E8",
+  "#C7A8F2","#DEDE7A"];
+let rrgHorizon="1W",rrgHidden=new Set();
+// drill-down state: "sectors" (16 sector indices) or "stocks" (one sector's
+// F&O names). Stocks carry their own hidden-set + a benchmark toggle.
+let rrgLevel="sectors",rrgSector=null,rrgStockBench="n",rrgStockHidden=new Set();
+/* which RRG quadrant a point sits in, + the standard read for it (relative to
+   the reference `ref` — NIFTY for the market view, the sector for intra-sector) */
+function rrgQuadrantRef(rr,rm,ref){
+  if(rr>=100&&rm>=100)return{name:"Leading",col:C.bull,desc:`Outperforming ${ref} with momentum still rising — strongest state.`};
+  if(rr<100&&rm>=100)return{name:"Improving",col:C.cyan,desc:`Still lagging ${ref}, but momentum is turning up — often rotates toward Leading.`};
+  if(rr<100&&rm<100)return{name:"Lagging",col:C.bear,desc:`Underperforming ${ref} with falling momentum — weakest state.`};
+  return{name:"Weakening",col:C.amber,desc:`Still ahead of ${ref}, but momentum is fading — often rotates toward Lagging.`};
+}
+function rrgQuadrant(rr,rm){return rrgQuadrantRef(rr,rm,"NIFTY");}
+/* "nice" axis ticks (1/2/5 × 10ⁿ) spanning [lo,hi] */
+function rrgTicks(lo,hi,target){
+  const span=(hi-lo)||1,raw=span/target,mag=Math.pow(10,Math.floor(Math.log10(raw)));
+  const n=raw/mag,step=(n<1.5?1:n<3?2:n<7?5:10)*mag;
+  const out=[];for(let v=Math.ceil(lo/step)*step;v<=hi+1e-9;v+=step)out.push(+v.toFixed(6));
+  return out;
+}
+// Slice each label's shipped series to its position AS OF the selected session
+// (SDATE) — time-travel aware; dots-only, the date selector is the time axis.
+function rrgSliceDots(labels,arrOf,dates,lastIdx,atLatest,partial_last){
+  const out={};
+  labels.forEach(l=>{
+    const arr=arrOf(l),v=(arr&&lastIdx>=0)?arr[lastIdx]:null;
+    out[l]=v?{date:dates[lastIdx],rs_ratio:v[0],rs_momentum:v[1],
+      partial:!!(partial_last&&atLatest&&lastIdx===dates.length-1)}:null;
+  });
+  return out;
+}
+
+// Shared RRG scatter renderer — owns legend, hover-isolate, range, quadrants,
+// numeric axes, dots+tooltip, and the label de-overlap placer. drawRRG()
+// assembles a level-specific dataset (sectors, or stocks-in-a-sector) and
+// calls this, so both levels stay pixel-identical in their common core.
+function renderRRGScatter(o){
+  const {labels,dotByLabel,hidden,colorOf,labelText,tipName,quadrantFn,
+         countText,thinText,onLegendToggle,onDotClick,dotHint}=o;
+
+  $("#rrg-count").textContent=countText;
+  $("#rrg-thin").hidden=!thinText;
+  if(thinText)$("#rrg-thin").textContent=thinText;
+
+  $("#rrg-legend").innerHTML=labels.map((l,i)=>
+    `<span class="chip" data-sec="${esc(l)}" aria-pressed="${!hidden.has(l)}"
+       ><i style="background:${colorOf(l,i)}"></i>${esc(labelText(l))}</span>`).join("");
+  document.querySelectorAll("#rrg-legend .chip").forEach(c=>{
+    c.addEventListener("click",()=>onLegendToggle(c.dataset.sec));
+    c.addEventListener("mouseenter",()=>highlightSector(c.dataset.sec));
+    c.addEventListener("mouseleave",unhighlightSector);
+  });
+
+  // dim-on-hover: dots in a tight band overlap — hovering a legend chip or a
+  // dot brings just that series to full opacity + reveals its label and fades
+  // the rest, without hiding any (that's the legend toggle's job).
+  const trailEls={};
+  function highlightSector(l){
+    labels.forEach(k=>{
+      const e=trailEls[k];if(!e)return;
+      const on=k===l;
+      e.dot.setAttribute("opacity",on?"1":".15");
+      e.label.setAttribute("opacity",on?"1":"0");
+    });
+    document.querySelectorAll("#rrg-legend .chip").forEach(c=>{
+      c.style.opacity=hidden.has(c.dataset.sec)?"":(c.dataset.sec===l?"1":".35");
+    });
+  }
+  function unhighlightSector(){
+    labels.forEach(k=>{
+      const e=trailEls[k];if(!e)return;
+      e.dot.setAttribute("opacity","1");
+      e.label.setAttribute("opacity","1");
+    });
+    document.querySelectorAll("#rrg-legend .chip").forEach(c=>{c.style.opacity=""});
+  }
+
+  // Axis range from ALL series' dots regardless of hidden state (so toggling
+  // a legend chip never rescales/jumps the chart under the user).
+  const allPts=labels.map(l=>dotByLabel[l]).filter(Boolean);
+  const xs=allPts.map(p=>p.rs_ratio),ys=allPts.map(p=>p.rs_momentum);
+  const pad=(lo,hi)=>{const s=(hi-lo)||2;return[lo-s*0.15,hi+s*0.15]};
+  const[x0,x1]=pad(Math.min(...xs,100),Math.max(...xs,100));
+  const[y0,y1]=pad(Math.min(...ys,100),Math.max(...ys,100));
+
+  const el=$("#rrg-chart");el.innerHTML="";
+  // Isotropic scale (same px-per-data-unit on both axes), plot centered in
+  // the box — a full-bleed panel (~1900px wide) against a fixed short height
+  // otherwise stretches X far more than Y (e.g. 200px/unit vs 50px/unit),
+  // flattening genuine loops/rotations into what reads as a flat zigzag
+  // scribble. Real RRG tools keep roughly equal X/Y scale for this reason.
+  const W=el.clientWidth||600,H=520,ml=66,mr=48,mt=18,mb=48,iw=W-ml-mr,ih=H-mt-mb;
+  const xSpan=(x1-x0)||1,ySpan=(y1-y0)||1;
+  const scale=Math.min(iw/xSpan,ih/ySpan);
+  const plotW=xSpan*scale,plotH=ySpan*scale;
+  const ox=ml+(iw-plotW)/2,oy=mt+(ih-plotH)/2;
+  const X=v=>ox+(v-x0)*scale, Y=v=>oy+plotH-(v-y0)*scale;
+  const NS="http://www.w3.org/2000/svg";
+  const svg=document.createElementNS(NS,"svg");
+  svg.setAttribute("viewBox",`0 0 ${W} ${H}`);svg.setAttribute("width","100%");svg.style.display="block";
+  const add=(tag,at,parent=svg)=>{const n=document.createElementNS(NS,tag);for(const k in at)n.setAttribute(k,at[k]);parent.appendChild(n);return n};
+
+  // quadrant fills, sized to the actual (100,100)-centered data range
+  const qx=X(100),qy=Y(100);
+  const quads=[
+    [ml,mt,qx-ml,qy-mt,"rgba(83,221,242,.08)","Improving","start","hanging"],
+    [qx,mt,ml+iw-qx,qy-mt,"rgba(49,168,120,.08)","Leading","end","hanging"],
+    [ml,qy,qx-ml,mt+ih-qy,"rgba(232,84,111,.08)","Lagging","start","auto"],
+    [qx,qy,ml+iw-qx,mt+ih-qy,"rgba(179,136,56,.08)","Weakening","end","auto"],
+  ];
+  quads.forEach(([x,y,w,h,fill,label,anchor,base])=>{
+    if(w<=0||h<=0)return;
+    add("rect",{x,y,width:w,height:h,fill});
+    add("text",{x:anchor==="start"?x+6:x+w-6,y:base==="hanging"?y+12:y+h-8,
+      "text-anchor":anchor,"dominant-baseline":base,class:"axis-t",
+      style:"letter-spacing:.1em;text-transform:uppercase;opacity:.7"}).textContent=label;
+  });
+  // numeric axes: nice-tick gridlines + labels on both sides, with the 100
+  // center-cross drawn bolder over them
+  const clampTk=(t,lo,hi)=>t.filter(v=>v>=lo-1e-9&&v<=hi+1e-9);
+  const xt=clampTk(rrgTicks(x0,x1,7),x0,x1),yt=clampTk(rrgTicks(y0,y1,6),y0,y1);
+  xt.forEach(v=>{
+    add("line",{x1:X(v),x2:X(v),y1:mt,y2:mt+ih,class:"grid-l"});
+    add("text",{x:X(v),y:mt+ih+16,"text-anchor":"middle",class:"axis-t"}).textContent=v.toFixed(1);
+  });
+  yt.forEach(v=>{
+    add("line",{x1:ml,x2:ml+iw,y1:Y(v),y2:Y(v),class:"grid-l"});
+    add("text",{x:ml-8,y:Y(v)+3,"text-anchor":"end",class:"axis-t"}).textContent=v.toFixed(1);
+  });
+  add("line",{x1:qx,x2:qx,y1:mt,y2:mt+ih,stroke:"rgba(124,140,160,.5)","stroke-width":1});
+  add("line",{x1:ml,x2:ml+iw,y1:qy,y2:qy,stroke:"rgba(124,140,160,.5)","stroke-width":1});
+  add("text",{x:ml+iw/2,y:H-6,"text-anchor":"middle",class:"axis-t",
+    style:"letter-spacing:.08em;text-transform:uppercase"}).textContent="JdK RS-Ratio →";
+  const yTitle=add("text",{x:16,y:mt+ih/2,"text-anchor":"middle",class:"axis-t",
+    style:"letter-spacing:.08em;text-transform:uppercase",
+    transform:`rotate(-90 16 ${mt+ih/2})`});
+  yTitle.textContent="JdK RS-Momentum →";
+
+  // dots: one per series at its as-of position (no trail — the date selector
+  // is the time axis)
+  const lblMeta=[];
+  labels.forEach((l,i)=>{
+    if(hidden.has(l))return;
+    const p=dotByLabel[l],col=colorOf(l,i);
+    if(!p)return;
+    const cx=X(p.rs_ratio),cy=Y(p.rs_momentum);
+    const dot=add("circle",{cx,cy,r:5.5,fill:col,stroke:"#050810","stroke-width":1.5});
+    const label=add("text",{x:cx+8,y:cy+3.5,fill:col,class:"dlab"});
+    const ltext=labelText(l);
+    label.textContent=ltext;
+    trailEls[l]={dot,label};
+    lblMeta.push({cx,cy,col,text:ltext,el:label});
+    const hot=add("circle",{cx,cy,r:12,fill:"transparent"});
+    if(onDotClick){hot.style.cursor="pointer";hot.addEventListener("click",()=>onDotClick(l));}
+    hot.addEventListener("mouseenter",()=>highlightSector(l));
+    hot.addEventListener("mousemove",e=>{
+      const q=quadrantFn(p.rs_ratio,p.rs_momentum);
+      showTip(`<div class="t">${esc(tipName(l))} · ${fdate(p.date)}${p.partial?" · in progress":""}</div>
+        <div class="r"><span>Quadrant</span><b style="color:${q.col}">${q.name}</b></div>
+        <div style="font-size:10px;color:var(--muted);margin:2px 0 4px;max-width:210px;white-space:normal">${q.desc}</div>
+        <div class="r"><span>RS-Ratio</span><b>${p.rs_ratio.toFixed(2)}</b></div>
+        <div class="r"><span>RS-Momentum</span><b>${p.rs_momentum.toFixed(2)}</b></div>${dotHint?`<div style="font-size:9.5px;color:var(--faint);margin-top:5px">${dotHint}</div>`:""}`,e.clientX,e.clientY);
+    });
+    hot.addEventListener("mouseleave",()=>{hideTip();unhighlightSector();});
+  });
+
+  // Label placement: for each label try candidate positions around its dot
+  // (right/left/above/below, escalating outward) and pick the first that
+  // collides with NO dot and NO already-placed label — a bare vertical nudge
+  // isn't enough in a diagonal cluster, where a label can still run into
+  // another series' dot. A faint connector is drawn whenever a label ends
+  // up off its own dot.
+  const CHARW=6.2,LH=11,PAD=2;
+  const ov=(a,b)=>a[0]<b[1]&&b[0]<a[1]&&a[2]<b[3]&&b[2]<a[3];
+  const inB=b=>b[0]>=ml-2&&b[1]<=ml+iw+2&&b[2]>=mt&&b[3]<=mt+ih+2;
+  // dots occupy space first; place outermost labels first (they have room)
+  const occ=lblMeta.map(o=>[o.cx-6,o.cx+6,o.cy-6,o.cy+6]);
+  const mx=lblMeta.reduce((s,o)=>s+o.cx,0)/(lblMeta.length||1);
+  const my=lblMeta.reduce((s,o)=>s+o.cy,0)/(lblMeta.length||1);
+  lblMeta.sort((a,b)=>Math.hypot(b.cx-mx,b.cy-my)-Math.hypot(a.cx-mx,a.cy-my));
+  lblMeta.forEach(o=>{
+    const w=o.text.length*CHARW+PAD,h=LH;
+    const cands=[];
+    for(let r=0;r<7;r++){const off=9+r*7;
+      cands.push({a:"start", x:o.cx+off,   y:o.cy+3.5, box:[o.cx+off,o.cx+off+w,o.cy-h/2,o.cy+h/2]});
+      cands.push({a:"end",   x:o.cx-off,   y:o.cy+3.5, box:[o.cx-off-w,o.cx-off,o.cy-h/2,o.cy+h/2]});
+      cands.push({a:"middle",x:o.cx,       y:o.cy-off, box:[o.cx-w/2,o.cx+w/2,o.cy-off-h,o.cy-off]});
+      cands.push({a:"middle",x:o.cx,       y:o.cy+off+h,box:[o.cx-w/2,o.cx+w/2,o.cy+off,o.cy+off+h]});
+    }
+    let pick=cands.find(c=>inB(c.box)&&!occ.some(b=>ov(c.box,b)))||cands[0];
+    occ.push(pick.box);
+    o.el.setAttribute("x",pick.x);
+    o.el.setAttribute("y",pick.y);
+    o.el.setAttribute("text-anchor",pick.a);
+    const moved=pick.a!=="start"||Math.abs(pick.x-(o.cx+9))>1;
+    if(moved){
+      const ln=add("line",{x1:o.cx,y1:o.cy,x2:pick.x,y2:pick.y-3.5,
+        stroke:o.col,"stroke-width":.6,"stroke-opacity":.4});
+      svg.insertBefore(ln,o.el);   // connector behind the label text
+    }
+  });
+  el.appendChild(svg);
+}
+
+// Keep the RRG panel in step with a sector picked in the flow grid / scanner.
+// Same shared key as the scanner's sectorFilter and RRG's own dot-click drill,
+// so all three views stay on one sector. Drills into the sector's stocks when
+// we ship rotation data for it (mirrors the onDotClick seed: non-default names
+// start hidden); otherwise — INDEX / UNMAPPED tiles, or a horizon with no
+// stock-level data — falls back to the sectors overview.
+function syncRRGToSector(sec){
+  if(!RRG)return;
+  const sb=RRG.stocks&&RRG.stocks.timeframes[rrgHorizon];
+  if(sec&&sb&&sb.sectors[sec]){
+    rrgLevel="stocks"; rrgSector=sec;
+    const syms=Object.keys(sb.sectors[sec].symbols), def=new Set(sb.sectors[sec].default);
+    rrgStockHidden=new Set(syms.filter(s=>!def.has(s)));
+  }else{
+    rrgLevel="sectors"; rrgSector=null;
+  }
+  drawRRG();
+}
+
+// Dispatcher: shared timeframe chips, then render the active level (sectors,
+// or stocks-in-a-sector when drilled in and that sector has data).
+function drawRRG(){
+  const host=$("#p-rrg");if(!host)return;
+  if(!RRG){host.hidden=true;return}
+  host.hidden=false;
+  const tfs=Object.keys(RRG.timeframes);
+  if(!tfs.includes(rrgHorizon))rrgHorizon=tfs[0];
+  $("#rrg-chips").innerHTML=tfs.map(m=>
+    `<button class="chip" data-tf="${m}" aria-pressed="${rrgHorizon===m}">${({"1D":"Daily","1W":"Weekly","1M":"Monthly"})[m]||m}</button>`).join("");
+  document.querySelectorAll("#rrg-chips .chip").forEach(b=>
+    b.addEventListener("click",()=>{rrgHorizon=b.dataset.tf;drawRRG();}));
+
+  const stf=RRG.stocks&&RRG.stocks.timeframes[rrgHorizon];
+  if(rrgLevel==="stocks"&&stf&&rrgSector&&stf.sectors[rrgSector]){
+    drawRRGStocks(stf,stf.sectors[rrgSector]);
+  }else{
+    rrgLevel="sectors"; rrgSector=null;
+    drawRRGSectors();
+  }
+}
+
+function drawRRGSectors(){
+  $("#rrg-sub").textContent="EOD close vs NIFTY 50 · JdK RS-Ratio / RS-Momentum";
+  $("#rrg-bench").innerHTML="";
+  const tf=RRG.timeframes[rrgHorizon];
+  const labels=Object.keys(tf.sectors);
+  const dates=tf.dates||[];
+  let lastIdx=-1; for(let i=0;i<dates.length;i++){if(dates[i]<=SDATE)lastIdx=i;}
+  const atLatest=lastIdx===dates.length-1;
+  const dotByLabel=rrgSliceDots(labels,l=>tf.sectors[l],dates,lastIdx,atLatest,tf.partial_last);
+
+  const shown=labels.filter(l=>!rrgHidden.has(l)).length;
+  const countText=`${shown} of ${labels.length} shown · as of ${lastIdx>=0?fdate(dates[lastIdx]):"—"}`;
+  const thinText=lastIdx<0?`No rotation data as of ${fdate(SDATE)} — series begins ${fdate(dates[0]||"")}.`
+    :tf.thin?`Thin ${rrgHorizon.toLowerCase()} history (${tf.candles} periods).`:"";
+  const canDrill=!!(RRG.stocks&&RRG.stocks.timeframes[rrgHorizon]);
+
+  renderRRGScatter({
+    labels,dotByLabel,hidden:rrgHidden,
+    colorOf:(l,i)=>RRG_PALETTE[i%RRG_PALETTE.length],
+    labelText:l=>l.replace(/^NIFTY /,""),
+    tipName:l=>l,
+    quadrantFn:rrgQuadrant,
+    countText,thinText,
+    onLegendToggle:l=>{if(rrgHidden.has(l))rrgHidden.delete(l);else rrgHidden.add(l);drawRRG();},
+    onDotClick:canDrill?(l=>{
+      const sb=RRG.stocks.timeframes[rrgHorizon]; if(!sb.sectors[l])return;
+      rrgLevel="stocks"; rrgSector=l;
+      const syms=Object.keys(sb.sectors[l].symbols), def=new Set(sb.sectors[l].default);
+      rrgStockHidden=new Set(syms.filter(s=>!def.has(s)));   // seed: non-default hidden
+      drawRRG();
+    }):null,
+    dotHint:canDrill?"click → drill into stocks":"",
+  });
+
+  CHK.rrg={horizon:rrgHorizon,benchmark:RRG.benchmark,lookback:tf.lookback,candles:tf.candles,
+    as_of:lastIdx>=0?dates[lastIdx]:null,
+    sectors:Object.fromEntries(labels.map(l=>{const p=dotByLabel[l];
+      return[l,p?{date:p.date,rs_ratio:p.rs_ratio,rs_momentum:p.rs_momentum}:null]}))};
+}
+
+function drawRRGStocks(stf,sec){
+  const secShort=rrgSector.replace(/^NIFTY /,"");
+  const refName=rrgStockBench==="n"?"NIFTY 50":(RRG.stocks.sector_index[rrgSector]||secShort);
+  $("#rrg-sub").innerHTML=`<button class="chip" id="rrg-back" style="margin-right:9px;border-color:var(--accent);color:var(--accent)">‹ All Sectors</button><b>${esc(secShort)}</b> stocks · adj-close vs ${esc(refName)}`;
+  $("#rrg-back").addEventListener("click",e=>{e.preventDefault();rrgLevel="sectors";rrgSector=null;drawRRG();});
+  $("#rrg-bench").innerHTML=[["n","vs NIFTY"],["s","vs SECTOR"]].map(([k,lbl])=>
+    `<button class="chip" data-bench="${k}" aria-pressed="${rrgStockBench===k}">${lbl}</button>`).join("");
+  document.querySelectorAll("#rrg-bench .chip").forEach(b=>
+    b.addEventListener("click",()=>{rrgStockBench=b.dataset.bench;drawRRG();}));
+
+  const symbols=Object.keys(sec.symbols);
+  const dates=stf.dates||[];
+  let lastIdx=-1; for(let i=0;i<dates.length;i++){if(dates[i]<=SDATE)lastIdx=i;}
+  const atLatest=lastIdx===dates.length-1;
+  const dotByLabel=rrgSliceDots(symbols,s=>sec.symbols[s][rrgStockBench],dates,lastIdx,atLatest,stf.partial_last);
+
+  const shown=symbols.filter(s=>!rrgStockHidden.has(s)).length;
+  const countText=`${secShort} · ${shown} of ${symbols.length} · ${rrgStockBench==="n"?"vs NIFTY":"vs SECTOR"} · as of ${lastIdx>=0?fdate(dates[lastIdx]):"—"}`;
+  const thinText=lastIdx<0?`No data as of ${fdate(SDATE)} — series begins ${fdate(dates[0]||"")}.`
+    :stf.thin?`Thin ${rrgHorizon.toLowerCase()} history (${stf.candles} periods).`:"";
+  const qfn=rrgStockBench==="n"?rrgQuadrant:((rr,rm)=>rrgQuadrantRef(rr,rm,secShort));
+
+  renderRRGScatter({
+    labels:symbols,dotByLabel,hidden:rrgStockHidden,
+    colorOf:(l,i)=>RRG_PALETTE[i%RRG_PALETTE.length],
+    labelText:l=>l,
+    tipName:l=>l,
+    quadrantFn:qfn,
+    countText,thinText,
+    onLegendToggle:l=>{if(rrgStockHidden.has(l))rrgStockHidden.delete(l);else rrgStockHidden.add(l);drawRRG();},
+  });
+
+  CHK.rrg={horizon:rrgHorizon,level:"stocks",sector:rrgSector,bench:rrgStockBench,
+    lookback:stf.lookback,candles:stf.candles,as_of:lastIdx>=0?dates[lastIdx]:null,
+    points:Object.fromEntries(symbols.map(s=>{const p=dotByLabel[s];
+      return[s,p?{date:p.date,rs_ratio:p.rs_ratio,rs_momentum:p.rs_momentum}:null]}))};
 }
 
 /* ── signal feed ─────────────────────────────────────────────────────── */
@@ -1103,21 +1432,8 @@ function drawSignals(){
     el.addEventListener("click",()=>openDossier(el.dataset.sym)));
 }
 
-/* ── setup queue ─────────────────────────────────────────────────────── */
-let setupFilter=null;
-/* Setup Queue now tracks position lifecycle (vanguard/rules/setup_positions.py),
-   not raw daily_setups rows — "active" means a setup actually triggered
-   (price crossed the trigger level) and hasn't yet resolved, tracked from
-   its original trigger date rather than re-listed fresh every day. A
-   position stays visible through the exact session it resolves on (shown
-   with a TARGET/SL/REVERSED badge that day), then drops out the next
-   session — resolved history lives in daily_setup_positions for later
-   querying, not in this live queue. STALE positions (symbol stopped
-   appearing in the data — delisted, dropped from F&O eligibility, a
-   corporate-action ticker change) are excluded entirely, same as any other
-   resolved status. */
 /* ── Deep Dive Charting (Plotly) ── */
-async function loadDeepDiveCharts(sym, r) {
+function loadDeepDiveCharts(sym, r) {
   const tabs = document.querySelectorAll('.dss-tab');
   const panels = document.querySelectorAll('.dss-chart-panel');
   tabs.forEach(t => t.onclick = (e) => {
@@ -1136,9 +1452,7 @@ async function loadDeepDiveCharts(sym, r) {
   };
 
   try {
-    const res = await fetch('http://127.0.0.1:8787/api/chain/' + sym);
-    if (!res.ok) throw new Error('fetch err');
-    const data = await res.json();
+    const data = CHAIN_BY_SYMBOL[sym] || [];
     if (!data.length) {
       document.getElementById('dss-chart-gex').innerHTML = '<div style="color:var(--muted)">No chain data available.</div>';
       return;
@@ -1150,20 +1464,20 @@ async function loadDeepDiveCharts(sym, r) {
     const gf = r.gamma_flip;
     const lo = spot * 0.85;
     const hi = spot * 1.15;
-    
+
     // Aggregate by strike
     let byStrike = {};
     data.forEach(d => {
-      if (d.STRIKE_PR >= lo && d.STRIKE_PR <= hi) {
-        if (!byStrike[d.STRIKE_PR]) byStrike[d.STRIKE_PR] = {STRIKE: d.STRIKE_PR, CE_GEX:0, PE_GEX:0, CE_OI:0, PE_OI:0, CE_IV:0, PE_IV:0};
-        if (d.OPTION_TYP === 'CE') {
-          byStrike[d.STRIKE_PR].CE_GEX += d.GEX||0;
-          byStrike[d.STRIKE_PR].CE_OI += d.OPEN_INT||0;
-          byStrike[d.STRIKE_PR].CE_IV = d.IV||0;
+      if (d.strike_pr >= lo && d.strike_pr <= hi) {
+        if (!byStrike[d.strike_pr]) byStrike[d.strike_pr] = {STRIKE: d.strike_pr, CE_GEX:0, PE_GEX:0, CE_OI:0, PE_OI:0, CE_IV_X_OI:0, PE_IV_X_OI:0};
+        if (d.option_typ === 'CE') {
+          byStrike[d.strike_pr].CE_GEX += d.gex||0;
+          byStrike[d.strike_pr].CE_OI += d.open_int||0;
+          byStrike[d.strike_pr].CE_IV_X_OI += (d.iv||0)*(d.open_int||0);
         } else {
-          byStrike[d.STRIKE_PR].PE_GEX += d.GEX||0;
-          byStrike[d.STRIKE_PR].PE_OI += d.OPEN_INT||0;
-          byStrike[d.STRIKE_PR].PE_IV = d.IV||0;
+          byStrike[d.strike_pr].PE_GEX += d.gex||0;
+          byStrike[d.strike_pr].PE_OI += d.open_int||0;
+          byStrike[d.strike_pr].PE_IV_X_OI += (d.iv||0)*(d.open_int||0);
         }
       }
     });
@@ -1186,8 +1500,24 @@ async function loadDeepDiveCharts(sym, r) {
     const pOIHover = rows.map(r => `Strike: ${r.STRIKE}<br>Put OI: ${r.PE_OI.toLocaleString()}`);
     const dOIHover = rows.map(r => `Strike: ${r.STRIKE}<br>Divergence: ${(r.CE_OI - r.PE_OI).toLocaleString()}`);
     
-    const cIV = rows.map(r=>r.CE_IV*100);
-    const pIV = rows.map(r=>r.PE_IV*100);
+    // OI-weighted, not last-expiry-wins: a strike often carries multiple
+    // expiries (see greeks.csv), and a naive overwrite let a stale/illiquid
+    // far-month contract's noisy backed-out IV clobber the liquid one —
+    // same "dust" problem vanguard/engines/gamma.py already fixed for the
+    // aggregate per-symbol IV, just never applied here per-strike.
+    //
+    // That alone isn't enough: some strikes carry only ONE contract total
+    // (e.g. a single far-month, deep-ITM call with OI in the hundreds),
+    // so there's nothing to weight against — its own backed-out IV can
+    // still be wild (a real case: 120% on a strike with OI=1,275 vs.
+    // 300,000+ at the liquid strikes around it). Weighting can't fix noise
+    // from a single thin data point, so also drop any strike/side below
+    // 5% of that side's own max OI in the plotted window — Plotly leaves
+    // a gap in the line rather than a fake zero.
+    const ceOIMax = Math.max(1, ...rows.map(r=>r.CE_OI));
+    const peOIMax = Math.max(1, ...rows.map(r=>r.PE_OI));
+    const cIV = rows.map(r=>r.CE_OI>0 && r.CE_OI>=ceOIMax*0.05 ? (r.CE_IV_X_OI/r.CE_OI)*100 : null);
+    const pIV = rows.map(r=>r.PE_OI>0 && r.PE_OI>=peOIMax*0.05 ? (r.PE_IV_X_OI/r.PE_OI)*100 : null);
 
     const shapes = [];
     const addHoriz = (val, color, dash) => {
@@ -1256,77 +1586,6 @@ async function loadDeepDiveCharts(sym, r) {
     document.getElementById('dss-chart-gex').innerHTML = '<div style="color:var(--bear-hi)">Error loading chart data.</div>';
   }
 }
-
-let queueTrack="fno";   // 'fno' | 'equity' | 'both' -- defaults to fno (pre-U3 behavior unchanged by default)
-function drawSetups(){
-  const inWindow=s=>s.trigger_date<=SDATE&&(!s.resolved_date||s.resolved_date>=SDATE);
-  const fnoOpen=SPOS.filter(s=>inWindow(s)&&(!sectorFilter||s.sector===sectorFilter))
-    .map(s=>({...s,_track:"fno"}));
-  // Equity's `sector` column holds NSE's Industry classification (E6), a
-  // different taxonomy than F&O's sectorFilter (static sectoral-index
-  // mapping, vanguard/config/sectors.py) -- never apply one track's sector
-  // filter to the other track's rows.
-  const eqOpen=EQ_SPOS.filter(inWindow).map(s=>({...s,_track:"equity"}));
-  const open=queueTrack==="fno"?fnoOpen:queueTrack==="equity"?eqOpen:fnoOpen.concat(eqOpen);
-  const counts={};open.forEach(s=>counts[s.setup_type]=(counts[s.setup_type]||0)+1);
-  CHK.setups={n:open.length,track:queueTrack};
-  $("#setup-count").textContent=open.length+" active · "+fdate(SDATE)
-    +(sectorFilter&&queueTrack!=="equity"?" · "+sectorFilter:"");
-  $("#queue-track-chips").innerHTML=["fno","equity","both"].map(t=>
-    `<button class="chip" data-t="${t}" aria-pressed="${queueTrack===t}">${t==="both"?"ALL":t.toUpperCase()}</button>`).join("");
-  document.querySelectorAll("#queue-track-chips .chip").forEach(c=>c.addEventListener("click",()=>{
-    queueTrack=c.dataset.t;drawSetups()}));
-  $("#setup-chips").innerHTML=Object.entries(counts).sort((a,b)=>b[1]-a[1]).map(([t,n])=>
-    `<button class="chip" data-t="${t}" aria-pressed="${setupFilter===t}">${t.replace(/_/g," ")} <span class="n">${n}</span></button>`).join("");
-  document.querySelectorAll("#setup-chips .chip").forEach(c=>c.addEventListener("click",()=>{
-    setupFilter=setupFilter===c.dataset.t?null:c.dataset.t;drawSetups()}));
-  // priority_score only exists for the F&O universe (bySym, from daily_
-  // market_structure) -- Equity rows all tie at 0, so trigger_date breaks
-  // the tie (most recently triggered first) instead of falling back to an
-  // arbitrary stable-sort order.
-  const list=open.filter(s=>!setupFilter||s.setup_type===setupFilter)
-    .sort((a,b)=>((bySym[b.symbol]?.priority_score||0)-(bySym[a.symbol]?.priority_score||0))
-      ||(a.trigger_date<b.trigger_date?1:-1)).slice(0,60);
-  $("#setup-cards").innerHTML=list.map(s=>{
-    const k=biasKind(s.bias);
-    // Calendar days, not trading-session index: trigger_date can predate the
-    // exported session window (positions can stay open far longer than the
-    // HUD's session lookback), so a SESSIONS.indexOf() lookup would silently
-    // break for older positions. A day or two of weekend slop in the count
-    // is an acceptable trade for never breaking.
-    const daysHeld=Math.max(0,Math.round((new Date(SDATE)-new Date(s.trigger_date))/86400000));
-    const resolvedToday=s.status!=="OPEN"&&s.resolved_date===SDATE;
-    const badge=!resolvedToday?'<span class="bias neut" title="still open, tracking toward SL/target">🟢 OPEN</span>'
-      :s.status==="TARGET_HIT"?'<span class="bias bull" title="closed — hit target">🎯 TARGET</span>'
-      :s.status==="SL_HIT"?'<span class="bias bear" title="closed — hit stop-loss">🛑 SL</span>'
-      :'<span class="bias neut" title="closed — an opposite-direction setup triggered">↩ REVERSED</span>';
-    const hasDossier=!!bySym[s.symbol];   // F&O-only dossier (bySym is daily_market_structure)
-    const trackTag=queueTrack==="both"
-      ?`<span class="dim" style="font-size:9px;letter-spacing:.08em">${s._track==="equity"?"EQ":"F&amp;O"}</span> `:"";
-    // Risk-reward line: SL anchors 0%, TARGET anchors 100%, regardless of
-    // which is numerically larger (bear setups have SL above entry, target
-    // below) — the marker sits at the entry price's position between them.
-    const sl=+s.sl_price, tgt=+s.target_price;
-    const rrPct=tgt!==sl?Math.max(0,Math.min(100,(s.trigger_price-sl)/(tgt-sl)*100)):50;
-    return`<div class="sc ${k}" ${hasDossier?'tabindex="0" role="button"':""} data-sym="${esc(s.symbol)}">
-      <div class="top"><span class="sym">${trackTag}${esc(s.symbol)}${bySym[s.symbol]?._ban?' <span title="F&O ban — setup NOT armed live" style="color:var(--bear-hi);font-size:11px">⛔ BAN</span>':""}${(EVENTS_BY_SYM[s.symbol]||[]).some(e=>e.event_type==="RESULTS"&&e.event_date>=SDATE)?' <span title="results inside the event window — this is an event bet" style="color:#E8B45C;font-size:10px">📅</span>':""}</span><span class="typ">${esc(s.setup_type.replace(/_/g," "))}</span></div>
-      <div class="strikes">
-        <span class="bias ${k}">${esc(s.bias)}</span>
-        ${badge}
-      </div>
-      <div class="rr" title="Entry ${fmtPr(s.trigger_price)} vs SL ${fmtPr(sl)} / Target ${fmtPr(tgt)}">
-        <div class="rr-track"><i class="rr-mark" style="left:${rrPct}%"></i></div>
-        <div class="rr-lbls"><span>SL <b>${fmtPr(sl)}</b></span><span><b>${fmtPr(tgt)}</b> TARGET</span></div>
-      </div>
-      <div class="beh">Entered ${fdate(s.trigger_date)} @ ${fmtPr(s.trigger_price)} · ${daysHeld}d held</div>
-    </div>`}).join("");
-  document.querySelectorAll(".sc").forEach(el=>{
-    if(!bySym[el.dataset.sym])return;   // no F&O dossier data for equity-only symbols
-    el.addEventListener("click",()=>openDossier(el.dataset.sym));
-    el.addEventListener("keydown",e=>{if(e.key==="Enter"){openDossier(el.dataset.sym)}});
-  });
-}
-
 /* ── NSE context (C2): VIX tile + Positioning panel ──────────────────── */
 /* Both render from optional payload blocks and honour SDATE (time travel):
    values shown are the latest at-or-before the selected session, never after. */
@@ -1473,20 +1732,28 @@ function drawFlips(){
 const COLS=[
   ["symbol","SYM",r=>esc(r.symbol)+(r._ban?' <span title="F&O ban (MWPL) — no new positions" style="color:var(--bear-hi)">⛔</span>':""),!1],
   ["sector","SECTOR",r=>esc(r.sector||"—"),!1],
-  ["spot_close","SPOT",r=>fmtPr(r.spot_close)+`<span class="live-px" data-sym="${esc(r.symbol)}"></span>`,!0],
+  ["spot_close","SPOT",r=>fmtPr(r.spot_close),!0],
   ["spot_change_pct","Δ%",r=>{const v=SCAN_HZ_VALS[r.symbol];return`<span class="${cls(v)}">${fmtP(v)}</span>`},!0],
   ["pcr","PCR",r=>fmt2(r.pcr),!0],
   ["iv","IV",r=>r.iv==null?"—":(r.iv*100).toFixed(1)+"%",!0],
   ["gex_intensity","GEX-I",r=>fmt2(r.gex_intensity),!0],
   ["futures_oi_chg","FUT OIΔ",r=>`<span class="${cls(r.futures_oi_chg)}">${fmtOI(r.futures_oi_chg)}</span>`,!0],
+  ["_buildup","OI FLOW",r=>{const t=buildupTag(r);if(!t)return'<span class="dim">—</span>';
+    const[kind,tip]=BUILDUP_INFO[t];return`<span class="bias ${kind}" title="${tip}">${t}</span>`},!1],
+  ["_optflow","OPT FLOW",r=>{const[sym,kind,tip]=optFlowTag(r);
+    return`<span class="bias ${kind}" title="${esc(tip)}">${sym}</span>`},!1],
   ["_dlv","DLV%",r=>r._dlv==null?"—":r._dlv.toFixed(1)+"%"+(r._dlvr?`<span class="dim" style="font-size:10px"> ${r._dlvr.toFixed(1)}×</span>`:""),!0],
-  ["conviction_score","CONV",r=>{const v=Math.max(0,Math.min(100,r.conviction_score||0));
-     return fmt2(r.conviction_score)+`<span class="meter"><i style="width:${v}%"></i></span>`},!0],
-  ["priority_score","PRI",r=>`<b>${(r.priority_score??0).toFixed(0)}</b>`,!0],
+  ["volume","VOL",r=>r.volume==null?"—":fmtOI(r.volume)+(r.volume_ratio_20d?`<span class="dim" style="font-size:10px"> ${r.volume_ratio_20d.toFixed(1)}×</span>`:""),!0],
+  ["pct_from_52w_high","52W HI%",r=>r.pct_from_52w_high==null?"—":fmtP(r.pct_from_52w_high),!0],
+  ["pct_from_52w_low","52W LO%",r=>r.pct_from_52w_low==null?"—":fmtP(r.pct_from_52w_low),!0],
   ["structural_bias","BIAS",r=>`<span class="bias ${biasKind(r.structural_bias)}">${esc(r.structural_bias)}</span>`,!1],
-  ["suggested_strategy","DESK LINE",r=>`<span class="dim">${esc(r.suggested_strategy||"—")}</span>`,!1],
 ];
-let sortKey="priority_score",sortDir=-1;
+// Default landing sort: CONV/PRI failed validation (data/research/conv_pri_
+// validation.md — no monotonic win-rate/R improvement, Spearman ~0 against
+// realized R) and were removed as ranking signals. "abs_chg" is a synthetic
+// key (not a real column) so it only governs the initial view — clicking
+// any real header sorts by that column's raw (signed) value as usual.
+let sortKey="abs_chg",sortDir=-1;
 /* Δ% horizon toggle — same compounding as Sector Flow Grid (symbolReturn/
    SEC_HORIZONS, defined above), applied per-symbol instead of per-sector
    average. SCAN_HZ_VALS is recomputed once per render and read by both the
@@ -1500,9 +1767,10 @@ function renderScan(){
   MS.forEach(r=>{SCAN_HZ_VALS[r.symbol]=hn>1?symbolReturn(r.symbol,win):(r.spot_change_pct||0);});
   const q=$("#scan-q").value.trim().toLowerCase();
   let rows=MS.filter(r=>!sectorFilter||r.sector===sectorFilter);
-  if(q)rows=rows.filter(r=>(r.symbol+" "+(r.sector||"")+" "+(r.suggested_strategy||"")+" "+(r.structural_bias||"")).toLowerCase().includes(q));
+  if(q)rows=rows.filter(r=>(r.symbol+" "+(r.sector||"")+" "+(r.structural_bias||"")).toLowerCase().includes(q));
   rows=rows.slice().sort((a,b)=>{
-    const val=r=>sortKey==="spot_change_pct"?SCAN_HZ_VALS[r.symbol]:r[sortKey];
+    const val=r=>sortKey==="abs_chg"?Math.abs(SCAN_HZ_VALS[r.symbol]||0)
+      :sortKey==="spot_change_pct"?SCAN_HZ_VALS[r.symbol]:r[sortKey];
     const x=val(a),y=val(b);
     if(x==null)return 1;if(y==null)return -1;
     return(typeof x==="string"?x.localeCompare(y):x-y)*sortDir});
@@ -1528,7 +1796,7 @@ function renderScan(){
 }
 $("#scan-q").addEventListener("input",renderScan);
 $("#scan-clear").addEventListener("click",()=>{sectorFilter=null;$("#scan-clear").hidden=true;
-  renderScan();drawSetups();drawFlips();drawSignals();});
+  renderScan();drawFlips();drawSignals();syncRRGToSector(null);});
 
 /* ── dossier ─────────────────────────────────────────────────────────── */
 function ladder(r){
@@ -1585,7 +1853,7 @@ function wallTrail(sym){
   // mr=12 (was 4) — room for addSessionMarker()'s "◷" glyph, same fix as the
   // Cash Internals charts; the plain dashed line this used to draw fit fine
   // at mr=4, but the shared glyph treatment needs more margin.
-  const W=230,H=150,ml=4,mr=12,mt=8,mb=16,NS="http://www.w3.org/2000/svg";
+  const W=820,H=140,ml=8,mr=16,mt=8,mb=16,NS="http://www.w3.org/2000/svg";
   const iw=W-ml-mr,ih=H-mt-mb;
   const vals=hist.flatMap(r=>[r.spot_close,r.call_wall,r.put_wall,r.gamma_flip]).filter(v=>v>0);
   const lo=Math.min(...vals),hi=Math.max(...vals),pad=(hi-lo||lo*.02)*.08;
@@ -1633,38 +1901,6 @@ function wallTrail(sym){
   hot.addEventListener("mouseleave",()=>{cross.setAttribute("visibility","hidden");hideTip()});
   el.appendChild(svg);
 }
-/* Setup status vs current spot — mirrors the dashboard's status logic.
-   Direction comes from bias text when it says Bullish/Bearish; biases that
-   don't (Regime Transition, Mean Reversion, Volatility Stable Range, ...)
-   fall back to inferring shape from trigger vs invalidation — same rule
-   vanguard/live/trigger_engine.py's _direction() uses — instead of sitting
-   permanently in MONITORING despite having real trigger/invalidation levels. */
-function setupStatus(spot,bias,trig,inv){
-  if(!(spot>0))return["⇅ MONITORING","#38bdf8"];
-  const b=String(bias||"");
-  const isVol=b==="Volatility Expansion";
-  let up;
-  if(/Bullish/.test(b)||isVol)up=true;
-  else if(/Bearish/.test(b))up=false;
-  else if(trig>0&&inv>0&&trig!==inv)up=trig>inv;
-  else return["⇅ MONITORING","#38bdf8"];
-  if(up){
-    if(trig>0&&spot>=trig)return["🟢 TRIGGERED",C.bull];
-    if(inv>0&&spot<=inv)return["🔴 INVALIDATED",C.bear];
-    return[isVol?"🌀 COILING":"⏳ WAITING","#E8B45C"];
-  }
-  if(trig>0&&spot<=trig)return["🟢 TRIGGERED",C.bull];
-  if(inv>0&&spot>=inv)return["🔴 INVALIDATED",C.bear];
-  return["⏳ WAITING","#E8B45C"];
-}
-/* Interp polarity: side-aware (put writing is bullish, put short-covering bearish) */
-function interpCol(side,txt){
-  const t=String(txt||"");
-  const bull=side==="CE"?/Call Buying|Short Covering/.test(t):/Put Writing/.test(t);
-  const bear=side==="CE"?/Call Writing/.test(t):/Put Buying|Short Covering/.test(t);
-  return bull?C.bull:bear?C.bear:"var(--muted)";
-}
-
 function generateNarrative(r, sym) {
   const hist = msBySymbol[sym] || [];
   const idx = hist.findIndex(h => h.date === r.date);
@@ -1689,19 +1925,26 @@ function generateNarrative(r, sym) {
 
   const spot = r.spot_close || 0, cw = r.call_wall || 0, pw = r.put_wall || 0, gf = r.gamma_flip || 0;
   if (spot > cw && cw > 0) narrative.push(`Spot accepts <b>above the Call Wall</b> (${fmtPr(cw)}), forcing dealers into short covering (gamma squeeze) buying cascades.`);
+  else if (spot < pw && pw > 0) narrative.push(`Spot has broken <b>below the Put Wall</b> (${fmtPr(pw)}), a support failure that often accelerates further downside as dealer hedging flips.`);
   else if (cw > 0 && Math.abs(spot - cw)/spot <= 0.025) narrative.push(`Spot compresses just below the Call Wall (${fmtPr(cw)}). A breakout above this level could accelerate dealer buying.`);
   else if (pw > 0 && Math.abs(spot - pw)/spot <= 0.025) narrative.push(`Spot hovers near the major Put Wall support (${fmtPr(pw)}), serving as a strong institutional floor.`);
   else narrative.push(`Spot is currently trading in a well-defined channel between dealer walls (Call Wall: ${fmtPr(cw)} | Put Wall: ${fmtPr(pw)}).`);
 
+  // Textbook long/short-gamma volatility framing (suppressed vs expanded
+  // moves) is NOT backed by this book's own data: a full-history check
+  // (vanguard/research/gex_wall_validation.py, data/research/
+  // gex_wall_validation.md) found forward realized |return| barely differs
+  // between LONG_GAMMA and SHORT_GAMMA days — so the copy below states the
+  // positioning fact (spot vs flip strike) without asserting the unconfirmed
+  // volatility-forecast claim as settled.
   const reg = r.gamma_regime || "TRANSITION_REGIME";
-  if (reg.includes("LONG_GAMMA")) narrative.push("Dealer positioning is in <b>Positive (Long) Gamma</b>. Volatility remains suppressed, favoring mean-reversion buying on dips.");
-  else if (reg.includes("SHORT_GAMMA")) narrative.push("Dealer positioning is in <b>Negative (Short) Gamma</b>. Delta-hedging moves accelerate volatility; expect highly expanded price swings.");
+  if (reg.includes("LONG_GAMMA")) narrative.push("Dealer positioning sits in <b>Positive (Long) Gamma</b> territory (spot above the flip strike). Textbook theory expects dampened volatility here, though that edge hasn't held up in our own backtests.");
+  else if (reg.includes("SHORT_GAMMA")) narrative.push("Dealer positioning sits in <b>Negative (Short) Gamma</b> territory (spot below the flip strike). Textbook theory expects amplified volatility here, though that edge hasn't held up in our own backtests.");
   else narrative.push(`Spot sits directly in the <b>Regime Flip Zone</b> (${fmtPr(gf)}), indicating an active regime transition.`);
 
   const st = SET.filter(s => s.symbol === sym);
-  const strat = r.suggested_strategy || "Wait for Setup";
-  if (st.length > 0) narrative.push(`This specific structure triggers the <b>${st.map(s=>s.setup_type.replace(/_/g," ")).join(" / ")} Setup</b>. Recommended tactical strategy: <b>${strat}</b>.`);
-  else narrative.push(`Tactical structure shows a <b>${r.structural_bias || "Transition Regime"}</b> regime. Suggested positioning: <b>${strat}</b>.`);
+  if (st.length > 0) narrative.push(`This specific structure triggers the <b>${st.map(s=>s.setup_type.replace(/_/g," ")).join(" / ")} Setup</b>.`);
+  else narrative.push(`Tactical structure shows a <b>${r.structural_bias || "Transition Regime"}</b> regime.`);
 
   return narrative.join(" ");
 }
@@ -1713,35 +1956,21 @@ function renderIntelligencePanel(r, sym){
   let h="";
 
   /* Quant Narrative */
-  const conv_score = r.conviction_score || 0;
-  const cc = conv_score >= 70 ? "#10b981" : conv_score >= 40 ? "#fbbf24" : "#7888aa";
-  const svg = `<svg width="46" height="46" viewBox="0 0 36 36" style="flex:none;margin-right:12px">
-    <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="rgba(124,140,160,.2)" stroke-width="3" />
-    <path stroke-dasharray="${conv_score}, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="${cc}" stroke-width="3" stroke-linecap="round" />
-    <text x="18" y="21.5" font-family="monospace" font-size="8" font-weight="bold" fill="${cc}" text-anchor="middle">${conv_score.toFixed(0)}</text>
-  </svg>`;
   h+=`<div class="intel-card">
     <div class="intel-title">🤖 Vanguard Quant Narrative</div>
-    <div style="display:flex;align-items:center">
-      ${svg}
-      <div>
-        <div style="font-size:9.5px;color:var(--muted);letter-spacing:.05em">VANGUARD CONVICTION SCORE</div>
-        <div style="font-size:14px;font-weight:700;color:${cc}">${conv_score.toFixed(1)}%</div>
-        <div style="font-size:9px;color:var(--faint)">Smart Money Accumulation Conviction</div>
-      </div>
-    </div>
     <div class="narrative-body">${generateNarrative(r, sym)}</div>
   </div>`;
 
-  /* Wall Migration */
+  /* Wall Migration — bar only; the exact price + %-from-spot for each level
+     (including the broken-outside-channel case) is already in the Strike
+     Ladder (ladder(), same panel), so no caption is re-derived here. */
   let cw=r.call_wall||0, pw=r.put_wall||0, spot=r.spot_close||0;
-  let prox=0, lbls="", sub="";
+  let prox=0, lbls="";
   if(cw>pw){
     prox=Math.max(0,Math.min(100,(spot-pw)/(cw-pw+1e-5)*100));
     lbls=`<span style="color:var(--bear-hi);font-weight:600">PUT WALL (${fmtPr(pw)})</span>
           <span style="color:#fbbf24;font-weight:600">SPOT (${fmtPr(spot)})</span>
           <span style="color:var(--bull-hi);font-weight:600">CALL WALL (${fmtPr(cw)})</span>`;
-    sub=`Spot is ${prox.toFixed(1)}% of the way from Put Wall to Call Wall`;
   }else{
     const wall=cw;
     const dev=(spot-wall)/(wall+1e-5);
@@ -1749,30 +1978,14 @@ function renderIntelligencePanel(r, sym){
     lbls=`<span style="color:var(--muted);font-weight:600">${fmtPr(0.95*wall)} (-5%)</span>
           <span style="color:${C.violet};font-weight:600">CONCENTRATED WALL (${fmtPr(wall)})</span>
           <span style="color:var(--muted);font-weight:600">${fmtPr(1.05*wall)} (+5%)</span>`;
-    const diff=Math.abs(dev)*100;
-    sub=spot<wall?`Spot (${fmtPr(spot)}) is ${diff.toFixed(2)}% below Concentrated Wall (${fmtPr(wall)})`
-       :spot>wall?`Spot (${fmtPr(spot)}) is ${diff.toFixed(2)}% above Concentrated Wall (${fmtPr(wall)})`
-       :`Spot is exactly at the Concentrated Wall (${fmtPr(wall)})`;
   }
   h+=`<div class="intel-card">
     <div class="intel-title">🔄 Live Wall Migration Meter</div>
     <div style="font-size:10px;color:var(--muted);margin-bottom:8px">Tracking spot proximity relative to major dealer positioning.</div>
     <div class="migration-labels">${lbls}</div>
     <div class="migration-track"><div class="migration-fill" style="width:${prox}%"></div><div class="migration-marker" style="left:${prox}%"></div></div>
-    <div style="font-size:9.5px;color:var(--muted);font-style:italic;text-align:center;margin-top:5px">${sub}</div>
   </div>`;
-  
-  /* Gamma Radar */
-  const gf=r.gamma_flip||0, reg=r.gamma_regime||"ROTATION";
-  const dang=reg==="SHORT_GAMMA";
-  const gap=spot>0?Math.abs(spot-gf)/spot*100:0;
-  h+=`<div class="intel-card ${dang?"danger":""}">
-    <div class="intel-title" style="color:${dang?"var(--bear-hi)":C.violet}">${dang?"⚠ DEALER DANGER ZONE":"🛡 GAMMA FLIP RADAR"}</div>
-    <div style="font-size:10px;color:var(--muted);margin-bottom:8px">${dang?"Spot is currently trading in a <b>SHORT GAMMA</b> hedging regime. Dealer delta-hedging will expand volatility.":"Spot is currently in a stable <b>LONG GAMMA</b> or transition zone. Volatility is structurally capped."}</div>
-    <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted)"><span style="letter-spacing:.05em">REGIME FLIP TRIGGER:</span><span style="color:#fbbf24;font-weight:600">${fmtPr(gf)}</span></div>
-    <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-top:3px"><span style="letter-spacing:.05em">PROXIMITY TO PIVOT:</span><span style="color:${dang?"var(--bear-hi)":"var(--bull-hi)"};font-weight:600">${gap.toFixed(2)}% gap</span></div>
-  </div>`;
-  
+
   /* EOD Flow Velocity */
   const noi=(r.net_inv_shift||0)/1e5, vol=(r.delta_volume||0)/1e5;
   const noic=noi>=0?C.bull:C.bear, volc=vol>=0?C.bull:C.bear;
@@ -1826,26 +2039,13 @@ function openDossier(sym){
     ["PCR",fmt2(r.pcr),dtile(r.pcr,prevRow?.pcr,2)||"&nbsp;"],
     ["IV",(r.iv*100).toFixed(1)+"%",(r.iv_shift>0?"+":"")+(r.iv_shift*100).toFixed(2)+" pt shift"],
     ["GEX-I",fmt2(r.gex_intensity),fmtOI(r.gex_shift)+" shift"],
-    ["CONVICTION",(r.conviction_score??0).toFixed(1),"priority "+(r.priority_score??0).toFixed(0)+dtile(r.conviction_score,prevRow?.conviction_score,1)],
     ["IFS",(r.ifs_score??0).toFixed(1),"smart-money "+(r.smart_money_persistence??0).toFixed(0)+"%"+dtile(r.ifs_score,prevRow?.ifs_score,1)],
     ["FUT OI",fmtOI(r.futures_oi),fmtOI(r.futures_oi_chg)+" Δ"],
-    ["NET INV",fmtOI(r.net_inv_shift),""],
     ["CE / PE",fmtOI(r.delta_ce_oi)+" / "+fmtOI(r.delta_pe_oi),"Δ OI"],
     ["DLV%",r._dlv==null?"—":r._dlv.toFixed(1)+"%",r._dlvr?r._dlvr.toFixed(2)+"× 20d avg":"cash delivery"],
+    ["VOL",r.volume==null?"—":fmtOI(r.volume),r.volume_ratio_20d?r.volume_ratio_20d.toFixed(2)+"× 20d avg":"cash traded qty"],
   ].map(([k,v,d])=>`<div class="tile"><span class="k">${k}</span><div class="v" style="font-size:14px">${v}</div><span class="d">${d}</span></div>`).join("");
   const st=SET.filter(s=>s.symbol===sym);
-  const s0=st[0]||null;
-  /* Desk line: strategy + trade levels + live status vs spot */
-  let levelsHtml="";
-  if(s0){
-    const[stTxt,stCol]=setupStatus(r.spot_close,s0.bias,s0.trigger_strike,s0.invalidation_strike);
-    levelsHtml=`<div style="display:flex;gap:14px;align-items:center;margin-top:9px;font-size:11px;font-variant-numeric:tabular-nums;flex-wrap:wrap">
-      <span id="dss-setup-status" data-trig="${s0.trigger_strike}" data-inv="${s0.invalidation_strike}" data-bias="${esc(s0.bias)}" style="border:1px solid ${stCol};color:${stCol};border-radius:4px;padding:1.5px 8px;font-size:9.5px;letter-spacing:.08em;font-weight:700">${stTxt}</span>
-      <span class="dim">TRIGGER <b style="color:#E8B45C">${s0.trigger_strike>0?fmtPr(s0.trigger_strike):"—"}</b></span>
-      <span class="dim">INVALIDATION <b style="color:${C.bearHi}">${s0.invalidation_strike>0?fmtPr(s0.invalidation_strike):"—"}</b></span></div>`;
-  }
-  $("#dss-strat").innerHTML=`<span class="strat">${esc(r.suggested_strategy||"—")}</span>${levelsHtml}
-    <div style="margin-top:8px;font-size:11px"><span style="color:${interpCol("CE",r.ce_interp)}">CE ${esc(r.ce_interp||"—")}</span><span class="dim"> · </span><span style="color:${interpCol("PE",r.pe_interp)}">PE ${esc(r.pe_interp||"—")}</span></div>`;
   $("#dss-setups-sect").style.display=st.length?"":"none";
   $("#dss-setups").innerHTML=st.map(s=>{
     const types=(s.setup_types?String(s.setup_types).split("|"):[s.setup_type]).filter(Boolean);
@@ -1864,7 +2064,6 @@ function openDossier(sym){
     return`<div style="font-size:11px;color:var(--muted);margin-bottom:5px">${m[0]} ${esc(s.msg)}</div>`}).join("");
   $("#dossier").hidden=false;
   loadDeepDiveCharts(sym, r);
-  renderLiveStructure(LIVE.feed_ts>0 && (Date.now()/1000-LIVE.feed_ts)<LIVE_STALE_SECS);
   $("#dss").scrollTop=0;
   $("#dss-close").focus();
 }
@@ -1933,184 +2132,15 @@ document.addEventListener("keydown",e=>{
 /* ── boot ────────────────────────────────────────────────────────────── */
 document.body.classList.add("boot");
 function renderSession(){
-  drawCmdbar();drawRegime();drawVix();drawPositioning();drawFlips();drawSectors();drawSignals();
-  drawSetups();renderScan();drawBreadth();drawInternals();
+  drawCmdbar();drawRegime();drawVix();drawPositioning();drawFlips();drawSectors();drawSignals();drawRRG();
+  renderScan();drawBreadth();drawInternals();
   if(!$("#dossier").hidden)$("#dossier").hidden=true;
 }
 renderSession();
 
-/* ── live overlay (M1.5): poll the bridge /snapshot when served over http ───
-   Served from file:// (no bridge) it silently no-ops and the HUD stays EOD. */
-const LIVE_STALE_SECS = 15;   // 3 missed snapshot writes (SNAPSHOT_CADENCE=5s)
-const LIVE = {quotes:{}, open:false, n:0, feed_ts:0, events:[], structure:{}, structure_validated:false};
-/* Live Triggers panel: two server-side producers feed the same `events` list —
-   trigger_engine (setup WAITING->TRIGGERED/INVALIDATED, no "type" key) and, as
-   of M2, live_compute (REGIME_CROSS/WALL_RELOCATED/IV_EVENT, discriminated by
-   "type"). Both are already one-shot/debounced server-side and ordered
-   newest-first, so this just renders the authoritative list each poll. */
-function eventLine(e){
-  if(e.type==="REGIME_CROSS"){
-    const bull=e.to==="LONG_GAMMA", bear=e.to==="SHORT_GAMMA";
-    return {cls: bull?"up":bear?"dn":"", icon:"🔄",
-      text:`<b>${esc(e.symbol)}</b> regime ${esc(e.from.replace(/_/g," "))} → ${esc(e.to.replace(/_/g," "))}`};
-  }
-  if(e.type==="WALL_RELOCATED"){
-    return {cls: e.side==="call"?"up":"dn", icon: e.side==="call"?"🧱":"🛡",
-      text:`<b>${esc(e.symbol)}</b> ${e.side.toUpperCase()} WALL relocated ₹${(+e.from).toLocaleString('en-IN')} → ₹${(+e.to).toLocaleString('en-IN')}`};
-  }
-  if(e.type==="IV_EVENT"){
-    return {cls: e.direction==="up"?"up":"dn", icon:"🌪",
-      text:`<b>${esc(e.symbol)}</b> IV ${e.direction} ${(e.iv*100).toFixed(1)}% (${e.delta>=0?'+':''}${(e.delta*100).toFixed(1)}pt vs open)`};
-  }
-  // trigger_engine event (no "type" key): setup TRIGGERED/INVALIDATED
-  return {cls: e.to==="TRIGGERED"?"up":"dn", icon: e.to==="TRIGGERED"?"⚡":"❌",
-    text:`<b>${esc(e.symbol)}</b> ${esc(e.setup_type)} ${e.to} — level ₹${(+e.level).toLocaleString('en-IN')}, spot ₹${(+e.spot).toLocaleString('en-IN')}`};
-}
-function renderTriggers(){
-  const panel = $("#p-triggers");
-  if(!panel)return;
-  const events = LIVE.events || [];
-  if(!events.length){ panel.hidden = true; return; }
-  panel.hidden = false;
-  $("#triggers-sub").textContent = events.length + " event" + (events.length===1?"":"s") + " today";
-  $("#triggers-list").innerHTML = events.map(e=>{
-    const {cls,icon,text} = eventLine(e);
-    const hhmm = new Date(e.ts*1000).toLocaleTimeString("en-IN",{hour12:false,hour:"2-digit",minute:"2-digit",second:"2-digit"});
-    return `<div class="sig ${cls}" data-sym="${esc(e.symbol)}">
-      <span class="ic">${icon}</span>
-      <span class="tx">${text}</span>
-      <span class="tm">${hhmm}</span>
-    </div>`;
-  }).join("");
-  document.querySelectorAll("#triggers-list .sig").forEach(el=>
-    el.addEventListener("click",()=>openDossier(el.dataset.sym)));
-}
-/* Dossier live structure strip (M2): call_wall/put_wall/gamma_regime/iv_avg
-   for covered (top-N-by-OI + indices) symbols only — absent from LIVE.structure
-   means "not covered," section stays hidden and the EOD tiles are unaffected. */
-function renderLiveStructure(fresh){
-  const sect = $("#dss-live-structure-sect");
-  if(!sect || $("#dossier").hidden)return;
-  const sym = $("#dss-sym").textContent;
-  const s = LIVE.structure[sym];
-  if(!s || !LIVE.open || !fresh){ sect.hidden = true; return; }
-  sect.hidden = false;
-  $("#dss-live-structure-watermark").hidden = !!LIVE.structure_validated;
-  const regimeCol = s.gamma_regime==="LONG_GAMMA"?C.bull:s.gamma_regime==="SHORT_GAMMA"?C.bear:"#E8B45C";
-  $("#dss-live-structure").innerHTML = `<div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;font-size:11px;font-variant-numeric:tabular-nums">
-    <span class="dim">CALL WALL <b style="color:#E8B45C">${s.call_wall>0?fmtPr(s.call_wall):"—"}</b></span>
-    <span class="dim">PUT WALL <b style="color:${C.bearHi}">${s.put_wall>0?fmtPr(s.put_wall):"—"}</b></span>
-    <span style="border:1px solid ${regimeCol};color:${regimeCol};border-radius:4px;padding:1.5px 8px;font-size:9.5px;letter-spacing:.08em;font-weight:700">${esc((s.gamma_regime||"").replace(/_/g," "))}</span>
-    <span class="dim">LIVE IV <b>${(s.iv_avg*100).toFixed(1)}%</b></span>
-  </div>`;
-}
-/* Live LTP on every scanner row. Patches the existing .live-px placeholder
-   spans (added per-row by the SPOT column in COLS) directly rather than
-   re-invoking renderScan(), so a poll never disturbs sort/filter/scroll. */
-function applyLiveToScan(fresh){
-  document.querySelectorAll("#scan .live-px").forEach(el=>{
-    const q=LIVE.quotes[el.dataset.sym];
-    el.innerHTML=(q && LIVE.open && fresh)
-      ? `<span style="color:${q.chg>=0?C.bull:C.bear}">● ₹${(+q.ltp).toLocaleString('en-IN')} (${q.chg>=0?'+':''}${q.chg}%)</span>`
-      : "";
-  });
-}
-/* Client-side wall-break alert: live LTP vs TODAY's already-EOD-compiled
-   call_wall/put_wall (no live wall recompute — that needs live options
-   streaming, not built). Same 1% breakout/breakdown buffer as
-   classifier.py's is_breakout/is_breakdown, so "broken" means the same
-   thing live as it does at EOD. One-shot toast per symbol/side per page
-   load (wallBreakAlerted); the row highlight itself is live and clears if
-   price moves back inside the wall. Only meaningful against the latest/
-   live session — same gate the code already uses for #histbadge. */
-const wallBreakAlerted = new Set();
-const WALL_BREAK_LOG_MAX = 300;      // defensive cap — a single session realistically never approaches this
-let wallBreakLog = [];                // ordered event log (newest first), independent of the dedup Set above
-function renderWallBreaks(){
-  const panel = $("#p-wallbreaks");
-  if(!panel)return;
-  if(!wallBreakLog.length){ panel.hidden = true; return; }
-  panel.hidden = false;
-  $("#wallbreak-sub").textContent = wallBreakLog.length + " event" + (wallBreakLog.length===1?"":"s") + " this session";
-  $("#wallbreak-list").innerHTML = wallBreakLog.map(e=>{
-    const dir = e.side==="call" ? "bull" : "bear";
-    const cls = e.side==="call" ? "up" : "dn";
-    const hhmm = new Date(e.t).toLocaleTimeString("en-IN",{hour12:false,hour:"2-digit",minute:"2-digit",second:"2-digit"});
-    return `<div class="sig ${cls}" data-sym="${esc(e.sym)}">
-      <span class="ic">${e.side==="call"?"🧱":"🛡"}</span>
-      <span class="tx"><b>${esc(e.sym)}</b> broke ${e.side.toUpperCase()} WALL ₹${e.wall.toLocaleString("en-IN")} — live ₹${e.ltp.toLocaleString("en-IN")}</span>
-      <span class="tm">${hhmm}</span>
-    </div>`;
-  }).join("");
-  document.querySelectorAll("#wallbreak-list .sig").forEach(el=>
-    el.addEventListener("click",()=>openDossier(el.dataset.sym)));
-}
-function checkWallBreaks(fresh){
-  if(SDATE!==SESSIONS[SESSIONS.length-1] || !(LIVE.open && fresh))return;
-  document.querySelectorAll("#scan tbody tr").forEach(row=>{
-    const sym=row.dataset.sym, q=LIVE.quotes[sym], r=bySym[sym];
-    if(!q || !r){ row.classList.remove("wall-break-bull","wall-break-bear"); return; }
-    const ltp=+q.ltp, cw=r.call_wall, pw=r.put_wall;
-    const brokeCall = cw>0 && ltp > cw*1.01;
-    const brokePut  = pw>0 && ltp < pw*0.99;
-    row.classList.toggle("wall-break-bull", brokeCall);
-    row.classList.toggle("wall-break-bear", brokePut);
-    if(brokeCall && !wallBreakAlerted.has(sym+":call")){
-      wallBreakAlerted.add(sym+":call");
-      wallBreakLog.unshift({sym, side:"call", wall:cw, ltp, t:Date.now()});
-      if(wallBreakLog.length>WALL_BREAK_LOG_MAX)wallBreakLog.length=WALL_BREAK_LOG_MAX;
-      showToast(`🚨 <b>${esc(sym)}</b> broke CALL WALL ₹${cw.toLocaleString('en-IN')} — live ₹${ltp.toLocaleString('en-IN')}`);
-    }
-    if(brokePut && !wallBreakAlerted.has(sym+":put")){
-      wallBreakAlerted.add(sym+":put");
-      wallBreakLog.unshift({sym, side:"put", wall:pw, ltp, t:Date.now()});
-      if(wallBreakLog.length>WALL_BREAK_LOG_MAX)wallBreakLog.length=WALL_BREAK_LOG_MAX;
-      showToast(`🚨 <b>${esc(sym)}</b> broke PUT WALL ₹${pw.toLocaleString('en-IN')} — live ₹${ltp.toLocaleString('en-IN')}`);
-    }
-  });
-  renderWallBreaks();
-}
-function applyLive(){
-  /* Freshness is measured from the last TICK (feed_ts), never from poll time:
-     the daemon loop keeps writing snapshots even if the feed thread stalls, so
-     polling successfully proves nothing about the data. Bridge is localhost, so
-     the server clock (epoch secs) is directly comparable to ours. */
-  const fresh = LIVE.feed_ts > 0 && (Date.now()/1000 - LIVE.feed_ts) < LIVE_STALE_SECS;
-  const badge = $("#live-badge");
-  if(badge){ badge.hidden = !(LIVE.open && fresh); $("#live-n").textContent = LIVE.n; }
-  if(!$("#dossier").hidden){
-    const sym=$("#dss-sym").textContent, q=LIVE.quotes[sym], el=$("#dss-live");
-    if(el) el.innerHTML = (q && LIVE.open && fresh)
-      ? `<span style="color:${q.chg>=0?C.bull:C.bear};font-weight:600">● LIVE ₹${(+q.ltp).toLocaleString('en-IN')} (${q.chg>=0?'+':''}${q.chg}%)</span>`
-      : "";
-    /* Setup status badge: prefer live spot over the EOD close once fresh live
-       data exists for this symbol, using the same setupStatus() the badge was
-       first rendered with in openDossier() — reuses that convention rather
-       than a parallel one. */
-    const stEl=$("#dss-setup-status");
-    if(stEl){
-      const spot=(q && LIVE.open && fresh)?+q.ltp:bySym[sym]?.spot_close;
-      const[stTxt,stCol]=setupStatus(spot,stEl.dataset.bias,+stEl.dataset.trig,+stEl.dataset.inv);
-      stEl.textContent=stTxt; stEl.style.borderColor=stCol; stEl.style.color=stCol;
-    }
-  }
-  applyLiveToScan(fresh);
-  checkWallBreaks(fresh);
-  renderTriggers();
-  renderLiveStructure(fresh);
-}
-async function pollLive(){
-  try{
-    const r = await fetch("/snapshot",{cache:"no-store"});
-    if(r.ok){
-      const s = await r.json();
-      LIVE.quotes=s.quotes||{}; LIVE.open=!!s.market_open; LIVE.n=s.n||0; LIVE.feed_ts=+s.feed_ts||0;
-      LIVE.events=s.events||[]; LIVE.structure=s.structure||{}; LIVE.structure_validated=!!s.structure_validated;
-    }
-  }catch(e){ /* bridge absent — fall through; staleness drops the badge */ }
-  applyLive();   // always re-evaluate: a dead bridge must not freeze a LIVE badge on screen
-}
-if(location.protocol.startsWith("http")){ pollLive(); setInterval(pollLive, 5000); }
+/* Live intraday overlay removed — this terminal is EOD-only. The live
+   layer (Fyers feed, /snapshot polling, LIVE badge, Live Triggers /
+   Live Wall Breaks) was archived; see archive/README.md. */
 
 let rsz;addEventListener("resize",()=>{clearTimeout(rsz);rsz=setTimeout(()=>{drawBreadth();drawInternals()},180)});
 requestAnimationFrame(()=>requestAnimationFrame(()=>document.body.classList.remove("boot")));

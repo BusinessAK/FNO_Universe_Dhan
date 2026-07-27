@@ -146,41 +146,58 @@ class InstitutionalIntelligence:
         return out.reindex(df_opt['SYMBOL'].unique(), fill_value=0.0)
 
     @staticmethod
-    def compute_walls_and_flip(greeks_df: pd.DataFrame, spot_prices: dict) -> dict:
+    def compute_walls_and_flip(greeks_df: pd.DataFrame) -> dict:
         """
-        Per-symbol call_wall/put_wall/gamma_flip from GEX, not raw OI (which
-        includes dead deep-OTM strikes). Wall = the strike carrying the most
-        dealer gamma risk on that side. Gamma flip = the strike where BOTH
-        sides' dealer gamma risk peaks simultaneously — the strike dealers are
-        forced to actively hedge both ways around.
+        Per-symbol call_wall/put_wall/gamma_flip from raw OPEN INTEREST on the
+        already-filtered candidate strikes GreeksEngine.process_dataframe()
+        hands in (15%-of-spot OR each side's top-5-OI strikes regardless of
+        distance — see that function's wall_candidates param — so dead
+        deep-OTM dust never reaches here). Wall = the strike carrying the
+        most open interest on that side. Gamma flip = the strike maximizing
+        min(CE_OI, PE_OI) — the strike where both sides have the largest
+        simultaneous conviction (the "straddle pin"), forcing dealers to
+        actively hedge both ways around it.
+
+        Previously this weighted by Gamma * OI ("GEX") instead of raw OI.
+        Retired 2026-07-24 after validation (vanguard/research/
+        gex_wall_validation.py, data/research/gex_wall_validation.md):
+        Black-Scholes Gamma is identical for a call and a put at the same
+        strike/expiry/IV and decays sharply away from the money, so the
+        Gamma term routinely overpowered genuine OI differences between
+        strikes and dragged call_wall, put_wall AND gamma_flip toward
+        whichever strike sat closest to spot regardless of where OI actually
+        concentrated — confirmed on SRF 2026-07-23, where raw OI put the real
+        call wall at strike 2900 (the largest CE OI on the board) but
+        GEX-weighting picked 2700 instead, purely because Gamma decays ~5.7x
+        faster than the OI gap between those two strikes. That collapsed
+        call_wall==put_wall==gamma_flip on 27.6% of all symbol-days in the
+        compiled history, and fed PINCH_ZONE's "extreme volatility coiling"
+        condition into firing on 25.8% of all symbol-days — not remotely
+        "extreme." Raw OI drops that trigger rate to 8.9%, with a modestly
+        cleaner pre/post-pinch forward-realized-volatility split.
 
         Shared by the EOD compiler (analyze_market_structure below) and the
         live structure engine (vanguard/live/live_compute.py) so the two paths
         computing this from either bhav closes or live ticks can never
         silently diverge on the math itself.
 
-        greeks_df: SYMBOL, STRIKE_PR, OPTION_TYP, GAMMA, OPEN_INT columns —
+        greeks_df: SYMBOL, STRIKE_PR, OPTION_TYP, OPEN_INT columns —
         the shape GreeksEngine.process_dataframe emits.
         Returns {symbol: {"call_wall": float, "put_wall": float, "gamma_flip": float}}.
         """
         if greeks_df.empty:
             return {}
-        df = greeks_df.copy()
-        df['SPOT'] = df['SYMBOL'].map(spot_prices)
-        df['MULTIPLIER'] = df['OPTION_TYP'].apply(lambda x: 1 if x == 'CE' else -1)
-        df['GEX'] = df['GAMMA'] * df['OPEN_INT'] * df['SPOT'].fillna(0.0) * 0.01 * df['MULTIPLIER']
-
         out = {}
-        for symbol, group in df.groupby('SYMBOL'):
-            ce_gex = group[group['OPTION_TYP'] == 'CE'].groupby('STRIKE_PR')['GEX'].sum()
-            pe_gex = group[group['OPTION_TYP'] == 'PE'].groupby('STRIKE_PR')['GEX'].sum().abs()
+        for symbol, group in greeks_df.groupby('SYMBOL'):
+            ce_oi = group[group['OPTION_TYP'] == 'CE'].groupby('STRIKE_PR')['OPEN_INT'].sum()
+            pe_oi = group[group['OPTION_TYP'] == 'PE'].groupby('STRIKE_PR')['OPEN_INT'].sum()
 
-            ce_gex_pos = ce_gex[ce_gex > 0]
-            pe_gex_pos = pe_gex[pe_gex > 0]
-            call_wall = float(ce_gex_pos.idxmax()) if not ce_gex_pos.empty else 0.0
-            put_wall = float(pe_gex_pos.idxmax()) if not pe_gex_pos.empty else 0.0
+            ce_oi_pos = ce_oi[ce_oi > 0]
+            pe_oi_pos = pe_oi[pe_oi > 0]
+            call_wall = float(ce_oi_pos.idxmax()) if not ce_oi_pos.empty else 0.0
+            put_wall = float(pe_oi_pos.idxmax()) if not pe_oi_pos.empty else 0.0
 
-            overlap = pd.concat([ce_gex, pe_gex], axis=1).min(axis=1)
+            overlap = pd.concat([ce_oi, pe_oi], axis=1).min(axis=1)
             overlap_pos = overlap[overlap > 0]
             gamma_flip = float(overlap_pos.idxmax()) if not overlap_pos.empty else 0.0
 
@@ -421,11 +438,11 @@ class InstitutionalIntelligence:
             
             greeks_t.to_csv(os.path.join(export_path, "greeks.csv"), index=False)
         
-        # --- OVERRIDE WALLS WITH GEX WALLS ---
-        # Instead of pure OI (which includes dead deep OTM strikes), we calculate
-        # the walls based on where the highest Dealer Gamma Risk is concentrated.
+        # --- OVERRIDE WALLS WITH RAW-OI WALLS ---
+        # Replaces the earlier max_ce/max_pe (per-expiry, not the combined
+        # candidate set below) with the shared, validated implementation.
         # Shared with the live structure engine — see compute_walls_and_flip above.
-        walls_and_flip = self.compute_walls_and_flip(greeks_t, spots_t)
+        walls_and_flip = self.compute_walls_and_flip(greeks_t)
         for symbol, wf in walls_and_flip.items():
             final.loc[final['SYMBOL'] == symbol, 'CALL_WALL_T'] = wf['call_wall']
             final.loc[final['SYMBOL'] == symbol, 'PUT_WALL_T'] = wf['put_wall']

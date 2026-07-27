@@ -1,15 +1,14 @@
 """
-Platform API (wave 3 / P1) — the bridge grown up. One localhost server for
-every read surface:
+Platform API — the localhost read server for the EOD terminal.
 
     /                 hud/vanguard_hud.html (the baked artifact)
-    /snapshot         live_snapshot.json (5s live overlay — unchanged contract)
     /session/latest   the EOD payload from store.export_service — the SAME
                       builder build_hud bakes, so served and baked data
                       cannot drift. Cached, invalidated on DB mtime change.
 
-Runs in a daemon thread inside the live process (vanguard/live/bridge.py is
-now a shim over this module).
+The live /snapshot overlay was removed when the intraday layer was archived
+(see archive/live/); this now serves purely static EOD data. Start it with
+scripts/serve_hud.py.
 """
 from __future__ import annotations
 
@@ -17,44 +16,12 @@ import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from vanguard.config import live as C
-from vanguard.config.paths import DB, HUD
+from vanguard.config.paths import DB, HUD, BRIDGE_HOST, BRIDGE_PORT
 
 HUD_FILE = HUD / "vanguard_hud.html"
 
 _payload_lock = threading.Lock()
 _payload_cache: dict = {"mtime": None, "body": None}
-
-_greeks_lock = threading.Lock()
-_greeks_cache: dict = {"mtime": None, "df": None}
-_live_chains_cache = None
-
-def get_chain_json(symbol: str) -> bytes | None:
-    global _live_chains_cache
-    if _live_chains_cache is not None and symbol in _live_chains_cache:
-        return _live_chains_cache[symbol].encode("utf-8")
-
-    import pandas as pd
-    greeks_path = Path("data/processed/greeks.csv")
-    try:
-        mtime = greeks_path.stat().st_mtime
-    except OSError:
-        return None
-    with _greeks_lock:
-        if _greeks_cache["mtime"] != mtime:
-            try:
-                _greeks_cache["df"] = pd.read_csv(greeks_path)
-            except Exception:
-                return None
-            _greeks_cache["mtime"] = mtime
-        df = _greeks_cache["df"]
-    if df is None or df.empty:
-        return b'[]'
-    sdf = df[df["SYMBOL"] == symbol]
-    if sdf.empty:
-        return b'[]'
-    return sdf.to_json(orient="records").encode("utf-8")
-
 
 
 def session_payload_bytes() -> bytes | None:
@@ -91,22 +58,10 @@ class _Handler(BaseHTTPRequestHandler):
                 self._send(200, HUD_FILE.read_bytes(), "text/html; charset=utf-8")
             else:
                 self._send(404, b"HUD not built", "text/plain")
-        elif path == "/snapshot":
-            if C.SNAPSHOT_JSON.exists():
-                self._send(200, C.SNAPSHOT_JSON.read_bytes(), "application/json")
-            else:
-                self._send(200, b'{"market_open":false,"n":0,"quotes":{}}', "application/json")
         elif path == "/session/latest":
             body = session_payload_bytes()
             if body is None:
                 self._send(503, b'{"error":"no compiled database"}', "application/json")
-            else:
-                self._send(200, body, "application/json")
-        elif path.startswith("/api/chain/"):
-            symbol = path.split("/")[-1]
-            body = get_chain_json(symbol)
-            if body is None:
-                self._send(503, b'{"error":"no greeks data"}', "application/json")
             else:
                 self._send(200, body, "application/json")
         else:
@@ -114,17 +69,24 @@ class _Handler(BaseHTTPRequestHandler):
 
 
 class Bridge:
-    def __init__(self, host: str = C.BRIDGE_HOST, port: int = C.BRIDGE_PORT, live_chains_cache: dict = None):
+    def __init__(self, host: str = BRIDGE_HOST, port: int = BRIDGE_PORT):
         self.host, self.port = host, port
         self._srv = None
-        if live_chains_cache is not None:
-            global _live_chains_cache
-            _live_chains_cache = live_chains_cache
 
     def start(self):
         self._srv = ThreadingHTTPServer((self.host, self.port), _Handler)
         t = threading.Thread(target=self._srv.serve_forever, daemon=True)
         t.start()
-        print(f"[bridge] serving HUD + /snapshot + /session/latest at "
+        print(f"[server] serving HUD + /session/latest at "
               f"http://{self.host}:{self.port}/")
         return t
+
+    def serve_forever(self):
+        """Blocking start — for a foreground `scripts/serve_hud.py` process."""
+        self._srv = ThreadingHTTPServer((self.host, self.port), _Handler)
+        print(f"[server] serving HUD + /session/latest at "
+              f"http://{self.host}:{self.port}/  (Ctrl-C to stop)")
+        try:
+            self._srv.serve_forever()
+        except KeyboardInterrupt:
+            print("\n[server] stopped")
