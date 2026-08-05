@@ -1,6 +1,6 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>VANGUARD // ORBITAL DECK</title>
+<title>DRISHTI // ORBITAL DECK</title>
 <script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
 <style>
 /* ── tokens ──────────────────────────────────────────────────────────── */
@@ -52,6 +52,11 @@ a{color:var(--accent)}
   border:1px solid var(--edge);border-radius:var(--r);
   padding:14px 16px 16px;backdrop-filter:blur(10px);
   box-shadow:0 0 0 1px rgba(0,0,0,.4),0 12px 40px rgba(0,0,0,.35);
+  /* Forces each panel onto its own stable GPU compositing layer up front —
+     works around a Chromium/WebKit backdrop-filter bug where a blurred panel
+     occasionally paints a stale/garbled frame (looks like a solid dark box)
+     until some unrelated repaint (hover, scroll) forces the layer to redraw. */
+  transform:translateZ(0);
 }
 .panel::before,.panel::after{
   content:"";position:absolute;width:14px;height:14px;pointer-events:none;
@@ -253,6 +258,18 @@ figure figcaption{font-size:10px;color:var(--muted);letter-spacing:.06em;margin-
   padding:2px 8px;border-radius:3px;font-weight:400;background:rgba(124,140,160,.12);color:var(--muted);
   border:1px solid rgba(124,140,160,.25)}
 #dss-date.hist{background:rgba(179,136,56,.15);color:var(--amber-hi);border-color:rgba(179,136,56,.4)}
+/* ── DSS date nav ‹ › ─────────────────────────────────────────────── */
+#dss-nav{display:inline-flex;align-items:center;gap:3px;margin-left:8px;vertical-align:middle}
+#dss-nav button{background:none;border:1px solid rgba(124,140,160,.28);border-radius:3px;color:var(--muted);
+  font-size:13px;line-height:1;padding:1px 7px;cursor:pointer;transition:border-color .12s,color .12s}
+#dss-nav button:hover:not(:disabled){border-color:var(--accent);color:var(--accent)}
+#dss-nav button:disabled{opacity:.28;cursor:default}
+/* ── RRG period nav ‹ › ────────────────────────────────────────────── */
+#rrg-nav button{background:none;border:1px solid rgba(124,140,160,.28);border-radius:3px;color:var(--muted);
+  font-size:13px;line-height:1;padding:1px 7px;cursor:pointer;font-family:var(--mono);
+  transition:border-color .12s,color .12s}
+#rrg-nav button:hover:not(:disabled){border-color:var(--accent);color:var(--accent)}
+#rrg-nav button:disabled{opacity:.28;cursor:default}
 #dss .sub{color:var(--muted);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;margin-bottom:14px}
 #dss-grid{display:grid;grid-template-columns:230px 1fr;gap:22px}
 @media(max-width:720px){#dss-grid{grid-template-columns:1fr}}
@@ -285,7 +302,7 @@ figure figcaption{font-size:10px;color:var(--muted);letter-spacing:.06em;margin-
       <path d="M16 8 L23 12 L23 20 L16 24 L9 20 L9 12 Z" fill="rgba(83,221,242,.12)" stroke="#53DDF2" stroke-width="1"/>
       <circle cx="16" cy="16" r="2.4" fill="#53DDF2"/>
     </svg>
-    <div id="brand"><b>VANGUARD</b><span>Orbital Deck // dealer positioning</span></div>
+    <div id="brand"><b>DRISHTI</b><span>Orbital Deck // dealer positioning</span></div>
     <div class="cb-stat"><span class="k">Session <span id="histbadge" hidden>◷ TIME TRAVEL</span></span>
       <span class="v" id="sess-ctl">
         <button id="d-prev" aria-label="Previous session">‹</button>
@@ -371,6 +388,10 @@ figure figcaption{font-size:10px;color:var(--muted);letter-spacing:.06em;margin-
       <span class="sub" id="rrg-sub">EOD close vs NIFTY 50 · JdK RS-Ratio / RS-Momentum</span>
       <span class="spacer"></span>
       <span id="rrg-count" class="sub dim" style="margin-right:10px"></span>
+      <span id="rrg-nav" style="display:inline-flex;align-items:center;gap:3px;margin-right:10px">
+        <button id="rrg-prev" aria-label="Previous period" title="Previous period">&#x2039;</button>
+        <button id="rrg-next" aria-label="Next period"   title="Next period">&#x203a;</button>
+      </span>
       <div style="display:flex;gap:6px;margin-right:8px" id="rrg-bench"></div>
       <div style="display:flex;gap:6px" id="rrg-chips"></div></div>
     <div id="rrg-thin" class="sub dim" style="margin-bottom:6px" hidden></div>
@@ -389,7 +410,7 @@ figure figcaption{font-size:10px;color:var(--muted);letter-spacing:.06em;margin-
     <div id="scan-wrap"><table id="scan" aria-label="Market structure scanner"><thead></thead><tbody></tbody></table></div>
   </section>
 
-  <div id="foot">VANGUARD ORBITAL DECK · EOD compiled from vanguard.duckdb · not investment advice · rebuild: python3 scripts/build_hud.py</div>
+  <div id="foot">DRISHTI ORBITAL DECK · EOD compiled from vanguard.duckdb · not investment advice · rebuild: python3 scripts/build_hud.py</div>
 </div>
 
 <div id="dossier" hidden role="dialog" aria-modal="true" aria-labelledby="dss-sym">
@@ -398,17 +419,14 @@ figure figcaption{font-size:10px;color:var(--muted);letter-spacing:.06em;margin-
     <a id="dss-tv" class="chip" target="_blank" rel="noopener"
        title="One-click chart view (TradingView, NSE). Renders the exact stock — for a quick look."
        style="position:absolute;top:12px;right:76px;text-decoration:none">📈 CHART ⤴</a>
-    <a id="dss-chart" class="chip" href="https://my.fyers.in/"
-       title="Opens Fyers terminal (ONE reused tab, saved layout) · symbol copied — paste (⌘V) + Enter in Symbol Search"
-       style="position:absolute;top:12px;right:166px;text-decoration:none">FYERS ⤴</a>
-    <h3><span id="dss-sym">—</span><span id="dss-date"></span></h3>
+    <h3><span id="dss-sym">—</span><span id="dss-date"></span><span id="dss-nav"><button id="dss-prev" aria-label="Previous session">‹</button><button id="dss-next" aria-label="Next session">›</button></span></h3>
     <div class="sub" id="dss-sub">—</div>
     <div id="dss-grid">
       <div>
         <div class="sect" style="margin-top:0"><h4>Strike Ladder</h4><div id="dss-ladder"></div></div>
       </div>
       <div>
-        <div class="sect" style="margin-top:0" id="dss-intel-sect"><h4>Vanguard Intelligence</h4><div id="dss-intel"></div></div>
+        <div class="sect" style="margin-top:0" id="dss-intel-sect"><h4>Drishti Intelligence</h4><div id="dss-intel"></div></div>
       </div>
     </div>
 
@@ -485,16 +503,6 @@ const SESSIONS = META.sessions;
 /* Shared lookback for all trend charts (waveform, McClellan, A/D line).
    Mirrors TREND_WINDOW_SESSIONS in vanguard/config/eod.py — keep in sync. */
 const TREND_WINDOW = 60;
-/* Fyers terminal link. FYERS_MAP (scripts/build_fyers_map.py) holds the
-   compiled-symbol -> Fyers ticker fragment; the accepted deep-link format is
-   NSE:<TICKER>-EQ. The symbol is still copied to the clipboard as a
-   fallback: if the deep link ever fails to resolve, paste + Enter in
-   Symbol Search recovers. */
-const FYERS_MAP = VG.fyers_map || {};
-const CHART_URL = s => {
-    let sym = FYERS_MAP[s] || s;
-    return `https://my.fyers.in/?symbol=NSE:${sym}-EQ`;
-};
 // TradingView: real deep-link that renders the exact stock in one click (viewing, no orders).
 const TV_URL = s => "https://www.tradingview.com/chart/?symbol=NSE:" + encodeURIComponent(String(s).replace(/[&-]/g, "_"));
 const groupByDate = rows => { const m = {}; rows.forEach(r => { (m[r.date] ??= []).push(r); }); return m; };
@@ -703,6 +711,7 @@ function addSessionMarker(svg,NS,x,top,bottom){
   g.textContent="◷";svg.appendChild(g);
 }
 function lineChart(host,series,dates,{h=190,ymin,ymax,unit="%",markDate,shadow}={}){
+  hideTip();
   const el=$(host);el.innerHTML="";
   const W=el.clientWidth||600,H=h,ml=34,mr=64,mt=8,mb=22;
   const iw=W-ml-mr,ih=H-mt-mb;
@@ -784,6 +793,7 @@ function drawBreadth(){
   const coil=B.map(r=>r.compression_pct||0);
   {const bi=B.findIndex(r=>r.date===SDATE);
    CHK.breadth=bi>=0?{date:SDATE,net:raw[bi],coil:coil[bi]}:null;}
+  hideTip();
   const el=$("#bw-chart");el.innerHTML="";
   const W=el.clientWidth||600,H=230,ml=34,mr=64,mt=8,mb=22,iw=W-ml-mr,ih=H-mt-mb;
   const M=Math.max(10,...raw.map(Math.abs),...coil);
@@ -882,6 +892,7 @@ function drawInternals(){
   /* McClellan: thin bars around zero, diverging by sign, 2px gaps.
      Scale floor 28 keeps the ±25 reference bands on-screen — small bars near
      zero then read correctly as weak momentum on an absolute scale. */
+  hideTip();
   const mc=CM.slice(-TREND_WINDOW);const el=$("#mcc-chart");el.innerHTML="";
   const W=el.clientWidth||300,H=86,mt=4,mb=4,ih=H-mt-mb;
   // Bars span only cw (not the full W) so the session marker's "◷" glyph has
@@ -951,6 +962,7 @@ function drawInternals(){
 
   /* A/D line area + indexed NIFTY overlay (both min-max scaled to the same
      pixel band, no y-axes — divergence between the two is the signal) */
+  hideTip();
   const ad=CM.slice(-TREND_WINDOW);const el2=$("#adl-chart");el2.innerHTML="";
   const W2=el2.clientWidth||300,H2=86;
   // Points span only (W2-mr2) so the session marker's "◷" glyph has room on
@@ -1085,6 +1097,45 @@ let rrgHorizon="1W",rrgHidden=new Set();
 // drill-down state: "sectors" (16 sector indices) or "stocks" (one sector's
 // F&O names). Stocks carry their own hidden-set + a benchmark toggle.
 let rrgLevel="sectors",rrgSector=null,rrgStockBench="n",rrgStockHidden=new Set();
+
+/* ── RRG period navigation ‹ › ──────────────────────────────────────────
+   Steps through tf.dates[] for the active timeframe, NOT through SESSIONS.
+   Why: 1D → step by trading session (same as SESSIONS).
+        1W → step by week-end date  (one meaningful weekly bar).
+        1M → step by month-end date (one meaningful monthly bar).
+   After picking a tf.dates entry we find the nearest SESSIONS date at-or-
+   before it so the global SDATE and top-bar dropdown stay in sync.         */
+function rrgCurrentTfDates(){
+  if(!RRG)return[];
+  const tf=RRG.timeframes[rrgHorizon];
+  return(tf&&tf.dates)||[];
+}
+function rrgCurrentTfIdx(){
+  const dates=rrgCurrentTfDates();
+  let idx=-1;
+  for(let i=0;i<dates.length;i++){if(dates[i]<=SDATE)idx=i;}
+  return idx;
+}
+/* Map a tf.dates date back to the nearest SESSIONS entry (≤ target). */
+function rrgDateToSession(d){
+  let best=SESSIONS[0];
+  for(let i=0;i<SESSIONS.length;i++){if(SESSIONS[i]<=d)best=SESSIONS[i];else break;}
+  return best;
+}
+function rrgUpdateNavButtons(){
+  const idx=rrgCurrentTfIdx(),len=rrgCurrentTfDates().length;
+  $("#rrg-prev").disabled=idx<=0;
+  $("#rrg-next").disabled=idx<0||idx>=len-1;
+}
+function rrgNavStep(dir){
+  const dates=rrgCurrentTfDates();
+  const idx=rrgCurrentTfIdx()+dir;
+  if(idx<0||idx>=dates.length)return;
+  const sess=rrgDateToSession(dates[idx]);
+  setSession(sess);  // syncs SDATE + top-bar dropdown + full page re-render
+}
+$("#rrg-prev").addEventListener("click",()=>rrgNavStep(-1));
+$("#rrg-next").addEventListener("click",()=>rrgNavStep(1));
 /* which RRG quadrant a point sits in, + the standard read for it (relative to
    the reference `ref` — NIFTY for the market view, the sector for intra-sector) */
 function rrgQuadrantRef(rr,rm,ref){
@@ -1166,6 +1217,7 @@ function renderRRGScatter(o){
   const[x0,x1]=pad(Math.min(...xs,100),Math.max(...xs,100));
   const[y0,y1]=pad(Math.min(...ys,100),Math.max(...ys,100));
 
+  hideTip();
   const el=$("#rrg-chart");el.innerHTML="";
   // Isotropic scale (same px-per-data-unit on both axes), plot centered in
   // the box — a full-bleed panel (~1900px wide) against a fixed short height
@@ -1334,6 +1386,7 @@ function drawRRGSectors(){
   const dates=tf.dates||[];
   let lastIdx=-1; for(let i=0;i<dates.length;i++){if(dates[i]<=SDATE)lastIdx=i;}
   const atLatest=lastIdx===dates.length-1;
+  rrgUpdateNavButtons();
   const dotByLabel=rrgSliceDots(labels,l=>tf.sectors[l],dates,lastIdx,atLatest,tf.partial_last);
 
   const shown=labels.filter(l=>!rrgHidden.has(l)).length;
@@ -1380,6 +1433,7 @@ function drawRRGStocks(stf,sec){
   const dates=stf.dates||[];
   let lastIdx=-1; for(let i=0;i<dates.length;i++){if(dates[i]<=SDATE)lastIdx=i;}
   const atLatest=lastIdx===dates.length-1;
+  rrgUpdateNavButtons();
   const dotByLabel=rrgSliceDots(symbols,s=>sec.symbols[s][rrgStockBench],dates,lastIdx,atLatest,stf.partial_last);
 
   const shown=symbols.filter(s=>!rrgStockHidden.has(s)).length;
@@ -1800,6 +1854,7 @@ $("#scan-clear").addEventListener("click",()=>{sectorFilter=null;$("#scan-clear"
 
 /* ── dossier ─────────────────────────────────────────────────────────── */
 function ladder(r){
+  hideTip();
   const el=$("#dss-ladder");el.innerHTML="";
   const W=210,H=300,NS="http://www.w3.org/2000/svg";
   const levels=[["CALL WALL",r.call_wall,C.bear],["GAMMA FLIP",r.gamma_flip,C.violet],
@@ -1847,6 +1902,7 @@ function ladder(r){
   el.appendChild(svg);
 }
 function wallTrail(sym){
+  hideTip();
   const el=$("#dss-trail");el.innerHTML="";
   const hist=(msBySymbol[sym]||[]).filter(r=>r.spot_close>0);
   if(hist.length<2){el.innerHTML='<span class="dim" style="font-size:11px">insufficient history</span>';return}
@@ -1957,7 +2013,7 @@ function renderIntelligencePanel(r, sym){
 
   /* Quant Narrative */
   h+=`<div class="intel-card">
-    <div class="intel-title">🤖 Vanguard Quant Narrative</div>
+    <div class="intel-title">🤖 Drishti Quant Narrative</div>
     <div class="narrative-body">${generateNarrative(r, sym)}</div>
   </div>`;
 
@@ -2001,6 +2057,7 @@ function renderIntelligencePanel(r, sym){
 }
 
 function openDossier(sym){
+  dssUpdateNavButtons();
   const r=bySym[sym];if(!r)return;
   $("#dss-sym").textContent=r.symbol;
   /* Every tile below is bound to SDATE, not necessarily "today" — a
@@ -2013,7 +2070,6 @@ function openDossier(sym){
   dssDate.textContent=(isLatest?"EOD ":"◷ ")+fdate(SDATE);
   dssDate.className=isLatest?"":"hist";
   dssDate.title=isLatest?"latest compiled session":"historical session — not today's data";
-  $("#dss-chart").href=CHART_URL(r.symbol);
   $("#dss-tv").href=TV_URL(r.symbol);
   const flipChip=r.structure_flip&&r.structure_flip!=="NONE"
     ?(r.structure_flip==="BEARISH_TO_BULLISH"
@@ -2068,30 +2124,19 @@ function openDossier(sym){
   $("#dss-close").focus();
 }
 $("#dss-close").addEventListener("click",()=>$("#dossier").hidden=true);
-/* One-click Fyers deep link (see CHART_URL note): opens ?symbol=<FYERS_MAP sym>
-   in ONE named tab ("fyers_terminal", navigated + refocused every click — a
-   new tab per click left stale charts around, which read as "opens the wrong
-   chart"). The symbol is ALSO copied (clipboard promise awaited; rejections
-   used to show "✓ copied" over an unchanged clipboard) so if a symbol format
-   ever fails to resolve, paste + Enter in Symbol Search recovers. */
-$("#dss-chart").addEventListener("click",e=>{
-  e.preventDefault();
-  const sym=$("#dss-sym").textContent;
-  const fyersSym=FYERS_MAP[sym]||sym;
-  const done=ok=>showToast(ok
-    ?`⤴ Opening <b>${esc(fyersSym)}</b> in Fyers — also copied (⌘V + Enter in Symbol Search if the chart didn't switch)`
-    :`⤴ Opening <b>${esc(fyersSym)}</b> in Fyers — if the chart didn't switch, type it in Symbol Search`);
-  const legacyCopy=()=>{const ta=document.createElement("textarea");ta.value=fyersSym;
-    ta.style.cssText="position:fixed;opacity:0";document.body.appendChild(ta);ta.select();
-    let ok=false;try{ok=document.execCommand("copy")}catch(_){/* denied */}
-    ta.remove();return ok};
-  if(navigator.clipboard?.writeText)
-    navigator.clipboard.writeText(fyersSym).then(()=>done(true),()=>done(legacyCopy()));
-  else done(legacyCopy());
-  /* open/refocus the single Fyers tab synchronously inside the click gesture
-     (popup blockers require it) */
-  const w=window.open(CHART_URL(sym),"fyers_terminal");
-  try{w&&w.focus()}catch(_){/* cross-origin focus refusal is fine */}
+/* DSS date navigation — step session while keeping the current stock open */
+function dssUpdateNavButtons(){
+  const i=SESSIONS.indexOf(SDATE);
+  $("#dss-prev").disabled=i<=0;
+  $("#dss-next").disabled=i>=SESSIONS.length-1;
+}
+$("#dss-prev").addEventListener("click",()=>{
+  const i=SESSIONS.indexOf(SDATE);
+  if(i>0){setSession(SESSIONS[i-1]);openDossier($("#dss-sym").textContent);}  
+});
+$("#dss-next").addEventListener("click",()=>{
+  const i=SESSIONS.indexOf(SDATE);
+  if(i<SESSIONS.length-1){setSession(SESSIONS[i+1]);openDossier($("#dss-sym").textContent);}
 });
 $("#dossier").addEventListener("click",e=>{if(e.target.id==="dossier")$("#dossier").hidden=true});
 document.addEventListener("keydown",e=>{

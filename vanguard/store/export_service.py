@@ -17,7 +17,7 @@ import re
 import duckdb
 import pandas as pd
 
-from vanguard.config.paths import DB, COMPILED, PROCESSED
+from vanguard.config.paths import DB, PROCESSED
 from vanguard.config.sectors import get_sector
 from vanguard.config.eod import TREND_WINDOW_SESSIONS
 from vanguard.research.position_stats import summarize_by_group
@@ -242,18 +242,10 @@ def _build(con, n_sessions: int) -> dict:
     data["cm_breadth"]["rows"].reverse()
     data["nifty"]["rows"].reverse()
 
-    # Ticker → Fyers display-symbol map for chart deep links.
-    # Regenerate via scripts/build_fyers_map.py.
-    fyers_map_path = COMPILED / "fyers_symbol_map.json"
-    fyers_map = {}
-    if fyers_map_path.exists():
-        full_map = json.loads(fyers_map_path.read_text())
-        # We only ship mappings for the symbols actually included in the export.
-        # This prevents the initial payload from bloating with 5000+ unused names.
-        yi = MS_COLS.index("symbol")
-        exported_syms = {r[yi] for r in data["market_structure"]["rows"]}
-        fyers_map = {s: full_map[s] for s in exported_syms if s in full_map}
-    data["fyers_map"] = fyers_map
+    # Symbols actually included in this export — used below to filter the
+    # option chain snapshot down to just what the payload ships.
+    yi = MS_COLS.index("symbol")
+    exported_syms = {r[yi] for r in data["market_structure"]["rows"]}
 
     # Per-symbol option chain (strike/OI/IV/GEX) for the Dossier's Deep Dive
     # Charts (GEX Profile / OI Concentration / IV Skew). Previously an

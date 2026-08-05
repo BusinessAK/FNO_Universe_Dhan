@@ -46,9 +46,9 @@ class NarrativeEngine:
         # 2. Key Level Proximity
         if spot > cw and cw > 0:
             narrative.append(NARRATIVE_ABOVE_CALL_WALL.format(cw=cw))
-        elif cw > 0 and abs(spot - cw) / spot <= 0.025:
+        elif cw > 0 and spot > 0 and abs(spot - cw) / spot <= 0.025:
             narrative.append(NARRATIVE_NEAR_CALL_WALL.format(cw=cw))
-        elif pw > 0 and abs(spot - pw) / spot <= 0.025:
+        elif pw > 0 and spot > 0 and abs(spot - pw) / spot <= 0.025:
             narrative.append(NARRATIVE_NEAR_PUT_WALL.format(pw=pw))
         else:
             narrative.append(NARRATIVE_CHANNEL.format(cw=cw, pw=pw))
