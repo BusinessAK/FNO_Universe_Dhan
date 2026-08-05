@@ -17,3 +17,8 @@ feedparser
 google-genai
 websockets
 fyers-apiv3>=3.0.0
+
+# Dev/verification only — not imported by the nightly pipeline or the HUD,
+# used by scripts/verify_greeks_vs_pyvollib.py to cross-check Greeks/IV
+# against an independent reference implementation.
+py_vollib
