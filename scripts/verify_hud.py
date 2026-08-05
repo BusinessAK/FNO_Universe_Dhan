@@ -171,9 +171,7 @@ class Oracle:
             }
 
         exp["sectors"] = {h: self.sectors(sdate, h) for h in ("1D", "1W", "1M")}
-        # Not session-indexed — RRG always reflects the latest compiled
-        # session regardless of time-travel, same as drawRRG() client-side.
-        exp["rrg"] = self.rrg()
+        exp["rrg"] = self.rrg(sdate)
 
         flips = cur[cur.structure_flip.notna() & (cur.structure_flip != "NONE")]
         exp["flips"] = {
@@ -215,11 +213,8 @@ class Oracle:
         return per_sym, win, cur
 
     def sectors(self, sdate, horizon):
-        """Also aligned to scanner_universe (Nifty50+indices) now — Sector
-        Flow Grid was re-scoped to match the Scanner it sits next to, same
-        change as scan() below, so its oracle needs the same filter."""
+        """Sector Flow Grid on full universe."""
         per_sym, win, cur = self._per_symbol_return(sdate, horizon)
-        cur = cur[cur.symbol.isin(self.scanner_universe)]
         df = cur[["symbol", "sec"]].merge(
             per_sym.rename("ret"), left_on="symbol", right_index=True)
         g = df.groupby("sec").ret
@@ -227,28 +222,20 @@ class Oracle:
                 "avg": g.mean().to_dict(), "n": g.size().astype(int).to_dict()}
 
     def scan(self, sdate, horizon):
-        """Scanner is filtered to the Nifty50+indices universe (matches the
-        live-covered universe — see vanguard.live.universe/select_covered_names
-        and the same filter applied client-side in hud/template.html's
-        renderScan()). Sector Flow Grid stays full-215-universe market
-        context, so this filter is applied here, not inside
-        _per_symbol_return (shared with sectors())."""
+        """Scanner is no longer filtered to the Nifty50+indices universe."""
         per_sym, win, cur = self._per_symbol_return(sdate, horizon)
-        cur = cur[cur.symbol.isin(self.scanner_universe)]
         return {"shown": len(cur), "total": len(cur), "horizon": horizon,
                 "win": len(win), "chg": per_sym.reindex(cur.symbol).to_dict()}
 
-    def rrg(self) -> dict | None:
+    def rrg(self, sdate) -> dict | None:
         """Independent RS-Ratio/RS-Momentum recomputation straight from
-        daily_index_close — re-derived with its own zscore/window logic, not
-        by importing vanguard/engines/rrg.py's build_rrg(). Doesn't take an
-        sdate: the RRG panel always reflects the latest compiled session
-        regardless of time-travel, same as the HUD's drawRRG()."""
+        daily_index_close."""
         names = [RRG_BENCHMARK] + list(RRG_INDEX_BY_SECTOR.values())
         ph = ", ".join("?" * len(names))
+        # Filter by sdate so time-travel matches the frontend's slice
         df = self.con.execute(
             f"SELECT date, index_name, close FROM daily_index_close "
-            f"WHERE index_name IN ({ph}) ORDER BY date", names).df()
+            f"WHERE index_name IN ({ph}) AND date <= ? ORDER BY date", names + [sdate]).df()
         if df.empty or RRG_BENCHMARK not in set(df.index_name):
             return None
         df["date"] = pd.to_datetime(df["date"])
@@ -472,13 +459,7 @@ def main() -> int:
         # 1) latest session, default state
         assert_session(latest, "latest")
 
-        # Regime/Breadth/Internals/Positioning/Sectors + the date picker all
-        # live under the Market Context tab now — Playwright's click/
-        # inner_text/locator calls require the target actually visible, so
-        # switch tabs before touching any of them.
-        def goto_tab(tab):
-            page.click(f'.tab-btn[data-tab="{tab}"]')
-        goto_tab("context")
+        # (Tabs were removed in the new HUD layout)
 
         # DOM sanity: the numbers made it to screen
         exp = ref.expected(latest)
@@ -505,7 +486,6 @@ def main() -> int:
         # 2) sector horizons at the latest session — Sector Flow Grid now
         # lives in the Scanner tab (moved there so clicking a sector tile
         # can actually scroll to the now-visible, same-tab Scanner table).
-        goto_tab("scanner")
         for hz in ("1W", "1M", "1D"):
             page.click(f'#sec-chips .chip[data-hz="{hz}"]')
             page.wait_for_function(
@@ -514,7 +494,7 @@ def main() -> int:
                   registry()["sectors"], failures)
 
         # 2c) RRG Daily/Weekly/Monthly toggle
-        rrg_exp = ref.rrg() or {}
+        rrg_exp = ref.rrg(latest) or {}
         for tf in ("1W", "1M", "1D"):
             page.click(f'#rrg-chips .chip[data-tf="{tf}"]')
             page.wait_for_function(
@@ -535,7 +515,6 @@ def main() -> int:
                 failures.append((f"dom.#scan thead[{hz}]", want, hdr[:120]))
 
         # 3) positioning fut/opt toggle
-        goto_tab("context")
         page.click('#pos-chips .chip[data-pm="OPT"]')
         page.wait_for_function("window.__VG_CHECK__.positioning.mode==='OPT'")
         if "tilt" not in page.inner_text("#pos-cap"):
@@ -544,7 +523,6 @@ def main() -> int:
         page.click('#pos-chips .chip[data-pm="FUT"]')
 
         # 4) dossier: first scanner card opens with the right symbol + date
-        goto_tab("scanner")
         sym = page.get_attribute("#scan tbody tr", "data-sym")
         page.click("#scan tbody tr")
         page.wait_for_function(
@@ -557,7 +535,6 @@ def main() -> int:
         page.keyboard.press("Escape")
 
         # 5) time travel: two sessions back, full re-assert
-        goto_tab("context")
         back = ref.sessions[-3]
         page.select_option("#d-sel", back)
         page.wait_for_function(
