@@ -7,4 +7,8 @@ Wants=network-online.target
 Type=oneshot
 WorkingDirectory=/opt/vanguard
 EnvironmentFile=/opt/vanguard/.env
+# nightly.sh calls bare "python3" internally (poll_eod.py, run_tests.py,
+# verify_hud.py, notify_telegram.py) — putting the venv first on PATH here
+# resolves all of those to the venv's interpreter without editing the script.
+Environment="PATH=/opt/vanguard/venv/bin:/usr/bin:/bin"
 ExecStart=/bin/bash /opt/vanguard/scripts/nightly.sh

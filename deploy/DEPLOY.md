@@ -39,8 +39,12 @@ public domain or TLS cert needed.
 sudo mkdir -p /opt/vanguard && sudo chown $USER:$USER /opt/vanguard
 git clone <your-repo-url> /opt/vanguard
 cd /opt/vanguard
-python3 -m pip install -r requirements.txt
+python3 -m venv venv
+./venv/bin/pip install --upgrade pip
+./venv/bin/pip install -r requirements.txt
 ```
+
+Use `./venv/bin/python3` for anything you run manually on the box (`./venv/bin/python3 scripts/build_hud.py`, etc). Ubuntu 24.04 blocks installing into the system Python directly (PEP 668) — a venv sidesteps that instead of overriding it with `--break-system-packages`, which risks conflicting with apt-managed packages.
 
 ## 4. Secrets — `.env`
 
@@ -102,7 +106,7 @@ post-compile test failure, HUD parity mismatch) — nothing else to connect.
 Test it directly:
 
 ```bash
-python3 scripts/notify_telegram.py "test alert from vanguard VPS"
+./venv/bin/python3 scripts/notify_telegram.py "test alert from vanguard VPS"
 ```
 
 ## 7. Reach the HUD only over Tailscale

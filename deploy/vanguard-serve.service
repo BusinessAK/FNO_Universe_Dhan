@@ -6,7 +6,7 @@ After=network.target
 Type=simple
 WorkingDirectory=/opt/vanguard
 EnvironmentFile=/opt/vanguard/.env
-ExecStart=/usr/bin/python3 scripts/serve_hud.py
+ExecStart=/opt/vanguard/venv/bin/python3 scripts/serve_hud.py
 Restart=on-failure
 RestartSec=5
 # Binds to BRIDGE_HOST:BRIDGE_PORT (vanguard/config/paths.py) — keep that
