@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Vanguard evening EOD sync — fires scripts/nightly.sh every 15 minutes from
+  18:00 to 21:00 (assumes the Mac's system clock is already IST, same as
+  every other timestamp in this project; adjust the Hour values below if not).
+  Repeated fires, not a single one, because poll_eod.py is single-shot and
+  expects an external retry loop until NSE actually publishes the bhavcopy
+  (see scripts/nightly.sh's own header comment).
+
+  Install:
+    cp scripts/com.vanguard.eod-sync.plist ~/Library/LaunchAgents/
+    launchctl load ~/Library/LaunchAgents/com.vanguard.eod-sync.plist
+  Verify without waiting for the window:
+    launchctl start com.vanguard.eod-sync
+    tail -f data/live/nightly_$(date +%Y%m%d).log
+  Uninstall:
+    launchctl unload ~/Library/LaunchAgents/com.vanguard.eod-sync.plist
+    rm ~/Library/LaunchAgents/com.vanguard.eod-sync.plist
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.vanguard.eod-sync</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>/Users/shivanidamodar/Desktop/FNO_BHAV/scripts/nightly.sh</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/shivanidamodar/Desktop/FNO_BHAV</string>
+
+    <key>StartCalendarInterval</key>
+    <array>
+        <dict><key>Hour</key><integer>18</integer><key>Minute</key><integer>0</integer></dict>
+        <dict><key>Hour</key><integer>18</integer><key>Minute</key><integer>15</integer></dict>
+        <dict><key>Hour</key><integer>18</integer><key>Minute</key><integer>30</integer></dict>
+        <dict><key>Hour</key><integer>18</integer><key>Minute</key><integer>45</integer></dict>
+        <dict><key>Hour</key><integer>19</integer><key>Minute</key><integer>0</integer></dict>
+        <dict><key>Hour</key><integer>19</integer><key>Minute</key><integer>15</integer></dict>
+        <dict><key>Hour</key><integer>19</integer><key>Minute</key><integer>30</integer></dict>
+        <dict><key>Hour</key><integer>19</integer><key>Minute</key><integer>45</integer></dict>
+        <dict><key>Hour</key><integer>20</integer><key>Minute</key><integer>0</integer></dict>
+        <dict><key>Hour</key><integer>20</integer><key>Minute</key><integer>15</integer></dict>
+        <dict><key>Hour</key><integer>20</integer><key>Minute</key><integer>30</integer></dict>
+        <dict><key>Hour</key><integer>20</integer><key>Minute</key><integer>45</integer></dict>
+        <dict><key>Hour</key><integer>21</integer><key>Minute</key><integer>0</integer></dict>
+    </array>
+
+    <key>StandardOutPath</key>
+    <string>/Users/shivanidamodar/Library/Logs/vanguard-eod-sync.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/shivanidamodar/Library/Logs/vanguard-eod-sync.log</string>
+</dict>
+</plist>

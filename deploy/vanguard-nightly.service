@@ -1,0 +1,10 @@
+[Unit]
+Description=Vanguard EOD nightly sync (one-shot: poll_eod -> tests -> HUD parity)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/vanguard
+EnvironmentFile=/opt/vanguard/.env
+ExecStart=/bin/bash /opt/vanguard/scripts/nightly.sh

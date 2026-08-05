@@ -1,0 +1,17 @@
+[Unit]
+Description=Vanguard HUD server (EOD-only terminal, static HUD + /session/latest)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/vanguard
+EnvironmentFile=/opt/vanguard/.env
+ExecStart=/usr/bin/python3 scripts/serve_hud.py
+Restart=on-failure
+RestartSec=5
+# Binds to BRIDGE_HOST:BRIDGE_PORT (vanguard/config/paths.py) — keep that
+# bound to the Tailscale interface / 127.0.0.1, not 0.0.0.0, so the HUD is
+# reachable only over the Tailscale network, never the public internet.
+
+[Install]
+WantedBy=multi-user.target

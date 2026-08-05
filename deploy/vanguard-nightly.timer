@@ -1,0 +1,16 @@
+[Unit]
+Description=Fire vanguard-nightly.service every 15 min, 18:00-21:00 IST
+
+[Timer]
+# Same repeated-fire design as the macOS launchd plist it replaces
+# (scripts/com.vanguard.eod-sync.plist): poll_eod.py is single-shot and
+# expects an external retry loop until NSE actually publishes the bhavcopy.
+# Assumes the VM's system clock is set to IST (Asia/Kolkata) — if not, either
+# `timedatectl set-timezone Asia/Kolkata` or shift these OnCalendar times to
+# match your VM's timezone.
+OnCalendar=*-*-* 18,19,20:00,15,30,45:00
+OnCalendar=*-*-* 21:00:00
+Persistent=false
+
+[Install]
+WantedBy=timers.target
