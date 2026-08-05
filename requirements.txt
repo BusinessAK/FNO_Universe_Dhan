@@ -22,3 +22,8 @@ fyers-apiv3>=3.0.0
 # used by scripts/verify_greeks_vs_pyvollib.py to cross-check Greeks/IV
 # against an independent reference implementation.
 py_vollib
+
+# Test suite — pytest (tests/test_oi_flow.py), playwright (scripts/verify_hud.py's
+# headless-browser HUD parity check, run by nightly.sh after every EOD compile).
+pytest
+playwright
