@@ -437,6 +437,12 @@ figure figcaption{font-size:10px;color:var(--muted);letter-spacing:.06em;margin-
 
     <div class="sect" style="margin-top:20px" id="dss-charts-sect">
       <h4>Detailed Longitudinal Analysis Panel</h4>
+      <div class="legend" style="margin-bottom:8px">
+        <span><i style="background:#f59e0b"></i>Spot</span>
+        <span><i style="background:#3ED598"></i>Call Wall</span>
+        <span><i style="background:#FF7A92"></i>Put Wall</span>
+        <span><i style="background:#B8C4D4"></i>Gamma Flip</span>
+      </div>
       <div class="dss-tabs" id="dss-chart-tabs">
         <button class="dss-tab active" data-target="gex">📊 GEX PROFILE</button>
         <button class="dss-tab" data-target="oi">📈 OI CONCENTRATION</button>
@@ -1579,12 +1585,18 @@ function loadDeepDiveCharts(sym, r) {
       shapes.push({type: 'line', x0: 0, x1: 1, xref: 'x2 domain', y0: val, y1: val, yref: 'y2', line: {color: color, width: 1, dash: dash}});
     };
     if(spot) addHoriz(spot, '#f59e0b', 'dot');
-    
+    if(cw) addHoriz(cw, '#3ED598', 'solid');
+    if(pw) addHoriz(pw, '#FF7A92', 'solid');
+    if(gf) addHoriz(gf, '#B8C4D4', 'dashdot');
+
     const vshapes = [];
     const addVert = (val, color, dash) => {
       vshapes.push({type: 'line', y0: 0, y1: 1, yref: 'paper', x0: val, x1: val, line: {color: color, width: 1, dash: dash}});
     };
     if(spot) addVert(spot, '#f59e0b', 'dot');
+    if(cw) addVert(cw, '#3ED598', 'solid');
+    if(pw) addVert(pw, '#FF7A92', 'solid');
+    if(gf) addVert(gf, '#B8C4D4', 'dashdot');
 
     const config = { displayModeBar: false, responsive: true };
 
