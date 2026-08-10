@@ -243,7 +243,7 @@ def build_report(date: str) -> str:
         if sectors:
             hdr = (
                 f"  {'SECTOR':<22} {'#':>4}  {'AVG IFS':>8}  "
-                f"{'NET INV SHIFT':>14}  {'AVG CHG%':>9}"
+                f"{'NET INV SHIFT (₹Cr)':>19}  {'AVG CHG%':>9}"
             )
             lines.append(hdr)
             lines.append("  " + "─" * (WIDTH - 4))
@@ -253,7 +253,7 @@ def build_report(date: str) -> str:
                     f"  {tag} {_col(s.get('sector'),20)}"
                     f"{_col(s.get('symbols'),4,'>')}  "
                     f"{_col(_fmt_num(s.get('avg_ifs')),8,'>')}  "
-                    f"{_col(_fmt_num(s.get('total_net_inv'),0),14,'>')}  "
+                    f"{_col(_crore(s.get('total_net_inv')),19,'>')}  "
                     f"{_col(_pct(s.get('avg_chg_pct')),9,'>')}"
                 )
         else:

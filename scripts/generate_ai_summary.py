@@ -70,7 +70,12 @@ SYSTEM_PROMPT = (
     "negative, do not pair it with bullish language; describe it as a "
     "volatility setup only, or note the conflict explicitly (e.g. "
     "\"long-gamma but IFS deeply negative — vol expansion, not a directional "
-    "call\")."
+    "call\").\n"
+    "3. Every figure already carries its unit in the report (₹Cr, %, etc.) — "
+    "quote that unit verbatim. Never rescale a number or attach a different "
+    "unit (lakh/crore/million/billion) than what is printed next to it in "
+    "the report; if a figure has no unit shown, state it as a bare number "
+    "rather than guessing one."
 )
 
 
