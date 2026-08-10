@@ -80,7 +80,15 @@ SYSTEM_PROMPT = (
     "report above. If FII/DII flow, a specific figure, or any other data "
     "point is not present in the report, do not mention it or estimate "
     "it from general market knowledge — omit that claim entirely rather "
-    "than fill the gap with a plausible-sounding invented number."
+    "than fill the gap with a plausible-sounding invented number.\n"
+    "5. The report contains two independent sources of FII/other flow "
+    "data: the FII/DII Net Flow section (official, single-day, from the "
+    "exchange) and news catalyst headlines (a reporter's own figure, "
+    "often a different timeframe like \"this week\" or \"this month\"). "
+    "These can both be true at once without contradicting each other — "
+    "never merge them into one number or imply they measure the same "
+    "thing. If you cite a catalyst-sourced figure, attribute it to the "
+    "headline/source, not to the exchange data."
 )
 
 
