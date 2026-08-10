@@ -4,9 +4,11 @@ catalyst_service.py — Fetch news, match F&O symbols, score impact.
 Pipeline:
   1. Fetch headlines from RSS feeds (ET Markets, MoneyControl, NSE)
   2. Match symbols & sectors from F&O universe
-  3. Score impact:
-       - If GEMINI_API_KEY in env → use Gemini 1.5 Flash (AI mode)
-       - Otherwise             → use keyword rules (offline mode)
+  3. Score impact, provider priority (same free-tier-first stance as
+     scripts/generate_ai_summary.py):
+       - NVIDIA_API_KEY set        → Nemotron Ultra (free tier)
+       - else GEMINI_API_KEY set + CATALYST_AI_MODE=true → Gemini Flash
+       - else                      → keyword rules (offline mode)
   4. Return list[CatalystEntry] — caller writes daily_catalysts.json
 
 Usage (standalone):
@@ -104,6 +106,11 @@ MAX_PER_FEED = 20
 # Minimum confidence to include in the report
 MIN_CONFIDENCE = 0.35
 
+DDL = """CREATE TABLE IF NOT EXISTS daily_catalysts (
+    date VARCHAR, headline VARCHAR, source VARCHAR, published VARCHAR, url VARCHAR,
+    impact VARCHAR, confidence DOUBLE, affected_symbols VARCHAR, affected_sectors VARCHAR,
+    reason VARCHAR, suggestion VARCHAR, mode VARCHAR)"""
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Helpers
@@ -180,8 +187,85 @@ def _fetch_headlines() -> list[dict]:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# AI Analysis (Gemini)
+# AI Analysis (Nemotron via NVIDIA NIM, Gemini)
 # ─────────────────────────────────────────────────────────────────────────────
+
+NEMOTRON_MODEL = "nvidia/nemotron-3-ultra-550b-a55b"
+NEMOTRON_URL = "https://integrate.api.nvidia.com/v1/chat/completions"
+
+
+def _strip_json_fences(text: str) -> str:
+    cleaned = text.strip()
+    cleaned = re.sub(r"^```[a-z]*\n?", "", cleaned)
+    cleaned = re.sub(r"\n?```$", "", cleaned)
+    return cleaned
+
+
+def _parse_analysis(text: str, who: str) -> list[dict]:
+    """Parse a model reply into the analysis-dict list the assembler expects.
+
+    The prompt asks for a bare JSON array, but a model may wrap it
+    ({"results": [...]}) or return something else entirely. An unvalidated
+    parse is worse than a failure: a truthy non-list sets mode="AI", skips
+    every fallback, and then blows up in the assembler's `res.get(...)`.
+    Returning [] instead lets the caller fall through to the next provider.
+    """
+    obj = json.loads(_strip_json_fences(text))
+    if isinstance(obj, dict):
+        # tolerate a single wrapper key holding the array
+        for v in obj.values():
+            if isinstance(v, list):
+                obj = v
+                break
+    if not isinstance(obj, list):
+        print(f"[CATALYST] {who} returned {type(obj).__name__}, expected a list — falling back.")
+        return []
+    rows = [r for r in obj if isinstance(r, dict)]
+    if len(rows) != len(obj):
+        print(f"[CATALYST] {who}: dropped {len(obj) - len(rows)} non-object entries.")
+    return rows
+
+
+def _analyze_with_nemotron(
+    headlines: list[dict],
+    fno_symbols: set[str],
+    api_key: str,
+) -> list[dict]:
+    """Call Nemotron via NVIDIA NIM (OpenAI-compatible chat completions) to
+    score headlines. Returns list of analysis dicts, or [] on any failure —
+    caller falls back to Gemini/rules."""
+    import requests
+
+    prompt = _build_gemini_prompt(headlines, fno_symbols)
+    try:
+        resp = requests.post(
+            NEMOTRON_URL,
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": NEMOTRON_MODEL,
+                "messages": [{"role": "user", "content": prompt}],
+                "max_tokens": 8192,
+                "temperature": 0.1,
+            },
+            timeout=240,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        choice = data["choices"][0]
+        if choice.get("finish_reason") == "length":
+            print("[CATALYST] Nemotron hit max_tokens — response truncated, falling back.")
+            return []
+        return _parse_analysis(choice["message"]["content"], "Nemotron")
+    except requests.RequestException as e:
+        print(f"[CATALYST] Nemotron request error ({e}) — falling back.")
+        return []
+    except (KeyError, IndexError, ValueError, json.JSONDecodeError) as e:
+        print(f"[CATALYST] Nemotron response malformed ({e}) — falling back.")
+        return []
+
 
 def _build_gemini_prompt(headlines: list[dict], fno_symbols: set[str]) -> str:
     symbol_list = ", ".join(sorted(fno_symbols)[:150])  # cap to avoid token overflow
@@ -242,15 +326,11 @@ def _analyze_with_gemini(
             client = genai.Client(api_key=api_key)
             prompt = _build_gemini_prompt(headlines, fno_symbols)
             response = client.models.generate_content(
-                model="gemini-3.5-flash",
+                model="gemini-1.5-flash",
                 contents=prompt,
                 config=types.GenerateContentConfig(temperature=0.1),
             )
-            text = response.text.strip()
-            # Strip markdown code fences if present
-            text = re.sub(r"^```[a-z]*\n?", "", text)
-            text = re.sub(r"\n?```$", "", text)
-            return json.loads(text)
+            return _parse_analysis(response.text, "Gemini")
         except Exception as e:
             if attempt < max_retries - 1:
                 print(f"[CATALYST] Gemini attempt {attempt + 1} failed ({e}). Retrying in {delay}s...")
@@ -361,9 +441,16 @@ def run_catalyst_scan(
     date: str,
     output_path: str | None = None,
     quiet: bool = False,
+    con=None,
 ) -> list[CatalystEntry]:
     """
     Full pipeline: fetch → analyse → assemble CatalystEntry list → write JSON.
+
+    RSS feeds only ever expose *current* headlines — there is no way to fetch
+    what was live on a past date. Callers MUST NOT invoke this for a backfill
+    date; it fetches today's news and would mislabel it as belonging to
+    `date`. Use `load_catalysts_for_date` to read back what was actually
+    archived for a given session instead.
 
     Parameters
     ----------
@@ -371,6 +458,9 @@ def run_catalyst_scan(
     date        : YYYY-MM-DD session date string
     output_path : where to write daily_catalysts.json (None = skip write)
     quiet       : suppress print statements
+    con         : optional DuckDB connection — if given, results are also
+                  upserted into daily_catalysts keyed by `date` so past
+                  sessions can be looked up later (e.g. by the HUD export)
 
     Returns
     -------
@@ -387,20 +477,32 @@ def run_catalyst_scan(
     if not headlines:
         return []
 
-    # Choose analysis mode
-    api_key = os.getenv("GEMINI_API_KEY", "").strip()
+    # Choose analysis mode — free tier first, same stance as
+    # scripts/generate_ai_summary.py: Nemotron (NVIDIA_API_KEY, free) tried
+    # before Gemini (GEMINI_API_KEY, gated behind CATALYST_AI_MODE), before
+    # the offline keyword-rules fallback.
+    nvidia_key = os.getenv("NVIDIA_API_KEY", "").strip()
+    gemini_key = os.getenv("GEMINI_API_KEY", "").strip()
     ai_mode = os.getenv("CATALYST_AI_MODE", "").strip().lower() in ("1", "true", "yes")
 
-    if api_key and ai_mode:
+    raw_results: list[dict] = []
+    mode = "RULES"
+
+    if nvidia_key:
+        if not quiet:
+            print("[CATALYST] Using Nemotron AI analysis mode.")
+        raw_results = _analyze_with_nemotron(headlines, fno_symbols, nvidia_key)
+        if raw_results:
+            mode = "AI"
+
+    if not raw_results and gemini_key and ai_mode:
         if not quiet:
             print("[CATALYST] Using Gemini AI analysis mode.")
-        raw_results = _analyze_with_gemini(headlines, fno_symbols, api_key)
-        mode = "AI"
-        # If Gemini returned empty (error fallback), use rules
-        if not raw_results:
-            raw_results = _analyze_with_rules(headlines, fno_symbols)
-            mode = "RULES"
-    else:
+        raw_results = _analyze_with_gemini(headlines, fno_symbols, gemini_key)
+        if raw_results:
+            mode = "AI"
+
+    if not raw_results:
         if not quiet:
             print("[CATALYST] Using keyword rules analysis mode.")
         raw_results = _analyze_with_rules(headlines, fno_symbols)
@@ -460,7 +562,62 @@ def run_catalyst_scan(
         if not quiet:
             print(f"[CATALYST] {len(unique_entries)} catalysts written → {output_path}")
 
+    if con is not None:
+        con.execute(DDL)
+        # Replace the day's rows only when there is something to replace them
+        # with. An empty result is usually a transient scan failure (feeds
+        # down, every headline below MIN_CONFIDENCE, provider error) — wiping
+        # a good archive on that would defeat the point of keeping one.
+        if unique_entries:
+            con.execute("DELETE FROM daily_catalysts WHERE date = ?", [date])
+            rows = [
+                (date, e.headline, e.source, e.published, e.url, e.impact,
+                 e.confidence, json.dumps(e.affected_symbols),
+                 json.dumps(e.affected_sectors), e.reason, e.suggestion, e.mode)
+                for e in unique_entries
+            ]
+            con.executemany(
+                "INSERT INTO daily_catalysts VALUES (?,?,?,?,?,?,?,?,?,?,?,?)", rows
+            )
+        elif not quiet:
+            print(f"[CATALYST] no catalysts this run — leaving {date} archive untouched.")
+
     return unique_entries
+
+
+def load_catalysts_for_date(con, date: str) -> dict:
+    """
+    Read back archived catalysts for a past session date from DuckDB.
+    Returns the same shape as `load_catalysts` (raw JSON dict), or an empty
+    dict if the table doesn't exist yet or nothing was archived for that date.
+    """
+    try:
+        tables = {r[0] for r in con.execute("SHOW TABLES").fetchall()}
+        if "daily_catalysts" not in tables:
+            return {}
+        rows = con.execute(
+            "SELECT headline, source, published, url, impact, confidence, "
+            "affected_symbols, affected_sectors, reason, suggestion, mode "
+            "FROM daily_catalysts WHERE date = ? ORDER BY confidence DESC",
+            [date],
+        ).fetchall()
+    except Exception:
+        return {}
+
+    if not rows:
+        return {}
+
+    catalysts = [
+        {
+            "headline": r[0], "source": r[1], "published": r[2], "url": r[3],
+            "impact": r[4], "confidence": r[5],
+            "affected_symbols": json.loads(r[6]) if r[6] else [],
+            "affected_sectors": json.loads(r[7]) if r[7] else [],
+            "reason": r[8], "suggestion": r[9], "mode": r[10],
+        }
+        for r in rows
+    ]
+    return {"date": date, "mode": catalysts[0]["mode"], "count": len(catalysts), "catalysts": catalysts}
 
 
 # ─────────────────────────────────────────────────────────────────────────────

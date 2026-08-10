@@ -264,15 +264,24 @@ def match_symbols_in_headline(
 
 
 def match_sectors_in_headline(text: str) -> list[str]:
-    """Returns sector names that appear to be referenced in the headline."""
+    """Returns sector names that appear to be referenced in the headline.
+
+    Bounded on the LEFT so a short keyword cannot fire inside a longer word
+    ("ev" in "elevated", "ports" in "reports", "media" in "immediately",
+     "oil" in "foiled") — every observed false positive had a preceding
+    letter. An optional plural suffix is allowed on the right so legitimate
+    inflections still match ("Metals", "Drugs", "Vehicles", "Oils"); anything
+    longer than a plural still fails, so "every"/"event" stay excluded.
+    """
+    import re as _re
     tl = text.lower()
     matched = []
     sector_keywords = {
         "NIFTY IT":           ["it sector", "software", "tech companies", "infotech"],
         "NIFTY PSU BANK":     ["psu bank", "public sector bank", "government bank"],
         "NIFTY PVT BANK":     ["private bank", "pvt bank", "banking sector"],
+        "NIFTY PHARMA":       ["pharma", "pharmaceutical", "drug", "medicine", "healthcare"],
         "NIFTY FIN SERVICE":  ["nbfc", "housing finance", "microfinance"],
-        "NIFTY PHARMA":       ["pharma", "drug", "medicine", "healthcare"],
         "NIFTY AUTO":         ["auto", "automobile", "ev", "electric vehicle", "vehicle"],
         "NIFTY METAL":        ["steel", "metal", "aluminium", "zinc", "iron ore"],
         "NIFTY REALTY":       ["real estate", "housing", "property", "realty"],
@@ -282,6 +291,9 @@ def match_sectors_in_headline(text: str) -> list[str]:
         "NIFTY MEDIA & COMM": ["telecom", "media", "broadband", "5g"],
     }
     for sector, kws in sector_keywords.items():
-        if any(kw in tl for kw in kws):
-            matched.append(sector)
+        for kw in kws:
+            pattern = r"(?<![a-z0-9])" + _re.escape(kw) + r"(?:s|es)?(?![a-z0-9])"
+            if _re.search(pattern, tl):
+                matched.append(sector)
+                break
     return matched

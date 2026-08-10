@@ -41,7 +41,7 @@ from vanguard.services.briefing_service import (
     get_ifs_leaders,
     get_structural_alerts,
 )
-from vanguard.services.catalyst_service import run_catalyst_scan, load_catalysts
+from vanguard.services.catalyst_service import run_catalyst_scan, load_catalysts, load_catalysts_for_date
 
 CATALYST_PATH = ROOT / "data" / "compiled" / "daily_catalysts.json"
 
@@ -351,6 +351,11 @@ def build_report(date: str) -> str:
         # ─────────────────────────────────────────────────────────────────────
         # Load pre-computed catalysts if JSON exists (written in main)
         _catalyst_data = load_catalysts(str(CATALYST_PATH))
+        if _catalyst_data.get("date") != date:
+            # JSON is stale or belongs to a different (live) run than the
+            # session we're reporting on — fall back to whatever was
+            # actually archived for this date, if anything.
+            _catalyst_data = load_catalysts_for_date(conn, date)
         _catalysts = _catalyst_data.get("catalysts", [])
 
         if _catalysts:
@@ -448,6 +453,11 @@ def _resolve_date(arg: str | None) -> str:
 # Main
 # ─────────────────────────────────────────────────────────────────────────────
 
+def _latest_session() -> str:
+    """The newest compiled session — _resolve_date's no-argument behaviour."""
+    return _resolve_date(None)
+
+
 def main():
     args   = [a for a in sys.argv[1:] if not a.startswith("--")]
     quiet  = "--quiet" in sys.argv
@@ -457,25 +467,43 @@ def main():
     date     = _resolve_date(date_arg)
 
     # ── Step A: Run catalyst scan (before building report so STEP 7 has data) ─
-    if not skip_catalyst and DB_PATH.exists():
+    # RSS feeds only expose *current* headlines, so a scan can only ever
+    # describe news relevant to the NEXT open — i.e. the latest compiled
+    # session. Running it against an older `date` would fetch today's news
+    # and mislabel it as that day's, so backfill runs skip the scan and fall
+    # back to whatever was archived in daily_catalysts (see STEP 7 in
+    # build_report), which is empty for dates that predate the archive.
+    # Note this is "latest session", not "today": after a weekend or holiday
+    # the latest session is several days back, and the news since that close
+    # is exactly what informs its next open.
+    if not skip_catalyst and DB_PATH.exists() and date == _latest_session():
+        # The connection MUST be closed even when the scan raises: it is
+        # read-write, and build_report() below opens the same file read-only.
+        # DuckDB refuses a second connection with a different configuration, so
+        # a leaked handle turns a non-fatal catalyst error into a fatal
+        # briefing crash.
+        _conn = None
         try:
             # Pull F&O symbol universe from DB
-            _conn = duckdb.connect(str(DB_PATH), read_only=True)
+            _conn = duckdb.connect(str(DB_PATH), read_only=False)
             _sym_df = _conn.execute(
                 "SELECT DISTINCT symbol FROM daily_market_structure WHERE date = ?",
                 [date]
             ).df()
-            _conn.close()
             fno_symbols = set(_sym_df["symbol"].tolist())
             run_catalyst_scan(
                 fno_symbols=fno_symbols,
                 date=date,
                 output_path=str(CATALYST_PATH),
                 quiet=quiet,
+                con=_conn,
             )
         except Exception as e:
             if not quiet:
                 print(f"[CATALYST] Scan error (non-fatal): {e}")
+        finally:
+            if _conn is not None:
+                _conn.close()
 
     # ── Step B: Build report (STEP 7 reads the JSON just written above) ────────
     report = build_report(date)
