@@ -17,7 +17,7 @@ import re
 import duckdb
 import pandas as pd
 
-from vanguard.config.paths import DB, PROCESSED
+from vanguard.config.paths import DB, PROCESSED, COMPILED
 from vanguard.config.sectors import get_sector
 from vanguard.config.eod import TREND_WINDOW_SESSIONS
 from vanguard.research.position_stats import summarize_by_group
@@ -300,6 +300,31 @@ def _build(con, n_sessions: int) -> dict:
         r[mi] = TAG_RE.sub("", r[mi] or "")
 
     _context_blocks(con, data, sessions, ph)
+
+    # AI-interpreted EOD summary (scripts/generate_ai_summary.py). Best-effort
+    # and read-only here — only surfaced if its date matches the payload's
+    # latest session, so a stale/failed generation from an earlier run never
+    # gets shown against the wrong day's data.
+    try:
+        ai_path = COMPILED / "daily_ai_summary.json"
+        if ai_path.exists():
+            ai_data = json.loads(ai_path.read_text())
+            if ai_data.get("date") == data["meta"]["session"]:
+                data["ai_summary"] = ai_data
+    except Exception:
+        pass
+
+    # News catalysts (vanguard/services/catalyst_service.py), read from the
+    # per-date DuckDB archive rather than the single overwritten JSON so
+    # older sessions keep the catalysts that were actually scanned for them.
+    try:
+        from vanguard.services.catalyst_service import load_catalysts_for_date
+        cat = load_catalysts_for_date(con, data["meta"]["session"])
+        if cat.get("catalysts"):
+            data["catalysts"] = cat
+    except Exception:
+        pass
+
     return data
 
 

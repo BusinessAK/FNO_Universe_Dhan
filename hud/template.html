@@ -69,6 +69,43 @@ a{color:var(--accent)}
 .ph .sub{font-size:10px;letter-spacing:.08em;color:var(--muted);text-transform:uppercase}
 .ph .spacer{flex:1}
 
+/* ── desk read (AI summary) ───────────────────────────────────────────── */
+/* Primary readout: sits above the deck, so it carries a little more chrome
+   than a standard panel — an energised top edge and a lit verdict rail. */
+#p-ai-summary{overflow:hidden;
+  background:linear-gradient(180deg,rgba(83,221,242,.035),transparent 120px),var(--panel)}
+#p-ai-summary .edge{position:absolute;top:0;left:0;right:0;height:1px;pointer-events:none;
+  background:linear-gradient(90deg,transparent,var(--edge-hot) 30%,var(--edge-hot) 70%,transparent)}
+#p-ai-summary .ph h2{color:var(--accent)}
+#ai-model{font-size:9px;letter-spacing:.12em;color:var(--muted);text-transform:uppercase;
+  border:1px solid rgba(124,140,160,.22);border-radius:3px;padding:1px 6px;white-space:nowrap}
+#ai-stamp{font-size:9px;letter-spacing:.1em;color:var(--faint);text-transform:uppercase;font-variant-numeric:tabular-nums}
+.wl{font-size:9px;letter-spacing:.16em;color:var(--faint);text-transform:uppercase}
+
+#ai-summary-verdict{position:relative;font-size:14.5px;font-weight:600;line-height:1.55;
+  color:var(--ink);margin:0 0 4px;padding-left:15px}
+#ai-summary-verdict::before{content:"";position:absolute;left:0;top:3px;bottom:3px;width:2px;border-radius:1px;
+  background:linear-gradient(180deg,var(--accent),rgba(83,221,242,.12));box-shadow:0 0 8px rgba(83,221,242,.45)}
+
+/* takeaways read as indexed telemetry lines, not prose bullets */
+#ai-summary-takeaways{list-style:none;margin:0;padding:0;counter-reset:tk}
+#ai-summary-takeaways li{counter-increment:tk;position:relative;font-size:12px;line-height:1.55;
+  color:var(--muted);padding:8px 0 8px 30px;border-top:1px solid rgba(124,140,160,.08)}
+#ai-summary-takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:2px;top:8px;
+  font-size:9.5px;letter-spacing:.08em;color:var(--accent);opacity:.5;font-variant-numeric:tabular-nums}
+#ai-summary-takeaways li::after{content:"";position:absolute;left:0;top:14px;width:14px;height:1px;
+  background:var(--accent);opacity:.18}
+
+#ai-summary-watch{display:flex;gap:5px;flex-wrap:wrap}
+.watch-pill{font-size:9.5px;letter-spacing:.06em;color:var(--accent);border:1px solid var(--edge);
+  border-radius:3px;padding:2px 7px;background:rgba(83,221,242,.07);cursor:pointer;
+  transition:border-color .15s,background .15s}
+.watch-pill:hover{border-color:var(--edge-hot);background:rgba(83,221,242,.16)}
+.watch-pill.off{color:var(--faint);border-color:rgba(124,140,160,.2);background:none;cursor:default}
+.hl-pos{color:var(--bull-hi);font-weight:600}
+.hl-neg{color:var(--bear-hi);font-weight:600}
+.hl-tick{color:var(--accent);font-weight:600}
+
 /* boot sequence */
 body.boot .panel,body.boot #cmdbar{opacity:0;transform:translateY(10px)}
 .panel,#cmdbar{transition:opacity .5s ease,transform .5s ease;transition-delay:calc(var(--i,0)*90ms)}
@@ -194,6 +231,28 @@ figure figcaption{font-size:10px;color:var(--muted);letter-spacing:.06em;margin-
 .sig.dn{border-left-color:var(--bear)}
 .sig.vol{border-left-color:var(--violet)}
 
+/* catalyst feed — same row idiom as .sig, with a headline + rationale stack */
+#cat-list{max-height:404px;overflow-y:auto;display:flex;flex-direction:column;gap:2px;scrollbar-width:thin;scrollbar-color:var(--faint) transparent}
+.cat{display:flex;gap:10px;padding:9px 8px;border-radius:4px;border-left:2px solid transparent}
+.cat:hover{background:rgba(83,221,242,.05)}
+.cat.up{border-left-color:var(--bull)}
+.cat.dn{border-left-color:var(--bear)}
+.cat.mix{border-left-color:var(--amber)}
+.cat.neu{border-left-color:var(--neutral-mark)}
+.cat .ic{flex:none;width:16px;text-align:center}
+.cat .body{min-width:0;flex:1}
+.cat .hl{font-size:11.5px;color:var(--ink);line-height:1.45;font-weight:600}
+.cat .hl a{color:inherit;text-decoration:none}
+.cat .hl a:hover{color:var(--accent);text-decoration:underline}
+.cat .why{font-size:11px;color:var(--muted);line-height:1.45;margin-top:3px}
+.cat .meta{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:5px}
+.cat .src{font-size:9.5px;letter-spacing:.06em;color:var(--faint);text-transform:uppercase}
+.cat-sym{font-size:9.5px;letter-spacing:.04em;color:var(--accent);border:1px solid var(--edge);
+  border-radius:3px;padding:1px 5px;background:rgba(83,221,242,.06);cursor:pointer}
+.cat-sym:hover{border-color:var(--edge-hot);background:rgba(83,221,242,.14)}
+.cat-sym.off{color:var(--faint);border-color:rgba(124,140,160,.2);background:none;cursor:default}
+.cat-conf{font-size:9.5px;color:var(--faint);margin-left:auto;padding-left:8px}
+
 /* ── setups queue ────────────────────────────────────────────────────── */
 
 /* ── scanner ─────────────────────────────────────────────────────────── */
@@ -318,6 +377,16 @@ figure figcaption{font-size:10px;color:var(--muted);letter-spacing:.06em;margin-
     <div id="hint"><kbd>/</kbd> SCAN &nbsp; <kbd>ESC</kbd> CLOSE</div>
   </header>
 
+  <section class="panel" id="p-ai-summary" hidden style="margin-bottom:14px">
+    <i class="edge" aria-hidden="true"></i>
+    <div class="ph"><h2>Desk Read</h2>
+      <span id="ai-model"></span><span id="ai-stamp"></span>
+      <span class="spacer"></span>
+      <span class="wl">watch</span><div id="ai-summary-watch"></div></div>
+    <p id="ai-summary-verdict"></p>
+    <ul id="ai-summary-takeaways"></ul>
+  </section>
+
   <section class="row r1">
     <div class="panel" style="--i:1" id="p-regime">
       <div class="ph"><h2>Regime Core</h2><span class="sub" id="regime-date"></span></div>
@@ -381,6 +450,12 @@ figure figcaption{font-size:10px;color:var(--muted);letter-spacing:.06em;margin-
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px" id="sig-chips"></div>
       <div id="sig-list"></div>
     </div>
+  </section>
+
+  <section class="panel" style="--i:6" id="p-catalysts" hidden>
+    <div class="ph"><h2>Catalyst Feed</h2><span class="sub" id="cat-count"></span>
+      <span class="spacer"></span><div style="display:flex;gap:6px;flex-wrap:wrap" id="cat-chips"></div></div>
+    <div id="cat-list"></div>
   </section>
 
   <section class="panel" style="--i:6" id="p-rrg">
@@ -631,6 +706,46 @@ function setSession(d){
   SDATE=d;$("#d-sel").value=d;
   sigFilter=null;
   bindSession();renderSession();
+}
+
+/* ── desk read: AI-interpreted EOD summary ──────────────────────────── */
+function drawAiSummary(){
+  const s=VG.ai_summary;
+  const show = s && s.date===SDATE && s.verdict && s.takeaways?.length;
+  $("#p-ai-summary").hidden=!show;
+  if(!show)return;
+
+  const watch=s.watch||[];
+  const hl=text=>{
+    let h=esc(text);
+    // ticker mentions — longest first so "BAJAJ-AUTO" matches before a bare "BAJAJ" would
+    [...watch].sort((a,b)=>b.length-a.length).forEach(sym=>{
+      const re=new RegExp(`(?<![A-Za-z0-9])${sym.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")}(?![A-Za-z0-9])`,"g");
+      h=h.replace(re,`<span class="hl-tick">${sym}</span>`);
+    });
+    // signed percentages: +1.1%  -52  -3.7M etc.
+    h=h.replace(/([+-]\d[\d,]*\.?\d*%)/g,(m)=>`<span class="${m[0]==="+"?"hl-pos":"hl-neg"}">${m}</span>`);
+    return h;
+  };
+
+  $("#ai-model").textContent=(s.model||"").split("/").pop();
+  /* generation stamp in IST — the deck reads IST everywhere else */
+  let stamp="";
+  if(s.generated_at){
+    const d=new Date(s.generated_at);
+    if(!isNaN(d))stamp="gen "+d.toLocaleString("en-IN",{timeZone:"Asia/Kolkata",day:"2-digit",
+      month:"short",hour:"2-digit",minute:"2-digit",hour12:false}).replace(",","")+" IST";
+  }
+  $("#ai-stamp").textContent=stamp;
+  $("#ai-summary-verdict").innerHTML=hl(s.verdict);
+  $("#ai-summary-takeaways").innerHTML=s.takeaways.map(t=>`<li>${hl(t)}</li>`).join("");
+  /* watch tickers open the dossier, same affordance as the catalyst feed —
+     dimmed and inert when the symbol isn't in this session's universe */
+  $("#ai-summary-watch").innerHTML=watch.map(w=>bySym[w]
+    ? `<span class="watch-pill" data-sym="${esc(w)}">${esc(w)}</span>`
+    : `<span class="watch-pill off">${esc(w)}</span>`).join("");
+  document.querySelectorAll("#ai-summary-watch .watch-pill:not(.off)").forEach(el=>
+    el.addEventListener("click",()=>openDossier(el.dataset.sym)));
 }
 
 /* ── regime core: donut + bias bars ─────────────────────────────────── */
@@ -1492,6 +1607,46 @@ function drawSignals(){
     el.addEventListener("click",()=>openDossier(el.dataset.sym)));
 }
 
+/* ── catalyst feed: news scored against the F&O universe ─────────────── */
+const CATMETA={BULLISH:["▲","BULLISH","up"],BEARISH:["▼","BEARISH","dn"],
+  MIXED:["◆","MIXED","mix"],NEUTRAL:["○","NEUTRAL","neu"]};
+let catFilter=null;
+function drawCatalysts(){
+  const c=VG.catalysts;
+  const rows=(c && c.date===SDATE) ? (c.catalysts||[]) : [];
+  $("#p-catalysts").hidden=!rows.length;
+  if(!rows.length){catFilter=null;return;}
+
+  const counts={};rows.forEach(r=>{const k=(r.impact||"NEUTRAL").toUpperCase();counts[k]=(counts[k]||0)+1});
+  $("#cat-count").textContent=rows.length+" news catalyst"+(rows.length===1?"":"s")
+    +" · "+fdate(SDATE)+" · "+(c.mode==="AI"?"AI-scored":"rule-scored");
+  $("#cat-chips").innerHTML=Object.entries(counts).sort((a,b)=>b[1]-a[1]).map(([k,n])=>
+    `<button class="chip" data-k="${k}" aria-pressed="${catFilter===k}">${(CATMETA[k]||["·",k])[1]} <span class="n">${n}</span></button>`).join("");
+  document.querySelectorAll("#cat-chips .chip").forEach(el=>el.addEventListener("click",()=>{
+    catFilter=catFilter===el.dataset.k?null:el.dataset.k;drawCatalysts()}));
+
+  const list=rows.filter(r=>!catFilter||(r.impact||"NEUTRAL").toUpperCase()===catFilter);
+  $("#cat-list").innerHTML=list.map(r=>{
+    const m=CATMETA[(r.impact||"NEUTRAL").toUpperCase()]||["·","—","neu"];
+    /* only symbols actually in this session's universe get a dossier click —
+       the scorer can name a symbol the payload never exported */
+    const syms=(r.affected_symbols||[]).slice(0,8).map(s=>bySym[s]
+      ? `<span class="cat-sym" data-sym="${esc(s)}">${esc(s)}</span>`
+      : `<span class="cat-sym off">${esc(s)}</span>`).join("");
+    const url=String(r.url||"");
+    const safe=/^https?:\/\//i.test(url);   /* never emit javascript: from feed data */
+    const head=safe?`<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(r.headline)}</a>`:esc(r.headline);
+    const conf=Number(r.confidence);
+    return`<div class="cat ${m[2]}"><span class="ic">${m[0]}</span><div class="body">
+      <div class="hl">${head}</div>
+      ${r.reason?`<div class="why">${esc(r.reason)}</div>`:""}
+      <div class="meta"><span class="src">${esc(r.source)} · ${esc(r.published)}</span>${syms}
+        ${isFinite(conf)?`<span class="cat-conf">conf ${Math.round(conf*100)}%</span>`:""}</div>
+    </div></div>`}).join("");
+  document.querySelectorAll("#cat-list .cat-sym:not(.off)").forEach(el=>
+    el.addEventListener("click",()=>openDossier(el.dataset.sym)));
+}
+
 /* ── Deep Dive Charting (Plotly) ── */
 function loadDeepDiveCharts(sym, r) {
   const tabs = document.querySelectorAll('.dss-tab');
@@ -2189,7 +2344,7 @@ document.addEventListener("keydown",e=>{
 /* ── boot ────────────────────────────────────────────────────────────── */
 document.body.classList.add("boot");
 function renderSession(){
-  drawCmdbar();drawRegime();drawVix();drawPositioning();drawFlips();drawSectors();drawSignals();drawRRG();
+  drawCmdbar();drawAiSummary();drawRegime();drawVix();drawPositioning();drawFlips();drawSectors();drawSignals();drawCatalysts();drawRRG();
   renderScan();drawBreadth();drawInternals();
   if(!$("#dossier").hidden)$("#dossier").hidden=true;
 }
