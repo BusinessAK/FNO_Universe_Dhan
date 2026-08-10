@@ -120,6 +120,13 @@ try:
         print("[*] Generating Vanguard HUD...")
         subprocess.run(["python3", "scripts/build_hud.py"], check=False)
 
+        # Rolling 1-year retention (best-effort, never blocks the pipeline).
+        # Prunes raw bhavcopy files + additive context tables older than the
+        # window; the *next* run's compilers naturally drop them from the
+        # derived tables since those are full rebuilds, not appends.
+        print("[*] Pruning data older than the retention window...")
+        subprocess.run(["python3", "scripts/prune_retention.py"], check=False)
+
         print(f"\n=======================================================")
         print(f"🎉 SUCCESS: EOD Bhavcopy {date_str} successfully processed!")
         print(f"All signals updated, and DuckDB/Streamlit are in sync!")
