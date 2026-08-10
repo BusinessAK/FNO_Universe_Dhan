@@ -2,16 +2,33 @@
 # ============================================================
 #  Vanguard Quantitative Terminal — Startup Script
 #  Usage:
-#    ./start.sh eod     → Process latest BhavCopy + launch dashboard
-#    ./start.sh full    → Full nightly chain: tests → poll_eod → verify_hud (no dashboard)
-#    ./start.sh live    → Live NSE polling + launch dashboard (split terminals)
-#    ./start.sh dash    → Launch dashboard only (data already processed)
+#    ./start.sh eod     → Process latest BhavCopy + open HUD
+#    ./start.sh full    → Full nightly chain: tests → poll_eod → verify_hud (no HUD launch)
+#    ./start.sh live    → Live NSE polling + open HUD
+#    ./start.sh dash    → Open HUD only (data already processed)
 # ============================================================
 
 set -e
 cd "$(dirname "$0")"
 
 MODE="${1:-dash}"
+
+# Open the HUD in the default browser. `open` is macOS-only and this runs
+# under `set -e`, so on Linux a bare `open` would abort the script — after a
+# successful pipeline in `eod`, or right after starting the bridge in `live`
+# (where the EXIT trap would then kill it). Never fail the caller: the HUD is
+# a file on disk either way, so fall back to printing the path.
+open_hud() {
+  local page="hud/vanguard_hud.html"
+  if command -v open >/dev/null 2>&1; then
+    open "$page"
+  elif command -v xdg-open >/dev/null 2>&1; then
+    xdg-open "$page"
+  else
+    echo "[*] HUD ready — open file://$(pwd)/$page"
+    echo "    (or serve it: python3 scripts/serve_hud.py)"
+  fi
+}
 
 case "$MODE" in
 
@@ -25,15 +42,8 @@ case "$MODE" in
     else
       python3 poll_eod.py
     fi
-    # Check if port 8502 is already occupied by a running Streamlit instance
-    if lsof -Pi :8502 -sTCP:LISTEN -t >/dev/null ; then
-      echo "⚡ Streamlit dashboard is already active on port 8502!"
-      echo "🚀 The database update has successfully triggered a dynamic hot-reload in your browser."
-      echo "🔗 Open http://localhost:8502 to view the compiled data instantly!"
-    else
-      echo "[2/2] Launching Streamlit dashboard..."
-      streamlit run dashboard.py --server.port 8502
-    fi
+    echo "[2/2] Opening HUD..."
+    open_hud
     ;;
 
   # ── Full Mode: offline tests → EOD pipeline → HUD parity check ─────────────
@@ -75,9 +85,10 @@ case "$MODE" in
     echo "[OK] Live bridge started (PID: $BRIDGE_PID)"
     echo "[*] Tail logs: tail -f data/live/daemon_stdout.log"
     echo ""
-    echo "[*] Launching Streamlit dashboard (toggle AUTO REFRESH ON)..."
+    echo "[*] Opening HUD..."
     trap "echo '[*] Stopping live bridge...'; kill $BRIDGE_PID 2>/dev/null" EXIT
-    streamlit run dashboard.py --server.port 8502
+    open_hud
+    wait $BRIDGE_PID
     ;;
 
   # ── Brief Mode: Generate Tomorrow's Watchlist for a given date ─────────────
@@ -92,24 +103,24 @@ case "$MODE" in
     fi
     ;;
 
-  # ── Dash Mode: Launch dashboard only ───────────────────────────────────────
+  # ── Dash Mode: Open HUD only ─────────────────────────────────────────────
   dash)
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo "  VANGUARD DASHBOARD — Using existing processed data"
+    echo "  VANGUARD HUD — Using existing processed data"
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    streamlit run dashboard.py --server.port 8502
+    open_hud
     ;;
 
   *)
     echo "Usage: ./start.sh [eod|full|live|brief|dash]"
     echo ""
-    echo "  eod         → Download latest BhavCopy, process signals, launch dashboard"
-    echo "  full        → Tests → EOD pipeline → HUD parity check (no dashboard)"
+    echo "  eod         → Download latest BhavCopy, process signals, open HUD"
+    echo "  full        → Tests → EOD pipeline → HUD parity check (no HUD launch)"
     echo "  full DATE   → Same, for a specific date (e.g. 20260721)"
-    echo "  live        → Start NSE live polling bridge + launch dashboard"
+    echo "  live        → Start NSE live polling bridge + open HUD"
     echo "  brief       → Generate Tomorrow's Watchlist briefing (latest date)"
     echo "  brief DATE  → Generate briefing for a specific date (e.g. 2026-06-25)"
-    echo "  dash        → Launch dashboard only (data already exists)"
+    echo "  dash        → Open HUD only (data already exists)"
     exit 1
     ;;
 esac
