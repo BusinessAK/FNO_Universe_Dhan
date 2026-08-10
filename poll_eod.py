@@ -120,12 +120,15 @@ try:
         print("[*] Generating Vanguard HUD...")
         subprocess.run(["python3", "scripts/build_hud.py"], check=False)
 
-        # Rolling 1-year retention (best-effort, never blocks the pipeline).
-        # Prunes raw bhavcopy files + additive context tables older than the
-        # window; the *next* run's compilers naturally drop them from the
-        # derived tables since those are full rebuilds, not appends.
-        print("[*] Pruning data older than the retention window...")
-        subprocess.run(["python3", "scripts/prune_retention.py"], check=False)
+        # Rolling 60-session retention (best-effort, never blocks the pipeline).
+        # Keeps session_history.json (and everything flattened from it) bounded
+        # to a fixed session count instead of growing forever — daily_compiler.py
+        # loads that file wholesale on every run, so an unbounded history is an
+        # unbounded and ever-growing memory footprint (see the 2026-08-10 OOM:
+        # ~243 sessions had grown session_history.json past what the VPS could
+        # hold in RAM alongside pandas/numpy/duckdb).
+        print("[*] Pruning data outside the 60-session retention window...")
+        subprocess.run(["python3", "scripts/prune_retention.py", "--retention-sessions", "60"], check=False)
 
         print(f"\n=======================================================")
         print(f"🎉 SUCCESS: EOD Bhavcopy {date_str} successfully processed!")

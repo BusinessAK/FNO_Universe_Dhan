@@ -91,6 +91,40 @@ def prune_raw_files(cutoff: datetime, raw_dir: str = RAW_DIR, dry_run: bool = Fa
     return removed
 
 
+def resolve_session_count_cutoff(n_sessions: int, path: str = SESSION_HISTORY_PATH) -> datetime:
+    """Turn 'keep the last N trading sessions' into an actual calendar cutoff,
+    derived from real session dates in session_history.json rather than a
+    calendar-day estimate (trading sessions aren't 5/7 of calendar days once
+    holidays are counted, so a naive day offset would over- or under-trim).
+
+    Same benchmark-symbol-first strategy daily_compiler.py uses for
+    compiled_dates: NIFTY/BANKNIFTY are present every session, so unioning
+    just those two is immune to a data gap in some other symbol silently
+    skewing the session list.
+    """
+    if not os.path.exists(path):
+        return datetime.now() - timedelta(days=365)
+    with open(path) as f:
+        history = json.load(f)
+
+    dates = set()
+    for bench in ("NIFTY", "BANKNIFTY"):
+        if bench in history:
+            dates.update(history[bench].keys())
+    if not dates:
+        for by_date in history.values():
+            dates.update(by_date.keys())
+
+    sorted_dates = sorted(dates)
+    if len(sorted_dates) <= n_sessions:
+        # Fewer sessions on disk than the window — keep everything.
+        return datetime.strptime(sorted_dates[0], "%Y-%m-%d") if sorted_dates else datetime.now()
+
+    # Cutoff = the oldest date we keep; everything strictly before it is pruned.
+    cutoff_date_str = sorted_dates[-n_sessions]
+    return datetime.strptime(cutoff_date_str, "%Y-%m-%d")
+
+
 def prune_session_history(cutoff: datetime, path: str = SESSION_HISTORY_PATH,
                            dry_run: bool = False) -> tuple:
     """Drop date entries older than cutoff from every symbol's history so the
@@ -155,11 +189,17 @@ def prune_db_tables(cutoff: datetime, db_path: str = DB, dry_run: bool = False) 
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--retention-days", type=int, default=DEFAULT_RETENTION_DAYS)
+    ap.add_argument("--retention-sessions", type=int, default=None,
+                     help="Keep only the last N trading sessions (overrides --retention-days).")
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
 
-    cutoff = datetime.now() - timedelta(days=args.retention_days)
-    print(f"[*] Retention cutoff: {cutoff.strftime('%Y-%m-%d')} ({args.retention_days}d window)")
+    if args.retention_sessions is not None:
+        cutoff = resolve_session_count_cutoff(args.retention_sessions)
+        print(f"[*] Retention cutoff: {cutoff.strftime('%Y-%m-%d')} (last {args.retention_sessions} sessions)")
+    else:
+        cutoff = datetime.now() - timedelta(days=args.retention_days)
+        print(f"[*] Retention cutoff: {cutoff.strftime('%Y-%m-%d')} ({args.retention_days}d window)")
 
     removed = prune_raw_files(cutoff, dry_run=args.dry_run)
     print(f"[*] Raw bhavcopy files {'to remove' if args.dry_run else 'removed'}: {removed}")
