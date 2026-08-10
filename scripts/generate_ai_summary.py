@@ -88,7 +88,16 @@ SYSTEM_PROMPT = (
     "These can both be true at once without contradicting each other — "
     "never merge them into one number or imply they measure the same "
     "thing. If you cite a catalyst-sourced figure, attribute it to the "
-    "headline/source, not to the exchange data."
+    "headline/source, not to the exchange data.\n"
+    "6. When a report section lists several items each with their own "
+    "per-item value (e.g. a list of stocks each with their own % pinch/"
+    "convergence/change figure), never roll the group up under a single "
+    "shared number unless every item in the group you name actually carries "
+    "that exact value. If only some items share a value, either name only "
+    "those items with that value, or state the range across the full group "
+    "instead of picking one figure to represent all of them. Same rule for "
+    "counts: count only the items that satisfy the claim you're making, not "
+    "the size of the section they came from."
 )
 
 

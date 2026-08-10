@@ -93,7 +93,9 @@ def _gamma_tag(regime: str) -> str:
         return "[LONG γ]"
     if "SHORT" in r:
         return "[SHORT γ]"
-    return "[NEUTRAL γ]"
+    if "TRANSITION" in r:
+        return "[TRANSITION γ]"
+    return f"[{r or 'UNKNOWN'} γ]"
 
 def _col(val, width, align="<"):
     s = str(val) if val is not None else "—"
