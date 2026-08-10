@@ -109,6 +109,13 @@ try:
         print("[*] Generating Tomorrow's Watchlist briefing...")
         subprocess.run(["python3", "briefing.py"], check=False)
 
+        # Generate AI-interpreted EOD summary (best-effort, skips silently if
+        # neither NVIDIA_API_KEY nor ANTHROPIC_API_KEY is set — see
+        # scripts/generate_ai_summary.py). Runs before build_hud so the
+        # summary is embedded in the same HUD build.
+        print("[*] Generating AI EOD summary...")
+        subprocess.run(["python3", "scripts/generate_ai_summary.py"], check=False)
+
         # Build Vanguard HUD (best-effort)
         print("[*] Generating Vanguard HUD...")
         subprocess.run(["python3", "scripts/build_hud.py"], check=False)
