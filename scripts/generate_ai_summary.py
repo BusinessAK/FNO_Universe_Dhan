@@ -75,7 +75,12 @@ SYSTEM_PROMPT = (
     "quote that unit verbatim. Never rescale a number or attach a different "
     "unit (lakh/crore/million/billion) than what is printed next to it in "
     "the report; if a figure has no unit shown, state it as a bare number "
-    "rather than guessing one."
+    "rather than guessing one.\n"
+    "4. Only state a number, name, or fact that appears verbatim in the "
+    "report above. If FII/DII flow, a specific figure, or any other data "
+    "point is not present in the report, do not mention it or estimate "
+    "it from general market knowledge — omit that claim entirely rather "
+    "than fill the gap with a plausible-sounding invented number."
 )
 
 

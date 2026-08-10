@@ -204,6 +204,28 @@ def build_report(date: str) -> str:
                     f"Fut OI Chg: {_fmt_num(r.get('futures_oi_chg'),0)}"
                 )
 
+        # FII/DII flow — pulled directly here (no separate service function
+        # needed for two rows). Previously this data existed in the DB
+        # (daily_fii_dii) but was never surfaced in the report text; the
+        # Desk Read LLM was filling the gap with a fabricated FII figure
+        # instead of reporting "no data." Grounding it here removes the
+        # temptation.
+        try:
+            flows = conn.execute(
+                "SELECT category, net_cr FROM daily_fii_dii WHERE date = ?",
+                [date],
+            ).fetchall()
+        except Exception:
+            flows = []
+        if flows:
+            lines.append("\n  ── FII / DII Net Flow (₹Cr) ──")
+            for category, net_cr in flows:
+                # daily_fii_dii.net_cr is already crore-scaled (see column
+                # name) — do not pass through _crore(), which expects raw ₹.
+                lines.append(f"  {category:<4}: ₹{_fmt_num(net_cr)}Cr" if net_cr is not None else f"  {category:<4}: N/A")
+        else:
+            lines.append("\n  ── FII / DII Net Flow ──\n  No FII/DII data for this date.")
+
         # ─────────────────────────────────────────────────────────────────────
         # STEP 2 — Top Setups
         # ─────────────────────────────────────────────────────────────────────
