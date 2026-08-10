@@ -122,10 +122,10 @@ def _generate_with_nemotron(report_text: str, api_key: str) -> dict | None:
                     {"role": "system", "content": SYSTEM_PROMPT},
                     {"role": "user", "content": report_text},
                 ],
-                "max_tokens": 2048,
+                "max_tokens": 4096,
                 "temperature": 0.3,
             },
-            timeout=120,
+            timeout=180,
         )
         resp.raise_for_status()
         data = resp.json()
