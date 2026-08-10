@@ -55,7 +55,22 @@ SYSTEM_PROMPT = (
     '}\n\n'
     "Each takeaway must be a complete, self-contained sentence a reader can "
     "scan in isolation — no partial fragments, no sentence spanning two "
-    "entries. Use tickers/numbers from the report, not vague language."
+    "entries. Use tickers/numbers from the report, not vague language.\n\n"
+    "Two hard rules, because getting these wrong misleads a trader with real "
+    "money on the line:\n"
+    "1. Any percentage you state (GEX change, price change, etc.) must be "
+    "computed directly from the two raw numbers in the report — (new-old)/"
+    "abs(old)*100 — not eyeballed or estimated. If you are not confident in "
+    "the arithmetic, omit the percentage rather than state an approximate "
+    "one.\n"
+    "2. Never describe a symbol as offering \"upside\", \"long\", or a "
+    "bullish setup based on its gamma regime (LONG_GAMMA/SHORT_GAMMA) alone — "
+    "gamma regime describes volatility/dealer-hedging behavior, not price "
+    "direction. If a symbol's institutional flow score (IFS) is strongly "
+    "negative, do not pair it with bullish language; describe it as a "
+    "volatility setup only, or note the conflict explicitly (e.g. "
+    "\"long-gamma but IFS deeply negative — vol expansion, not a directional "
+    "call\")."
 )
 
 
