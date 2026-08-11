@@ -13,5 +13,7 @@ RESEARCH = DATA / "research"
 DB = COMPILED / "vanguard.duckdb"
 HUD = ROOT / "hud"
 
-# Local HUD/API server bind address (vanguard/serve/api.py).
-BRIDGE_HOST, BRIDGE_PORT = "127.0.0.1", 8787
+# HUD/API server bind address (vanguard/serve/api.py). 0.0.0.0 so it's
+# reachable over Tailscale (per deploy/DEPLOY.md — no public port is opened;
+# the VPS's ufw only allows inbound on tailscale0, see deploy/DEPLOY.md §5).
+BRIDGE_HOST, BRIDGE_PORT = "0.0.0.0", 8787
