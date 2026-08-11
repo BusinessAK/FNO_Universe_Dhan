@@ -43,6 +43,16 @@ COMPILED_DIR = "data/compiled"
 SESSION_HISTORY_PATH = os.path.join(COMPILED_DIR, "session_history.json")
 DEFAULT_RETENTION_DAYS = 365
 
+# vanguard/engines/equity_technicals.py computes 200-session DMA and 52-week
+# (252-session) high/low from cash_market_prices.parquet, which
+# cash_market_builder.py rebuilds fresh from every CM_BhavCopy raw file on
+# disk each run (see module docstring point 2). Pruning CM raw files to the
+# same --retention-sessions window as the F&O side (which only needs enough
+# for daily_compiler.py's T-vs-T-1 pairing) silently zeroes out every
+# 200DMA/52w-high/low value system-wide — found 2026-08-11 after a 60-session
+# prune did exactly that. CM files get their own, much longer floor.
+CM_MIN_RETENTION_DAYS = 420
+
 # table -> date column, for tables NOT covered by session_history.json pruning
 _PRUNE_TABLES = {
     "daily_participant_oi": "date",
@@ -67,12 +77,16 @@ _SESSION_HISTORY_TABLES = {
 _DATE_RE = re.compile(r"(\d{8})")
 
 
-def prune_raw_files(cutoff: datetime, raw_dir: str = RAW_DIR, dry_run: bool = False) -> int:
+def prune_raw_files(cutoff: datetime, raw_dir: str = RAW_DIR, dry_run: bool = False,
+                     prefix: str = "BhavCopy") -> int:
+    """prefix defaults to matching both FO_ and CM_ bhavcopies (legacy/day-based
+    callers). Session-count callers must pass prefix="FO_BhavCopy" explicitly —
+    CM files need their own, much longer cutoff (see CM_MIN_RETENTION_DAYS)."""
     if not os.path.isdir(raw_dir):
         return 0
     removed = 0
     for fname in os.listdir(raw_dir):
-        if "BhavCopy" not in fname:
+        if prefix not in fname:
             continue
         m = _DATE_RE.search(fname)
         if not m:
@@ -197,12 +211,26 @@ def main():
     if args.retention_sessions is not None:
         cutoff = resolve_session_count_cutoff(args.retention_sessions)
         print(f"[*] Retention cutoff: {cutoff.strftime('%Y-%m-%d')} (last {args.retention_sessions} sessions)")
+
+        # F&O raw files: safe to prune tightly, session_history.json carries
+        # the compiled state forward (see module docstring point 1).
+        fo_removed = prune_raw_files(cutoff, dry_run=args.dry_run, prefix="FO_BhavCopy")
+        print(f"[*] FO raw bhavcopy files {'to remove' if args.dry_run else 'removed'}: {fo_removed}")
+
+        # CM raw files: floor at CM_MIN_RETENTION_DAYS regardless of the
+        # session-count window, since cash_market_builder.py needs 252+
+        # sessions on disk to compute 200DMA / 52w high-low (see
+        # CM_MIN_RETENTION_DAYS comment above).
+        cm_cutoff = min(cutoff, datetime.now() - timedelta(days=CM_MIN_RETENTION_DAYS))
+        cm_removed = prune_raw_files(cm_cutoff, dry_run=args.dry_run, prefix="CM_BhavCopy")
+        print(f"[*] CM raw bhavcopy files {'to remove' if args.dry_run else 'removed'}: {cm_removed} "
+              f"(floor {cm_cutoff.strftime('%Y-%m-%d')}, {CM_MIN_RETENTION_DAYS}d min for 200DMA/52w)")
     else:
         cutoff = datetime.now() - timedelta(days=args.retention_days)
         print(f"[*] Retention cutoff: {cutoff.strftime('%Y-%m-%d')} ({args.retention_days}d window)")
 
-    removed = prune_raw_files(cutoff, dry_run=args.dry_run)
-    print(f"[*] Raw bhavcopy files {'to remove' if args.dry_run else 'removed'}: {removed}")
+        removed = prune_raw_files(cutoff, dry_run=args.dry_run)
+        print(f"[*] Raw bhavcopy files {'to remove' if args.dry_run else 'removed'}: {removed}")
 
     hist_removed, hist_dropped = prune_session_history(cutoff, dry_run=args.dry_run)
     verb = "would remove" if args.dry_run else "removed"
