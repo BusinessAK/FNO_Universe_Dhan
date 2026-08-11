@@ -301,18 +301,11 @@ def _build(con, n_sessions: int) -> dict:
 
     _context_blocks(con, data, sessions, ph)
 
-    # AI-interpreted EOD summary (scripts/generate_ai_summary.py). Best-effort
-    # and read-only here — only surfaced if its date matches the payload's
-    # latest session, so a stale/failed generation from an earlier run never
-    # gets shown against the wrong day's data.
-    try:
-        ai_path = COMPILED / "daily_ai_summary.json"
-        if ai_path.exists():
-            ai_data = json.loads(ai_path.read_text())
-            if ai_data.get("date") == data["meta"]["session"]:
-                data["ai_summary"] = ai_data
-    except Exception:
-        pass
+    # AI-interpreted EOD summary (Desk Read) was removed 2026-08-11 — NVIDIA's
+    # free-tier Nemotron endpoint proved unreliable with no usable fallback.
+    # data["ai_summary"] is intentionally never set; hud/template.html's
+    # drawAiSummary() already no-ops and keeps #p-ai-summary hidden when the
+    # key is absent.
 
     # News catalysts (vanguard/services/catalyst_service.py), read from the
     # per-date DuckDB archive rather than the single overwritten JSON so

@@ -109,12 +109,12 @@ try:
         print("[*] Generating Tomorrow's Watchlist briefing...")
         subprocess.run(["python3", "briefing.py"], check=False)
 
-        # Generate AI-interpreted EOD summary (best-effort, skips silently if
-        # neither NVIDIA_API_KEY nor ANTHROPIC_API_KEY is set — see
-        # scripts/generate_ai_summary.py). Runs before build_hud so the
-        # summary is embedded in the same HUD build.
-        print("[*] Generating AI EOD summary...")
-        subprocess.run(["python3", "scripts/generate_ai_summary.py"], check=False)
+        # AI-interpreted EOD summary (Desk Read) removed from the pipeline —
+        # NVIDIA's free-tier Nemotron endpoint proved unreliable (repeated
+        # 503s/timeouts on 2026-08-10/11) with no usable fallback (Anthropic
+        # path requires a key/subscription this deployment doesn't have).
+        # scripts/generate_ai_summary.py still exists if a reliable provider
+        # is wired up later.
 
         # Build Vanguard HUD (best-effort)
         print("[*] Generating Vanguard HUD...")
