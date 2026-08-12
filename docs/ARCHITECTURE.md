@@ -23,7 +23,7 @@ FNO_BHAV/
 │   │                         sectors.py (sector_mapping), setups.py (setup_registry)
 │   ├── engines/              pure math, no I/O: greeks, gamma (analyzer), flow/
 │   │                         intelligence, classifier, longitudinal, breadth, cash_breadth
-│   ├── rules/                trading opinions: setup_screener (R1), playbook, catalyst_rules
+│   ├── rules/                trading opinions: setup_screener (R1), playbook
 │   ├── pipeline/             EOD plane: compiler, normalize (processor), poll_eod,
 │   │                         backfill, context/ (NSE datasets C1–C5)
 │   ├── live/                 realtime plane (moved intact — newest, best-tested code)
@@ -32,7 +32,7 @@ FNO_BHAV/
 │   ├── serve/                api.py (bridge grown up: /snapshot /session/<d> /ladder /events)
 │   ├── research/             backtesters + outcomes.py (shared signal→outcome join)
 │   ├── services/             TRANSITIONAL — dissolves in wave 6 (ui_state/session_cache die
-│   │                         with Streamlit; briefing/catalyst move to pipeline/)
+│   │                         with Streamlit; briefing moves to pipeline/)
 │   └── ui/hud/               (wave 3) template + build; Streamlit deleted in wave 6
 ├── tests/                    mirrors package + fixtures/ + e2e/
 ├── scripts/                  thin wrappers; shrinks as cli.py absorbs them

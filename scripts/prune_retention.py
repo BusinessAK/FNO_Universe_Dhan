@@ -60,7 +60,6 @@ _PRUNE_TABLES = {
     "daily_delivery": "date",
     "daily_ban": "date",
     "daily_fii_dii": "date",
-    "daily_catalysts": "date",
     "corporate_events": "event_date",
 }
 

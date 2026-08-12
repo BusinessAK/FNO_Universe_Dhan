@@ -372,26 +372,6 @@ def render_structure_flip_watch(
 
 
 
-@st.cache_data(ttl=60, show_spinner=False)
-def _load_daily_catalysts() -> dict:
-    """Loads compiled catalysts once, caching results for 1 minute."""
-    import json
-    import os
-    path = os.path.join("data", "compiled", "daily_catalysts.json")
-    mapping = {}
-    if os.path.exists(path):
-        try:
-            with open(path, encoding="utf-8") as f:
-                data = json.load(f)
-                for cat in data.get("catalysts", []):
-                    impact = cat.get("impact", "NEUTRAL")
-                    for sym in cat.get("affected_symbols", []):
-                        if sym:
-                            mapping[sym.strip().upper()] = impact
-        except Exception:
-            pass
-    return mapping
-
 def _get_setup_status_info(spot_price: float, bias: str, trig_strike: float, invalid_strike: float) -> tuple[str, str, str, str]:
     """Returns (status_str, color, bg, border).
 
@@ -576,42 +556,6 @@ def render_setup_card(s_ticker: str, s_m: dict, s_type: str, select_stock_callba
     
     bias_color = "#10b981" if ("Bullish" in bias or "Support" in bias or bias in ("Strong Bullish Momentum", "Bullish Accumulation", "Bullish Breakout")) else "#ef4444" if ("Bearish" in bias or bias in ("Strong Bearish Momentum", "Bearish Breakdown", "Bearish Consolidation")) else "#fbbf24"
     
-    # Check for active news catalyst and calculate divergence
-    cat_badge_html = ""
-    divergence_badge_html = ""
-    divergence_msg_html = ""
-    cat_impact = None
-    try:
-        catalysts = _load_daily_catalysts()
-        cat_impact = catalysts.get(s_ticker.strip().upper())
-        if cat_impact:
-            cat_color = "#10b981" if cat_impact == "BULLISH" else "#ef4444" if cat_impact == "BEARISH" else "#f59e0b"
-            cat_arrow = "▲" if cat_impact == "BULLISH" else "▼" if cat_impact == "BEARISH" else "◆"
-            cat_badge_html = f'<span style="background:rgba(255,255,255,0.03); color:{cat_color}; border:1px dashed {cat_color}; font-size:8.5px; font-weight:700; padding:1.5px 5px; border-radius:3px; font-family:\'IBM Plex Sans\', sans-serif; display:inline-flex; align-items:center; gap:2px; margin-right:4px;">⚡ {cat_arrow} {cat_impact}</span>'
-    except Exception:
-        pass
-
-    # Reconcile news vs quant positioning to check for divergence
-    if cat_impact:
-        is_cat_bullish = cat_impact == "BULLISH"
-        is_cat_bearish = cat_impact == "BEARISH"
-        is_quant_bearish = ("Bearish" in bias or ifs_score < -15)
-        is_quant_bullish = ("Bullish" in bias or "Support" in bias or ifs_score > 15)
-        
-        if (is_cat_bullish and is_quant_bearish) or (is_cat_bearish and is_quant_bullish):
-            divergence_badge_html = (
-                '<span style="background:rgba(244,63,94,0.06); color:#f43f5e; border:1px solid rgba(244,63,94,0.25); '
-                'font-size:8.5px; font-weight:700; padding:1.5px 5px; border-radius:3px; '
-                'font-family:\'IBM Plex Sans\', sans-serif; display:inline-flex; align-items:center; gap:2px; margin-right:4px;">'
-                '⚠️ DIVERGENT</span>'
-            )
-            div_details = "Bullish News vs Bearish Options" if is_cat_bullish else "Bearish News vs Bullish Options"
-            divergence_msg_html = (
-                f'<div class="card-stat-row" style="margin-top:6px; padding-top:4px; border-top:1px dashed rgba(244,63,94,0.15);">'
-                f'<span style="color:#f43f5e; font-weight:600; font-family:\'Inter Tight\', sans-serif;">⚠️ Divergence:</span>'
-                f'<span class="card-stat-val" style="color:#f43f5e; font-weight:bold; font-size:9.5px; font-family:\'Inter Tight\', sans-serif;">{div_details}</span></div>'
-            )
-
     # Structure flip badge — read from the session flip cache (populated by flip watch panel)
     flip_badge_html = ""
     flip_event = _get_cached_flips().get(s_ticker, {})
@@ -638,8 +582,6 @@ def render_setup_card(s_ticker: str, s_m: dict, s_type: str, select_stock_callba
         <div class="card-header-flex" style="flex-wrap: wrap; gap: 6px;">
             <span class="card-ticker">{s_ticker}</span>
             <div style="display:flex; align-items:center; flex-wrap:wrap; gap:4px;">
-                {cat_badge_html}
-                {divergence_badge_html}
                 {flip_badge_html}
                 <span style="background:{status_bg}; color:{status_color}; border:1px solid {status_border}; font-size:9.5px; font-weight:700; padding:2px 6px; border-radius:4px; letter-spacing:0.5px; font-family:'Inter Tight', sans-serif; white-space:nowrap;">{status_str}</span>
             </div>
@@ -651,7 +593,6 @@ def render_setup_card(s_ticker: str, s_m: dict, s_type: str, select_stock_callba
         <div class="card-stat-row"><span>Expected Behavior:</span><span class="card-stat-val" style="color:#6ee7b7;">{expected_behavior}</span></div>
         <div class="card-stat-row"><span>Trigger Strike:</span><span class="card-stat-val" style="color:#fbbf24; font-weight:bold;">{trig_strike_str}</span></div>
         <div class="card-stat-row"><span>Priority Score (Pty):</span><span class="card-stat-val" style="color:#a78bfa; font-weight:bold;">{s_m.get('priority_score', 0.0):.1f}</span></div>
-        {divergence_msg_html}
     </div>
     """)
 

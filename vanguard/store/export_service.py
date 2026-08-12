@@ -307,16 +307,10 @@ def _build(con, n_sessions: int) -> dict:
     # drawAiSummary() already no-ops and keeps #p-ai-summary hidden when the
     # key is absent.
 
-    # News catalysts (vanguard/services/catalyst_service.py), read from the
-    # per-date DuckDB archive rather than the single overwritten JSON so
-    # older sessions keep the catalysts that were actually scanned for them.
-    try:
-        from vanguard.services.catalyst_service import load_catalysts_for_date
-        cat = load_catalysts_for_date(con, data["meta"]["session"])
-        if cat.get("catalysts"):
-            data["catalysts"] = cat
-    except Exception:
-        pass
+    # News catalyst feed was removed 2026-08-12 — the RSS sources it depended on
+    # went stale (MoneyControl stopped publishing after Apr-2024 and kept serving
+    # those archived items as current), and rule-based scoring of headlines never
+    # earned its place next to the options-derived signals.
 
     return data
 

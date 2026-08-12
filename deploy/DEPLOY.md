@@ -134,7 +134,7 @@ Data is intentionally NOT kept forever: `scripts/prune_retention.py` runs at
 the end of every `poll_eod.py` pass and keeps a rolling 365-day window —
 oldest raw bhavcopy files and oldest rows of the context-layer tables
 (`daily_participant_oi`, `daily_index_close`, `daily_delivery`, `daily_ban`,
-`daily_fii_dii`, `daily_catalysts`, `corporate_events`) age out as each new
+`daily_fii_dii`, `corporate_events`) age out as each new
 day compiles in. `daily_market_structure`/`daily_setups`/`daily_equity_*`
 need no separate pruning — `daily_compiler.py`/`equity_compiler.py` fully
 rebuild those from whatever raw files still exist, so they shrink to the

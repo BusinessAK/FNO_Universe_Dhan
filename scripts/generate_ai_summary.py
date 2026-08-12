@@ -9,8 +9,7 @@ payload.
 
 Provider selection: tries NVIDIA NIM (Nemotron, NVIDIA_API_KEY — free tier)
 first, then falls back to Claude (ANTHROPIC_API_KEY — paid) if unset or the
-call fails. Same best-effort stance as vanguard/services/catalyst_service.py
-falling back to keyword rules when GEMINI_API_KEY is absent: if neither key
+call fails. Best-effort throughout: if neither key
 is set or both calls fail, this prints a warning and exits 0 without writing
 a file — the HUD's summary card just doesn't render that day. Never blocks
 the EOD pipeline (poll_eod.py runs it with check=False).
@@ -81,15 +80,7 @@ SYSTEM_PROMPT = (
     "point is not present in the report, do not mention it or estimate "
     "it from general market knowledge — omit that claim entirely rather "
     "than fill the gap with a plausible-sounding invented number.\n"
-    "5. The report contains two independent sources of FII/other flow "
-    "data: the FII/DII Net Flow section (official, single-day, from the "
-    "exchange) and news catalyst headlines (a reporter's own figure, "
-    "often a different timeframe like \"this week\" or \"this month\"). "
-    "These can both be true at once without contradicting each other — "
-    "never merge them into one number or imply they measure the same "
-    "thing. If you cite a catalyst-sourced figure, attribute it to the "
-    "headline/source, not to the exchange data.\n"
-    "6. When a report section lists several items each with their own "
+    "5. When a report section lists several items each with their own "
     "per-item value (e.g. a list of stocks each with their own % pinch/"
     "convergence/change figure), never roll the group up under a single "
     "shared number unless every item in the group you name actually carries "
