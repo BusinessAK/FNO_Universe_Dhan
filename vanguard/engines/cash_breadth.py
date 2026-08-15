@@ -46,6 +46,12 @@ _RSI_OVERSOLD = 30
 # Default parquet path (can be overridden in build_cm_breadth())
 _DEFAULT_CM_PARQUET = "data/compiled/cash_market_prices.parquet"
 _DEFAULT_OUTPUT     = "data/compiled/daily_cm_breadth.parquet"
+_DEFAULT_TIER_OUTPUT = "data/compiled/daily_cm_breadth_by_tier.parquet"
+
+# Money-flow (CMF) bucket window — matches equity_technicals.py's _CMF_WINDOW
+_CMF_WINDOW = 20
+
+_TIERS = ("large", "mid", "small", "micro")
 
 
 # ── Adjustment layer ──────────────────────────────────────────────────────────
@@ -205,6 +211,105 @@ class CashMarketBreadthEngine:
         breadth_df.to_parquet(output_path, index=False)
         print(f"[CashMarketBreadth] Saved {len(breadth_df)} rows → {output_path}")
         return breadth_df
+
+    def build_cm_breadth_by_tier(
+        self,
+        cm_parquet: str = _DEFAULT_CM_PARQUET,
+        output_path: str = _DEFAULT_TIER_OUTPUT,
+    ) -> pd.DataFrame:
+        """
+        Same breadth math as build_cm_breadth(), but grouped by market-cap
+        tier (large/mid/small/micro, each a real NSE index cohort — see
+        cap_tier_universe.py) instead of blended across the whole universe —
+        reveals whether DMA/RSI/NH-NL strength is broad or concentrated in a
+        handful of index-heavy names. Symbols outside all 4 index lists are
+        excluded from this breakdown, not folded into a catch-all bucket.
+
+        Reuses this engine's own _pct_above_dma/_count_new_highs_lows on a
+        tier-filtered symbol subset (rather than reimplementing them), plus
+        equity_technicals.py's _compute_cmf for money-flow buckets. Emits one
+        row per (date, tier); does not touch or replace the blended
+        build_cm_breadth() output.
+        """
+        if self._cm is None:
+            print("[CashMarketBreadth] Loading cash market prices...")
+            self._load_and_adjust(cm_parquet)
+        if not self._dma_cache:
+            print("[CashMarketBreadth] Computing DMA participation...")
+            self._precompute_dmas()
+
+        # Local import: equity_technicals.py imports CashMarketBreadthEngine
+        # from this module, so importing it back at module level would be
+        # circular. Also avoids paying that import's cost for callers who
+        # never touch tiered breadth.
+        from vanguard.engines.equity_technicals import _compute_cmf
+        from vanguard.pipeline.context.cap_tier_universe import get_symbol_tier_map
+
+        print("[CashMarketBreadth] Fetching cap-tier symbol map...")
+        all_symbols = sorted(self._cm["symbol"].unique().tolist())
+        tier_map = get_symbol_tier_map(all_symbols)
+
+        print("[CashMarketBreadth] Computing money-flow (CMF) table...")
+        high_pivot = self._cm.pivot_table(index="date", columns="symbol", values="adj_high", aggfunc="last")
+        low_pivot = self._cm.pivot_table(index="date", columns="symbol", values="adj_low", aggfunc="last")
+        close_pivot = self._cm.pivot_table(index="date", columns="symbol", values="adj_close", aggfunc="last")
+        vol_pivot = self._cm.pivot_table(index="date", columns="symbol", values="volume", aggfunc="last")
+        cmf_table = _compute_cmf(high_pivot, low_pivot, close_pivot, vol_pivot, _CMF_WINDOW)
+
+        print("[CashMarketBreadth] Building per-tier daily breadth rows...")
+        rows = []
+        dates = sorted(self._cm["date"].unique())
+        for dt in dates:
+            date_str = pd.Timestamp(dt).strftime("%Y-%m-%d")
+            day_slice = self._cm[self._cm["date"] == dt]
+            if day_slice.empty:
+                for tier in _TIERS:
+                    rows.append(self._empty_tier_row(date_str, tier))
+                continue
+
+            closes_today = day_slice.set_index("symbol")["adj_close"]
+            syms_by_tier: dict[str, list] = {tier: [] for tier in _TIERS}
+            for sym in day_slice["symbol"]:
+                # Symbols outside all 4 NSE index lists (illiquid/unclassified
+                # tail — ~1,700 of ~2,459 valid symbols) are excluded from the
+                # tier breakdown entirely rather than dumped into a catch-all
+                # bucket — see cap_tier_universe.py's 2026-08-14 docstring note.
+                tier = tier_map.get(sym)
+                if tier in syms_by_tier:
+                    syms_by_tier[tier].append(sym)
+
+            for tier in _TIERS:
+                tier_syms = syms_by_tier[tier]
+                if not tier_syms:
+                    rows.append(self._empty_tier_row(date_str, tier))
+                    continue
+                rsi_counts = self._compute_rsi_quartile_counts(dt, tier_syms)
+                cmf_counts = self._compute_cmf_bucket_counts(dt, tier_syms, cmf_table)
+                new_highs, new_lows = self._count_new_highs_lows(dt, tier_syms, closes_today)
+                rows.append({
+                    "date":               date_str,
+                    "tier":               tier,
+                    "n_stocks":           len(tier_syms),
+                    "pct_above_20dma":    self._pct_above_dma(dt, tier_syms, closes_today, _DMA_SHORT),
+                    "pct_above_50dma":    self._pct_above_dma(dt, tier_syms, closes_today, _DMA_MID),
+                    "pct_above_200dma":   self._pct_above_dma(dt, tier_syms, closes_today, _DMA_LONG),
+                    "rsi_oversold_n":     rsi_counts["oversold"],
+                    "rsi_neutral_low_n":  rsi_counts["neutral_low"],
+                    "rsi_neutral_high_n": rsi_counts["neutral_high"],
+                    "rsi_overbought_n":   rsi_counts["overbought"],
+                    "cmf_strong_pos_n":   cmf_counts["strong_pos"],
+                    "cmf_pos_n":          cmf_counts["pos"],
+                    "cmf_neg_n":          cmf_counts["neg"],
+                    "cmf_strong_neg_n":   cmf_counts["strong_neg"],
+                    "new_highs":          new_highs,
+                    "new_lows":           new_lows,
+                })
+
+        tier_df = pd.DataFrame(rows).sort_values(["date", "tier"]).reset_index(drop=True)
+        Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+        tier_df.to_parquet(output_path, index=False)
+        print(f"[CashMarketBreadth] Saved {len(tier_df)} rows → {output_path}")
+        return tier_df
 
     def compute_single_day(self, date_str: str, cm_parquet: str = _DEFAULT_CM_PARQUET) -> dict:
         """
@@ -440,6 +545,64 @@ class CashMarketBreadthEngine:
         if valid_count == 0:
             return None, None
         return new_highs, new_lows
+
+    def _compute_rsi_quartile_counts(self, dt: pd.Timestamp, syms: list) -> dict:
+        """RSI14 split into 4 buckets (finer than the blended overbought/
+        oversold %): <30 oversold, 30-50, 50-70, >70 overbought."""
+        counts = {"oversold": 0, "neutral_low": 0, "neutral_high": 0, "overbought": 0}
+        rsi_table = self._dma_cache.get("rsi14")
+        if rsi_table is None or dt not in rsi_table.index:
+            return counts
+        rsi_row = rsi_table.loc[dt]
+        for sym in syms:
+            v = rsi_row.get(sym, np.nan)
+            if pd.isna(v):
+                continue
+            if v < _RSI_OVERSOLD:
+                counts["oversold"] += 1
+            elif v < 50:
+                counts["neutral_low"] += 1
+            elif v < _RSI_OVERBOUGHT:
+                counts["neutral_high"] += 1
+            else:
+                counts["overbought"] += 1
+        return counts
+
+    @staticmethod
+    def _compute_cmf_bucket_counts(dt: pd.Timestamp, syms: list, cmf_table: pd.DataFrame) -> dict:
+        """Chaikin Money Flow split into 4 buckets: strong distribution
+        (<-0.25), distribution (-0.25 to 0), accumulation (0 to 0.25), strong
+        accumulation (>0.25)."""
+        counts = {"strong_pos": 0, "pos": 0, "neg": 0, "strong_neg": 0}
+        if dt not in cmf_table.index:
+            return counts
+        cmf_row = cmf_table.loc[dt]
+        for sym in syms:
+            v = cmf_row.get(sym, np.nan)
+            if pd.isna(v):
+                continue
+            if v > 0.25:
+                counts["strong_pos"] += 1
+            elif v > 0:
+                counts["pos"] += 1
+            elif v > -0.25:
+                counts["neg"] += 1
+            else:
+                counts["strong_neg"] += 1
+        return counts
+
+    @staticmethod
+    def _empty_tier_row(date_str: str, tier: str) -> dict:
+        return {
+            "date": date_str, "tier": tier, "n_stocks": 0,
+            "pct_above_20dma": float("nan"), "pct_above_50dma": float("nan"),
+            "pct_above_200dma": float("nan"),
+            "rsi_oversold_n": 0, "rsi_neutral_low_n": 0,
+            "rsi_neutral_high_n": 0, "rsi_overbought_n": 0,
+            "cmf_strong_pos_n": 0, "cmf_pos_n": 0,
+            "cmf_neg_n": 0, "cmf_strong_neg_n": 0,
+            "new_highs": None, "new_lows": None,
+        }
 
     @staticmethod
     def _empty_row(date_str: str) -> dict:

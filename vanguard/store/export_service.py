@@ -58,6 +58,13 @@ BREADTH_COLS = ["date", "bullish_pct", "bearish_pct", "compression_pct",
 CM_COLS = ["date", "cm_ad_ratio", "cm_net_advances", "cm_ad_line", "cm_mcclellan_osc",
            "cm_pct_above_20dma", "cm_pct_above_50dma", "cm_pct_above_200dma",
            "cm_new_highs", "cm_new_lows"]
+# Same TREND_WINDOW_SESSIONS lookback as CM_COLS (not just the latest day) —
+# the JS picks the row for the time-travelled session the same way it does
+# for CM, so the tier tiles stay in sync when the user steps back in time.
+CM_TIER_COLS = ["date", "tier", "n_stocks", "pct_above_20dma", "pct_above_50dma",
+                "pct_above_200dma", "rsi_oversold_n", "rsi_neutral_low_n",
+                "rsi_neutral_high_n", "rsi_overbought_n", "cmf_strong_pos_n",
+                "cmf_pos_n", "cmf_neg_n", "cmf_strong_neg_n", "new_highs", "new_lows"]
 
 TAG_RE = re.compile(r"<[^>]+>")
 
@@ -195,6 +202,11 @@ def _build(con, n_sessions: int) -> dict:
         et_select = ", ".join(f"NULL AS {c}" for c in et_cols)
         et_join = ""
 
+    # Cap-tier breadth table is additive/optional (pre-migration DBs won't
+    # have it) — same existence-check pattern as daily_equity_technicals above.
+    have_cm_tiers = "daily_cm_breadth_by_tier" in {
+        r[0] for r in con.execute("SHOW TABLES").fetchall()}
+
     data = {
         "meta": {"session": sessions[-1], "sessions": sessions},
         "market_structure": table(
@@ -236,11 +248,23 @@ def _build(con, n_sessions: int) -> dict:
             "SELECT date, spot_close FROM daily_market_structure "
             "WHERE symbol = 'NIFTY' ORDER BY date DESC LIMIT ?",
             ["date", "spot_close"], (TREND_WINDOW_SESSIONS,)),
+        "cm_breadth_tiers": (
+            table(
+                con,
+                f"SELECT {', '.join(CM_TIER_COLS)} FROM daily_cm_breadth_by_tier "
+                "WHERE date IN (SELECT DISTINCT date FROM daily_cm_breadth_by_tier "
+                "  ORDER BY date DESC LIMIT ?) "
+                "ORDER BY date DESC, CASE tier WHEN 'large' THEN 0 WHEN 'mid' THEN 1 "
+                "WHEN 'small' THEN 2 ELSE 3 END",
+                CM_TIER_COLS, (TREND_WINDOW_SESSIONS,))
+            if have_cm_tiers else {"cols": list(CM_TIER_COLS), "rows": []}
+        ),
     }
     # trend rows come back newest-first; charts want chronological order
     data["breadth"]["rows"].reverse()
     data["cm_breadth"]["rows"].reverse()
     data["nifty"]["rows"].reverse()
+    data["cm_breadth_tiers"]["rows"].reverse()
 
     # Symbols actually included in this export — used below to filter the
     # option chain snapshot down to just what the payload ships.

@@ -672,12 +672,18 @@ def main():
     # ─────────────────────────────────────────────────────────────────────────────
     cm_parquet_path = os.path.join("data", "compiled", "cash_market_prices.parquet")
     cm_breadth_output = os.path.join(output_dir, "daily_cm_breadth.parquet")
+    cm_breadth_tier_output = os.path.join(output_dir, "daily_cm_breadth_by_tier.parquet")
     df_cm_breadth = pd.DataFrame()  # fallback if CM parquet not present
+    df_cm_breadth_tier = pd.DataFrame()
     if os.path.exists(cm_parquet_path):
         try:
             df_cm_breadth = cm_breadth_engine.build_cm_breadth(cm_parquet_path, cm_breadth_output)
         except Exception as e:
             print(f"[!] CM breadth computation failed (non-fatal): {e}")
+        try:
+            df_cm_breadth_tier = cm_breadth_engine.build_cm_breadth_by_tier(cm_parquet_path, cm_breadth_tier_output)
+        except Exception as e:
+            print(f"[!] CM tier breadth computation failed (non-fatal): {e}")
     else:
         print("[!] cash_market_prices.parquet not found — skipping CM breadth. Run cash_market_builder.py first.")
 
@@ -715,6 +721,8 @@ def main():
     conn.execute("CREATE OR REPLACE TABLE daily_changes AS SELECT * FROM df_changes")
     if not df_cm_breadth.empty:
         conn.execute("CREATE OR REPLACE TABLE daily_cm_breadth AS SELECT * FROM df_cm_breadth")
+    if not df_cm_breadth_tier.empty:
+        conn.execute("CREATE OR REPLACE TABLE daily_cm_breadth_by_tier AS SELECT * FROM df_cm_breadth_tier")
     conn.close()
 
     # Backwards compatibility JSON dump

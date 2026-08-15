@@ -53,15 +53,29 @@ DEFAULT_RETENTION_DAYS = 365
 # prune did exactly that. CM files get their own, much longer floor.
 CM_MIN_RETENTION_DAYS = 420
 
-# table -> date column, for tables NOT covered by session_history.json pruning
+# vanguard/engines/rrg.py's Monthly timeframe needs >=6 months of
+# monthly-resampled closes per sector before it'll compute at all (MIN_W=3,
+# requires 2*MIN_W valid monthly bars) — found 2026-08-14 after daily_index_close
+# had been silently pruned to a ~60-session window under the generic
+# _PRUNE_TABLES cutoff, which made the RRG Monthly chip disappear from the HUD
+# entirely (not degrade gracefully, just vanish) even though the raw
+# ind_close_all_*.csv archive on disk went back over a year. Same fix pattern
+# as CM_MIN_RETENTION_DAYS: give this table its own longer floor instead of
+# sharing the F&O-driven session-count cutoff.
+INDEX_CLOSE_MIN_RETENTION_DAYS = 420
+
+# table -> date column, for tables NOT covered by session_history.json pruning.
+# daily_index_close is pruned separately in main()/prune_db_tables() with its
+# own INDEX_CLOSE_MIN_RETENTION_DAYS floor — not listed here.
 _PRUNE_TABLES = {
     "daily_participant_oi": "date",
-    "daily_index_close": "date",
     "daily_delivery": "date",
     "daily_ban": "date",
     "daily_fii_dii": "date",
     "corporate_events": "event_date",
 }
+
+_INDEX_CLOSE_TABLE = {"daily_index_close": "date"}
 
 # tables flattened straight from session_history.json by daily_compiler.py —
 # pruned there AND here so the DB reflects the new window immediately
@@ -196,6 +210,11 @@ def _prune_tables(cutoff: datetime, tables: dict, db_path: str, dry_run: bool) -
 def prune_db_tables(cutoff: datetime, db_path: str = DB, dry_run: bool = False) -> dict:
     results = _prune_tables(cutoff, _PRUNE_TABLES, db_path, dry_run)
     results.update(_prune_tables(cutoff, _SESSION_HISTORY_TABLES, db_path, dry_run))
+    # daily_index_close: floored at INDEX_CLOSE_MIN_RETENTION_DAYS regardless
+    # of how tight `cutoff` is, so RRG's Monthly timeframe always has enough
+    # history to compute (see INDEX_CLOSE_MIN_RETENTION_DAYS comment above).
+    index_close_cutoff = min(cutoff, datetime.now() - timedelta(days=INDEX_CLOSE_MIN_RETENTION_DAYS))
+    results.update(_prune_tables(index_close_cutoff, _INDEX_CLOSE_TABLE, db_path, dry_run))
     return results
 
 

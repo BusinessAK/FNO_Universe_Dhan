@@ -176,6 +176,21 @@ figure figcaption{font-size:10px;color:var(--muted);letter-spacing:.06em;margin-
 .tile .v{font-size:17px;font-variant-numeric:tabular-nums;margin-top:2px}
 .tile .d{font-size:10px;font-variant-numeric:tabular-nums;color:var(--muted)}
 
+#cm-tier-wrap{overflow-x:auto;margin-top:10px;scrollbar-width:thin;scrollbar-color:var(--faint) transparent}
+#cm-tier-table{width:100%;min-width:340px;border-collapse:collapse;font-variant-numeric:tabular-nums;table-layout:fixed}
+#cm-tier-table th{text-align:center;font-size:9px;letter-spacing:.06em;color:var(--ink);
+  text-transform:uppercase;padding:2px 3px 4px;font-weight:600;overflow:hidden;text-overflow:ellipsis}
+#cm-tier-table th:first-child{width:15%}
+#cm-tier-table th .n{display:block;font-size:8.5px;color:var(--muted);text-transform:none;
+  letter-spacing:0;font-weight:400;margin-top:1px}
+#cm-tier-table td{text-align:center;padding:5px 3px;font-size:11px;
+  border-top:1px solid rgba(124,140,160,.08);vertical-align:middle}
+#cm-tier-table td:first-child{text-align:left;color:var(--muted);font-size:8.5px;
+  letter-spacing:.04em;text-transform:uppercase;white-space:nowrap}
+#cm-tier-table .bar{display:flex;height:5px;border-radius:2px;overflow:hidden;
+  margin:0 auto 3px;width:70%;max-width:56px}
+#cm-tier-table .sub{font-size:9px;color:var(--muted);white-space:nowrap}
+
 /* chips */
 .chip{display:inline-flex;align-items:center;gap:5px;border:1px solid rgba(124,140,160,.25);border-radius:999px;
   padding:2px 10px;font-size:10px;letter-spacing:.06em;color:var(--muted);cursor:pointer;background:none;font-family:var(--mono);text-transform:uppercase}
@@ -388,6 +403,7 @@ figure figcaption{font-size:10px;color:var(--muted);letter-spacing:.06em;margin-
     <div class="panel" style="--i:3" id="p-internals">
       <div class="ph"><h2>Cash Internals</h2><span class="sub" id="cm-date"></span></div>
       <div class="tiles" id="cm-tiles"></div>
+      <div id="cm-tier-wrap"><table id="cm-tier-table"></table></div>
       <figure style="margin-top:12px">
         <div id="mcc-chart"></div>
         <figcaption>McClellan oscillator · last 60 sessions · <b id="mcc-val"></b></figcaption>
@@ -528,6 +544,7 @@ const ALL_SET = unpack(VG.setups);
 const ALL_SIG = unpack(VG.changes);
 const BR   = unpack(VG.breadth);
 const CM   = unpack(VG.cm_breadth);
+const CM_TIERS = unpack(VG.cm_breadth_tiers || {cols: [], rows: []});
 const NF   = unpack(VG.nifty || {cols: [], rows: []});
 const NF_BY_DATE = Object.fromEntries(NF.map(r => [r.date, r.spot_close]));
 // Baked option chain (strike/OI/IV/GEX) for the Dossier's Deep Dive Charts —
@@ -981,6 +998,40 @@ function drawInternals(){
     [">200 DMA",pct(p200),c200,dlt(p200,prev?.cm_pct_above_200dma,1,"pt")||"structural"],
     ["NH − NL",(nh-nl>0?"+":"")+(nh-nl),cNH,nh+"H / "+nl+"L"+dlt(nh-nl,prev?(prev.cm_new_highs??0)-(prev.cm_new_lows??0):null,0)],
   ].map(([k,v,c,d])=>`<div class="tile"><span class="k">${k}</span><div class="v" style="color:${c}">${v}</div><span class="d">${d}</span></div>`).join("");
+
+  /* Per-tier (large/mid/small/micro-other) DMA/RSI/CMF breakdown — reveals
+     whether the tiles above are broad strength or a handful of index-heavy
+     names propping up the number. cm_breadth_tiers carries the same trend
+     window as CM, so this follows time travel: pick the tier rows for
+     `last.date` (the same row drawInternals just selected for the blended
+     tiles above), not just whatever's newest. */
+  const tbl=$("#cm-tier-table");
+  const tierDay=CM_TIERS.filter(r=>r.date===last.date);
+  const tierRows=["large","mid","small","micro"].map(t=>tierDay.find(r=>r.tier===t)).filter(Boolean);
+  const tierPct=v=>v==null?"—":Math.round(v)+"%";
+  const tierSeg=(n,tot,col)=>tot>0&&n>0?`<span style="display:inline-block;height:100%;width:${Math.max(2,n/tot*100)}%;background:${col}"></span>`:"";
+  const TIER_LABEL={large:"LARGE",mid:"MID",small:"SMALL",micro:"MICRO"};
+  const TIER_TITLE={large:"Large cap (Nifty50+Next50)",mid:"Mid cap (Midcap150)",
+    small:"Small cap (Smallcap250)",micro:"Micro cap (Microcap250)"};
+  if(!tierRows.length){
+    tbl.innerHTML="";
+  }else{
+    const head="<thead><tr><th></th>"+tierRows.map(r=>
+      `<th title="${TIER_TITLE[r.tier]}">${TIER_LABEL[r.tier]}<span class="n">${r.n_stocks}</span></th>`).join("")+"</tr></thead>";
+    const dmaRow="<tr><td>&gt;50/200D</td>"+tierRows.map(r=>{
+      const p50=r.pct_above_50dma,c50=p50==null?C.ink:p50>=55?C.bull:p50<=45?C.bear:C.ink;
+      return `<td><span style="color:${c50};font-size:12px">${tierPct(p50)}</span> <span class="sub">/${tierPct(r.pct_above_200dma)}</span></td>`;
+    }).join("")+"</tr>";
+    const rsiRow="<tr><td>RSI</td>"+tierRows.map(r=>{
+      const tot=r.rsi_oversold_n+r.rsi_neutral_low_n+r.rsi_neutral_high_n+r.rsi_overbought_n;
+      return `<td><div class="bar">${tierSeg(r.rsi_oversold_n,tot,C.bear)}${tierSeg(r.rsi_neutral_low_n,tot,C.neutral)}${tierSeg(r.rsi_neutral_high_n,tot,C.neutral)}${tierSeg(r.rsi_overbought_n,tot,C.bull)}</div><span class="sub">${r.rsi_oversold_n}os/${r.rsi_overbought_n}ob</span></td>`;
+    }).join("")+"</tr>";
+    const cmfRow="<tr><td>CMF</td>"+tierRows.map(r=>{
+      const tot=r.cmf_strong_pos_n+r.cmf_pos_n+r.cmf_neg_n+r.cmf_strong_neg_n;
+      return `<td><div class="bar">${tierSeg(r.cmf_strong_neg_n,tot,C.bear)}${tierSeg(r.cmf_neg_n,tot,C.bear)}${tierSeg(r.cmf_pos_n,tot,C.bull)}${tierSeg(r.cmf_strong_pos_n,tot,C.bull)}</div><span class="sub">${r.cmf_strong_pos_n+r.cmf_pos_n}acc/${r.cmf_strong_neg_n+r.cmf_neg_n}dst</span></td>`;
+    }).join("")+"</tr>";
+    tbl.innerHTML=head+"<tbody>"+dmaRow+rsiRow+cmfRow+"</tbody>";
+  }
 
   /* McClellan: thin bars around zero, diverging by sign, 2px gaps.
      Scale floor 28 keeps the ±25 reference bands on-screen — small bars near
@@ -1775,29 +1826,111 @@ function drawPositioning(){
   const nc=r=>r&&r.opt_idx_call_long!=null?r.opt_idx_call_long-r.opt_idx_call_short:null;
   const np=r=>r&&r.opt_idx_put_long!=null?r.opt_idx_put_long-r.opt_idx_put_short:null;
   const tilt=r=>{const c=nc(r),q=np(r);return c!=null&&q!=null?c-q:null};
+  /* Flow: same-day Added/Closed on each side of index futures, derived from two
+     consecutive long/short snapshots (no new data — reuses cur/prev already
+     fetched for the delta arrows). imbalance = (accumulating − unwinding) /
+     total activity, signed −1..1: +1 is pure long-building/short-covering,
+     −1 is pure long-unwinding/short-building. tier() grades |imbalance| into
+     the 7-step scale using only this ratio — no history or percentile data
+     needed, just what a single day's Added/Closed already gives us. */
+  const flowLS=(lNow,sNow,lPrev,sPrev)=>{
+    if(lNow==null||sNow==null||lPrev==null||sPrev==null)return null;
+    const dLong=lNow-lPrev, dShort=sNow-sPrev;
+    const addedLong=Math.max(dLong,0), closedLong=Math.max(-dLong,0);
+    const addedShort=Math.max(dShort,0), closedShort=Math.max(-dShort,0);
+    const bullish=addedLong+closedShort, bearish=closedLong+addedShort;
+    const total=bullish+bearish;
+    const imbalance=total===0?0:(bullish-bearish)/total;
+    return{addedLong,closedLong,addedShort,closedShort,imbalance};
+  };
+  /* tier() reports market sentiment, not raw leg accumulation: imbalance>0 means
+     "added to this leg / covered the other side" on that leg alone, which is
+     bullish for futures and calls (bullPos=true) but bearish for puts
+     (bullPos=false) — buying puts is a bearish position. Flip here so BULLISH
+     always means bullish regardless of which leg produced it, matching the
+     color convention leg() already uses for the level number.
+     Thresholds are per-leg, not one fixed cutoff: futures OI at the
+     participant level moves almost entirely one-sided each day (median
+     |imbalance| ≈1.0 across 60 sessions), while options OI churns on both
+     sides at once (median ≈0.10–0.16) — a 0.15 "mild" bar that's trivial for
+     futures is nearly unreachable for options. th{} is derived below from
+     this same 60-session POS window already loaded for the chart, so grading
+     stays calibrated to what "unusual" actually looks like for that leg. */
+  const tier=(f,bullPos=true,th)=>{
+    if(!f)return null;
+    const a=Math.abs(f.imbalance);
+    const t=th||{mild:.15,med:.4,strong:.7};
+    const grade=a>=t.strong?"STRONG":a>=t.med?"MEDIUM":a>=t.mild?"MILD":null;
+    if(!grade)return{label:"INDECISIVE",dir:0};
+    const dir=(f.imbalance>0)===bullPos?1:-1;
+    return{label:`${grade} ${dir>0?"BULLISH":"BEARISH"}`,dir};
+  };
+  /* Pooled across FII/PRO/CLIENT and every consecutive pair in the loaded
+     window, so a single thin day doesn't skew the cutoffs. p50/p75/p90 of
+     |imbalance| become mild/med/strong — mirrors the VIX tile's own
+     percentile-of-history approach rather than a guessed constant. */
+  const legImbHist=(lk,sk)=>{
+    const out=[];
+    for(let i=1;i<dates.length;i++){
+      const c=byDate[dates[i]],pr=byDate[dates[i-1]];
+      ["FII","PRO","CLIENT"].forEach(pt=>{
+        const f=c[pt]&&pr[pt]?flowLS(c[pt][lk],c[pt][sk],pr[pt][lk],pr[pt][sk]):null;
+        if(f)out.push(Math.abs(f.imbalance));
+      });
+    }
+    return out.sort((a,b)=>a-b);
+  };
+  const pctl=(arr,q)=>arr.length?arr[Math.min(arr.length-1,Math.floor(q*arr.length))]:null;
+  const thFor=arr=>({mild:pctl(arr,.5)??.15,med:pctl(arr,.75)??.4,strong:pctl(arr,.9)??.7});
+  /* Futures flow is almost always one-sided (median |imbalance|≈1.0 across the
+     window — only one side of the book typically moves in a day), so its own
+     p50/p75/p90 collapse to ~1.0 and misclassify anything short of a perfect
+     1.0 — including a genuinely strong 0.76 day — as INDECISIVE. The fixed
+     0.15/0.4/0.7 bar already fit this leg (5.6% indecisive, well spread
+     across grades on 30 sessions of history); only options needed the
+     percentile recalibration, since their flow is two-sided and noisy. */
+  const thFut={mild:.15,med:.4,strong:.7};
+  const thCalls=thFor(legImbHist("opt_idx_call_long","opt_idx_call_short"));
+  const thPuts=thFor(legImbHist("opt_idx_put_long","opt_idx_put_short"));
+  const flow=(c,p)=>p&&c?flowLS(c.fut_idx_long,c.fut_idx_short,p.fut_idx_long,p.fut_idx_short):null;
+  const flowCalls=(c,p)=>p&&c?flowLS(c.opt_idx_call_long,c.opt_idx_call_short,p.opt_idx_call_long,p.opt_idx_call_short):null;
+  const flowPuts=(c,p)=>p&&c?flowLS(c.opt_idx_put_long,c.opt_idx_put_short,p.opt_idx_put_long,p.opt_idx_put_short):null;
   CHK.positioning={date:dates[di],mode:posMode,
     fut:Object.fromEntries(["FII","DII","PRO","CLIENT"].map(k=>[k,net(cur[k])])),
     calls:Object.fromEntries(["FII","DII","PRO","CLIENT"].map(k=>[k,nc(cur[k])])),
     puts:Object.fromEntries(["FII","DII","PRO","CLIENT"].map(k=>[k,np(cur[k])])),
+    flow:Object.fromEntries(["FII","PRO","CLIENT"].map(k=>[k,flow(cur[k],prev&&prev[k])])),
+    flowCalls:Object.fromEntries(["FII","PRO","CLIENT"].map(k=>[k,flowCalls(cur[k],prev&&prev[k])])),
+    flowPuts:Object.fromEntries(["FII","PRO","CLIENT"].map(k=>[k,flowPuts(cur[k],prev&&prev[k])])),
     fii_tilt:tilt(cur.FII)};
-  $("#pos-tiles").innerHTML=["FII","CLIENT"].map(pt=>{
+  $("#pos-tiles").innerHTML=["FII","CLIENT","PRO"].map(pt=>{
     const n=net(cur[pt]),d=prev&&net(prev[pt])!=null&&n!=null?n-net(prev[pt]):null;
     const col=n>0?C.bullHi:n<0?C.bearHi:"var(--ink)";
     const dch=d?`<span style="color:${d>0?C.bull:C.bear}">${d>0?"▲":"▼"}${fmtOI(Math.abs(d))}</span>`:"&nbsp;";
-    return`<div class="tile"><span class="k">${pt} idx fut net</span><div class="v" style="color:${col};font-size:15px">${n==null?"—":fmtOI(n)}</div><span class="d">${dch}</span></div>`;
+    const f=flow(cur[pt],prev&&prev[pt]),t=tier(f,true,thFut);
+    const vCol=t&&t.dir>0?C.bullHi:t&&t.dir<0?C.bearHi:"var(--ink)";
+    const vLab=t?`<div class="d" style="color:${vCol};letter-spacing:.04em;margin-top:2px">${t.label}</div>`:"";
+    const vTitle=f?`title="Added longs ${fmtOI(f.addedLong)} · Closed longs ${fmtOI(f.closedLong)} · Added shorts ${fmtOI(f.addedShort)} · Closed shorts ${fmtOI(f.closedShort)} · imbalance ${(f.imbalance*100).toFixed(0)}% (mild ${(thFut.mild*100).toFixed(0)}% / med ${(thFut.med*100).toFixed(0)}% / strong ${(thFut.strong*100).toFixed(0)}% for this leg)"`:"";
+    return`<div class="tile" ${vTitle}><span class="k">${pt} idx fut net</span><div class="v" style="color:${col};font-size:15px">${n==null?"—":fmtOI(n)}</div><span class="d">${dch}</span>${vLab}</div>`;
   }).join("");
   const hasOpt=nc(cur.FII)!=null;
-  const leg=(tag,v,d,bullPos)=>{
+  const leg=(tag,v,d,bullPos,f,th)=>{
     if(v==null)return`${tag} —`;
     const col=v===0?"var(--ink)":(v>0)===bullPos?C.bullHi:C.bearHi;
     const dch=d?`<span style="color:${(d>0)===bullPos?C.bull:C.bear};font-size:9.5px">${d>0?"▲":"▼"}${fmtOI(Math.abs(d))}</span>`:"";
-    return`${tag} <span style="color:${col}">${fmtOI(v)}</span> ${dch}`;
+    const t=tier(f,bullPos,th);
+    const vCol=t&&t.dir>0?C.bullHi:t&&t.dir<0?C.bearHi:"var(--muted)";
+    const vLab=t?` <span style="color:${vCol};font-size:8.5px;letter-spacing:.03em">${t.label}</span>`:"";
+    return`${tag} <span style="color:${col}">${fmtOI(v)}</span> ${dch}${vLab}`;
   };
-  $("#pos-opt-tiles").innerHTML=hasOpt?["FII","CLIENT"].map(pt=>{
+  $("#pos-opt-tiles").innerHTML=hasOpt?["FII","CLIENT","PRO"].map(pt=>{
     const c=nc(cur[pt]),q=np(cur[pt]);
     const dc=prev&&nc(prev[pt])!=null&&c!=null?c-nc(prev[pt]):null;
     const dq=prev&&np(prev[pt])!=null&&q!=null?q-np(prev[pt]):null;
-    return`<div class="tile" title="${pt} index options, net contracts (long − short). Stance only — not delta-adjusted."><span class="k">${pt} idx opt net</span><div class="v" style="font-size:11.5px;line-height:1.55">${leg("CALLS",c,dc,true)}<br>${leg("PUTS",q,dq,false)}</div></div>`;
+    const fc=flowCalls(cur[pt],prev&&prev[pt]),fq=flowPuts(cur[pt],prev&&prev[pt]);
+    const fcTitle=fc?`Calls — added long ${fmtOI(fc.addedLong)} · closed long ${fmtOI(fc.closedLong)} · added short ${fmtOI(fc.addedShort)} · closed short ${fmtOI(fc.closedShort)} · imbalance ${(fc.imbalance*100).toFixed(0)}% (mild ${(thCalls.mild*100).toFixed(0)}% / med ${(thCalls.med*100).toFixed(0)}% / strong ${(thCalls.strong*100).toFixed(0)}%)`:"";
+    const fqTitle=fq?`Puts — added long ${fmtOI(fq.addedLong)} · closed long ${fmtOI(fq.closedLong)} · added short ${fmtOI(fq.addedShort)} · closed short ${fmtOI(fq.closedShort)} · imbalance ${(fq.imbalance*100).toFixed(0)}% (mild ${(thPuts.mild*100).toFixed(0)}% / med ${(thPuts.med*100).toFixed(0)}% / strong ${(thPuts.strong*100).toFixed(0)}%)`:"";
+    return`<div class="tile" title="${pt} index options, net contracts (long − short). Stance only — not delta-adjusted.&#10;${fcTitle}&#10;${fqTitle}"><span class="k">${pt} idx opt net</span><div class="v" style="font-size:11.5px;line-height:1.55">${leg("CALLS",c,dc,true,fc,thCalls)}<br>${leg("PUTS",q,dq,false,fq,thPuts)}</div></div>`;
   }).join(""):"";
   $("#pos-chips").innerHTML=hasOpt?[["FUT","fut net"],["OPT","opt tilt"]].map(([m,lb])=>
     `<button class="chip" data-pm="${m}" aria-pressed="${posMode===m}">${lb}</button>`).join(""):"";

@@ -86,6 +86,20 @@ class Oracle:
         from vanguard.pipeline.context.nifty50_universe import (
             get_nifty50_constituents, INDEX_SYMBOLS)
         self.scanner_universe = set(get_nifty50_constituents()) | set(INDEX_SYMBOLS)
+        self.has_cm_tiers = "daily_cm_breadth_by_tier" in {
+            r[0] for r in con.execute("SHOW TABLES").fetchall()}
+
+    def cm_tier_count(self, sdate: str) -> int:
+        """# of (large/mid/small/micro_other) tier rows with n_stocks>0 at or
+        before sdate — used only as a DOM sanity check (#cm-tier-table's
+        count), not full CHK parity like the other panels."""
+        if not self.has_cm_tiers:
+            return 0
+        row = self._one(
+            "SELECT COUNT(*) FROM daily_cm_breadth_by_tier "
+            "WHERE date=(SELECT MAX(date) FROM daily_cm_breadth_by_tier WHERE date<=?) "
+            "AND n_stocks>0", [sdate])
+        return int(row[0]) if row else 0
 
     def _one(self, sql, params):
         r = self.con.execute(sql, params).fetchone()
@@ -480,7 +494,13 @@ def main() -> int:
         nsec = page.locator(".sec-tile").count()
         if nsec != len(exp["sectors"]["1D"]["avg"]):
             failures.append(("dom.sector tiles", len(exp["sectors"]["1D"]["avg"]), nsec))
-        print(f"  DOM sanity: cmdbar/internals/positioning/sectors "
+        # Cap-tier breadth grid (large/mid/small/micro_other) — table is
+        # additive/optional, so only check tile count when it's populated.
+        ntiers_exp = ref.cm_tier_count(latest)
+        ntiers_dom = page.locator("#cm-tier-table thead th").count() - 1  # minus blank label col
+        if ntiers_exp and ntiers_dom != ntiers_exp:
+            failures.append(("dom.#cm-tier-table columns", ntiers_exp, ntiers_dom))
+        print(f"  DOM sanity: cmdbar/internals/positioning/sectors/cm-tiers "
               f"{'PASS' if not any(str(f[0]).startswith('dom.') for f in failures) else 'FAIL'}")
 
         # 2) sector horizons at the latest session — Sector Flow Grid now
